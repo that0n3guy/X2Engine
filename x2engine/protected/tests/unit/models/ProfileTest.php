@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,10 +34,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
- * 
  * @package
  * @author Demitri Morgan <demitri@x2engine.com>
  */
@@ -56,6 +56,165 @@ class ProfileTest extends X2DbTestCase {
         // Test that non-existing layout widgets are removed:
         $profile->setAttribute('layout',json_encode(array('left'=>array('FooWidget'=>array('nothing to see here')),'center'=>array(),'right'=>array(),'hidden'=>array(),'hiddenRight'=>array())));
         $this->assertEquals($emptyLayout,$profile->getLayout());
+    }
+
+    public function testAddRemoveLayoutElements () {
+        $profile = $this->profile('testProfile');
+        $fn = TestingAuxLib::setPublic (
+            $profile, 'addRemoveLayoutElements', false, function ($method, $class) {
+
+                return function () use ($method, $class) {
+                    $args = func_get_args ();
+                    $args = array (
+                        $args[0],
+                        &$args[1],
+                        $args[2],
+                    );
+                    return $method->invokeArgs ($class, $args);
+                };
+            });
+
+        $defaultLayout = $profile->initLayout ();
+
+        // attempt to construct default layout from empty layout
+        $profile->layout = json_encode (array ());
+        $profile->update ('layout');
+        $layout = json_decode ($profile->layout, true);
+        $this->assertNotEquals (json_decode ($profile->layout), $defaultLayout);
+        $fn ('left', $layout, $defaultLayout);
+        $profile->refresh ();
+        $layout = json_decode ($profile->layout, true);
+        $fn ('right', $layout, $defaultLayout);
+        $profile->refresh ();
+        $this->assertEquals ($defaultLayout, json_decode ($profile->layout, true));
+
+        // ensure that invalid hidden right widgets get removed
+        $profile->layout = json_encode (array (
+            'hiddenRight' => array (
+                'InvalidRightWidget' => array(
+                    'title' => 'Invalid Right Widget',
+                    'minimize' => false,
+                ),
+            )
+        ));
+        $profile->update ('layout');
+        $layout = json_decode ($profile->layout, true);
+        $this->assertNotEquals (json_decode ($profile->layout), $defaultLayout);
+        $fn ('left', $layout, $defaultLayout);
+        $profile->refresh ();
+        $layout = json_decode ($profile->layout, true);
+        $fn ('right', $layout, $defaultLayout);
+        $profile->refresh ();
+        $this->assertEquals ($defaultLayout, json_decode ($profile->layout, true));
+
+        // ensure that invalid left widgets get removed
+        $profile->layout = json_encode (array (
+            'left' => array (
+                'Invalid' => array(
+                    'title' => 'Invalid',
+                    'minimize' => false,
+                ),
+            )
+        ));
+        $profile->update ('layout');
+        $layout = json_decode ($profile->layout, true);
+        $this->assertNotEquals (json_decode ($profile->layout), $defaultLayout);
+        $fn ('left', $layout, $defaultLayout);
+        $profile->refresh ();
+        $layout = json_decode ($profile->layout, true);
+        $fn ('right', $layout, $defaultLayout);
+        $profile->refresh ();
+        $this->assertEquals ($defaultLayout, json_decode ($profile->layout, true));
+
+        // ensure that invalid right widgets get removed
+        $profile->layout = json_encode (array (
+            'right' => array (
+                'Invalid' => array(
+                    'title' => 'Invalid',
+                    'minimize' => false,
+                ),
+            )
+        ));
+        $profile->update ('layout');
+        $layout = json_decode ($profile->layout, true);
+        $this->assertNotEquals (json_decode ($profile->layout), $defaultLayout);
+        $fn ('left', $layout, $defaultLayout);
+        $profile->refresh ();
+        $layout = json_decode ($profile->layout, true);
+        $fn ('right', $layout, $defaultLayout);
+        $profile->refresh ();
+        $this->assertEquals ($defaultLayout, json_decode ($profile->layout, true));
+
+        // ensure that right widgets get retitled while preserving other settings
+        $helpfulTipsConfig = $defaultLayout['right']['TimeZone'];
+        $this->assertFalse ($helpfulTipsConfig['minimize']); // make sure we're changing state
+        $newHelpfulTipsConfig = array(
+            'title' => 'Not Clock',
+            'minimize' => true,
+        );
+        $profile->layout = json_encode (array (
+            'right' => array (
+                'TimeZone' => $newHelpfulTipsConfig,
+            )
+        ));
+        $profile->update ('layout');
+        $layout = json_decode ($profile->layout, true);
+        $this->assertNotEquals (json_decode ($profile->layout), $defaultLayout);
+        $fn ('left', $layout, $defaultLayout);
+        $profile->refresh ();
+        $layout = json_decode ($profile->layout, true);
+        $fn ('right', $layout, $defaultLayout);
+        $profile->refresh ();
+        $expected = $defaultLayout;
+        $newHelpfulTipsConfig['title'] = $helpfulTipsConfig['title'];
+        $expected['right']['TimeZone'] = $newHelpfulTipsConfig;
+        $this->assertEquals ($expected, json_decode ($profile->layout, true));
+
+        // ensure that hidden right widgets remain hidden
+        $helpfulTipsConfig = $defaultLayout['right']['TimeZone'];
+        $profile->layout = json_encode (array (
+            'hiddenRight' => array (
+                'TimeZone' => $helpfulTipsConfig,
+            )
+        ));
+        $profile->update ('layout');
+        $layout = json_decode ($profile->layout, true);
+        $this->assertNotEquals (json_decode ($profile->layout), $defaultLayout);
+        $fn ('left', $layout, $defaultLayout);
+        $profile->refresh ();
+        $layout = json_decode ($profile->layout, true);
+        $fn ('right', $layout, $defaultLayout);
+        $profile->refresh ();
+        $expected = $defaultLayout;
+        unset ($expected['right']['TimeZone']);
+        $expected['hiddenRight']['TimeZone'] = $helpfulTipsConfig;
+        $this->assertEquals ($expected, json_decode ($profile->layout, true));
+
+        // ensure that hidden right widgets get retitled while preserving other settings
+        $helpfulTipsConfig = $defaultLayout['right']['TimeZone'];
+        $this->assertFalse ($helpfulTipsConfig['minimize']); // make sure we're changing state
+        $newHelpfulTipsConfig = array(
+            'title' => 'Not Clock',
+            'minimize' => true,
+        );
+        $profile->layout = json_encode (array (
+            'hiddenRight' => array (
+                'TimeZone' => $newHelpfulTipsConfig,
+            )
+        ));
+        $profile->update ('layout');
+        $layout = json_decode ($profile->layout, true);
+        $this->assertNotEquals (json_decode ($profile->layout), $defaultLayout);
+        $fn ('left', $layout, $defaultLayout);
+        $profile->refresh ();
+        $layout = json_decode ($profile->layout, true);
+        $fn ('right', $layout, $defaultLayout);
+        $profile->refresh ();
+        $expected = $defaultLayout;
+        $newHelpfulTipsConfig['title'] = $helpfulTipsConfig['title'];
+        unset ($expected['right']['TimeZone']);
+        $expected['hiddenRight']['TimeZone'] = $newHelpfulTipsConfig;
+        $this->assertEquals ($expected, json_decode ($profile->layout, true));
     }
 }
 

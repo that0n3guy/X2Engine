@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,20 +33,15 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 $this->pageTitle = CHtml::encode (
     Yii::app()->settings->appName . ' - '.Yii::t('x2Leads', 'Leads'));
 
-
-$menuItems = array(
-	array('label'=>Yii::t('x2Leads','Leads List')),
-	array('label'=>Yii::t('x2Leads','Create Lead'), 'url'=>array('create')),
-        array('label'=>Yii::t('x2Leads', 'Import Leads'), 'url'=>array('admin/importModels', 'model'=>'X2Leads'), 'visible'=>Yii::app()->params->isAdmin),
-        array('label'=>Yii::t('x2Leads', 'Export Leads'), 'url'=>array('admin/exportModels', 'model'=>'X2Leads'), 'visible'=>Yii::app()->params->isAdmin),
+$menuOptions = array(
+    'index', 'create', 'import', 'export',
 );
-
-$this->actionMenu = $this->formatMenu($menuItems);
+$this->insertMenu($menuOptions);
 
 Yii::app()->clientScript->registerScript('search', "
 $('.search-button').click(function(){
@@ -62,15 +58,15 @@ $('.search-form form').submit(function(){
 
 $this->widget('X2GridView', array(
 	'id'=>'x2Leads-grid',
-	'title'=>Yii::t('x2Leads','Leads'),
-	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize'),
+	'title'=>Yii::t('x2Leads','{leads}', array('{leads}' => Modules::displayName())),
+	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize','showHidden'),
 	'template'=>
         '<div id="x2-gridview-top-bar-outer" class="x2-gridview-fixed-top-bar-outer">'.
         '<div id="x2-gridview-top-bar-inner" class="x2-gridview-fixed-top-bar-inner">'.
         '<div id="x2-gridview-page-title" '.
          'class="page-title icon x2Leads x2-gridview-fixed-title">'.
         '{title}{buttons}{filterHint}'.
-        
+        '{massActionButtons}'.
         '{summary}{topPager}{items}{pager}',
     'fixedHeader'=>true,
 	'dataProvider'=>$model->search(),
@@ -92,11 +88,13 @@ $this->widget('X2GridView', array(
 		'lastActivity' => 79,
 		'assignedTo' => 119,
 	),
+    'excludedColumns' => array ('convertedToType', 'convertedToId'),
+    'dataColumnClass' => 'application.modules.x2Leads.components.X2LeadsDataColumn',
 	'specialColumns'=>array(
 		'name'=>array(
 			'name'=>'name',
 			'header'=>Yii::t('x2Leads','Name'),
-			'value'=>'CHtml::link($data->name,array("view","id"=>$data->id))',
+			'value'=>'CHtml::link($data->renderAttribute("name"),array("view","id"=>$data->id))',
 			'type'=>'raw',
 		),
         'id'=>array(

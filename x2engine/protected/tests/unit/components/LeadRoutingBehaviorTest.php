@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.models.*');
 Yii::import('application.modules.groups.models.*');
@@ -60,7 +61,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
     public function setUp () {
         // default onlineOnly value
         Yii::app()->settings->onlineOnly = 0;
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         parent::setUp ();
     }
 
@@ -77,7 +78,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
     public function testRoundRobin () {
         Yii::app()->settings->rrId = 0;
         Yii::app()->settings->leadDistribution = 'trueRoundRobin';
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         $_POST['Contacts'] = array (
             'firstName' => 'contact1',
             'lastName' => 'contact1'
@@ -95,7 +96,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
         Yii::app()->settings->rrId = 0;
         Yii::app()->settings->leadDistribution = 'trueRoundRobin';
         Yii::app()->settings->onlineOnly = 1;
-        $this->assertTrue (Yii::app()->settings->save ());
+        //$this->assertTrue (Yii::app()->settings->save ());
         $testUser1 = $this->profiles ('testProfile1');
         $this->assertSaves ($testUser1);
         $_POST['Contacts'] = array (
@@ -112,7 +113,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
     public function testRoundRobinAvailableOnly () {
         Yii::app()->settings->rrId = 0;
         Yii::app()->settings->leadDistribution = 'trueRoundRobin';
-        $this->assertTrue (Yii::app()->settings->save ());
+        //$this->assertTrue (Yii::app()->settings->save ());
         $testUser1 = $this->profiles ('testProfile1');
         $testUser1->leadRoutingAvailability = 0; 
         $this->assertSaves ($testUser1);
@@ -132,7 +133,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
     public function testSingleUser () {
         $testUser2 = $this->users ('user2');
         Yii::app()->settings->rrId = $testUser2->id;
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         Yii::app()->settings->leadDistribution = 'singleUser';
         $_POST['Contacts'] = array (
             'firstName' => 'contact1',
@@ -148,7 +149,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
         Yii::app()->settings->rrId = $testUser2->id;
         Yii::app()->settings->onlineOnly = 1;
         Yii::app()->settings->leadDistribution = 'singleUser';
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         $_POST['Contacts'] = array (
             'firstName' => 'contact1',
             'lastName' => 'contact1'
@@ -158,7 +159,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
 
         $testUser1 = $this->users ('user1');
         Yii::app()->settings->rrId = $testUser1->id;
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         $leadRouting = new LeadRoutingBehavior ();
         $this->assertEquals ('Anyone', $leadRouting->getNextAssignee ()); 
     }
@@ -170,7 +171,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
         $testUser2 = $this->users ('user2');
         Yii::app()->settings->rrId = $testUser2->id;
         Yii::app()->settings->leadDistribution = 'singleUser';
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         $_POST['Contacts'] = array (
             'firstName' => 'contact1',
             'lastName' => 'contact1'
@@ -182,7 +183,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
 	public function testCustomRoundRobinOnlineOnly () {
         Yii::app()->settings->onlineOnly = 1;
         Yii::app()->settings->leadDistribution = 'customRoundRobin';
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         TestingAuxLib::setUpSessions($this->sessions);
         $_POST['Contacts'] = array (
             'firstName' => 'contact1',
@@ -190,7 +191,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
         );
         $leadRouting = new LeadRoutingBehavior ();
         $username = $leadRouting->customRoundRobin (); 
-        if(VERBOSE_MODE) print ("Getting assignee: username = $username\n");
+        if(X2_TEST_DEBUG_LEVEL > 1) print ("Getting assignee: username = $username\n");
         $this->assertTrue ($username === 'Anyone');
 
         Yii::app()->settings->onlineOnly = 0;
@@ -200,13 +201,13 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
         );
         $leadRouting = new LeadRoutingBehavior ();
         $username = $leadRouting->customRoundRobin (); 
-        if(VERBOSE_MODE) print ("Getting assignee: username = $username\n");
+        if(X2_TEST_DEBUG_LEVEL > 1) print ("Getting assignee: username = $username\n");
         $this->assertTrue ($username === 'testUser1');
     }
 
 	public function testCustomRoundRobin () {
         Yii::app()->settings->leadDistribution = 'customRoundRobin';
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         TestingAuxLib::setUpSessions($this->sessions);
         $_POST['Contacts'] = array (
             'firstName' => 'contact1',
@@ -214,7 +215,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
         );
         $leadRouting = new LeadRoutingBehavior ();
         $username = $leadRouting->customRoundRobin (); 
-        if(VERBOSE_MODE) print ("Getting assignee: username = $username\n");
+        if(X2_TEST_DEBUG_LEVEL > 1) print ("Getting assignee: username = $username\n");
         $this->assertTrue ($username === 'testUser1');
 
         $_POST['Contacts'] = array (
@@ -222,7 +223,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
             'lastName' => 'contact2'
         );
         $username = $leadRouting->customRoundRobin (); 
-        if(VERBOSE_MODE) print ("Getting assignee: username = $username\n");
+        if(X2_TEST_DEBUG_LEVEL > 1) print ("Getting assignee: username = $username\n");
         $this->assertTrue ($username === 'testUser2');
 
         $_POST['Contacts'] = array (
@@ -230,7 +231,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
             'lastName' => 'contact3'
         );
         $username = $leadRouting->customRoundRobin (); 
-        if(VERBOSE_MODE) print ("Getting assignee: username = $username\n");
+        if(X2_TEST_DEBUG_LEVEL > 1) print ("Getting assignee: username = $username\n");
         $this->assertTrue ($username === 'Anyone');
 
         $_POST['Contacts'] = array (
@@ -250,7 +251,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
 
 	public function testCustomRoundRobinAvailableOnly () {
         Yii::app()->settings->leadDistribution = 'customRoundRobin';
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         $leadRouting = new LeadRoutingBehavior ();
         $testUser1 = $this->profiles ('testProfile1');
         $testUser1->leadRoutingAvailability = 0; 
@@ -275,7 +276,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
         $rule3->users = '1, 2';
         $this->assertSaves ($rule3);
         Yii::app()->settings->leadDistribution = 'customRoundRobin';
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         $leadRouting = new LeadRoutingBehavior ();
 
         $_POST['Contacts'] = array (
@@ -294,7 +295,7 @@ class LeadRoutingBehaviorTest extends X2DbTestCase {
         $rule3->users = '1';
         $this->assertSaves ($rule3);
         Yii::app()->settings->leadDistribution = 'customRoundRobin';
-        $this->assertSaves (Yii::app()->settings);
+        //$this->assertSaves (Yii::app()->settings);
         $leadRouting = new LeadRoutingBehavior ();
 
         $_POST['Contacts'] = array (

@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * 
@@ -66,8 +67,8 @@ class X2ListTest extends X2DbTestCase {
         // A cursory check that the criteria generation works:
         $expectedContacts = $dyn->queryCommand()->queryAll(true);
         $this->assertEquals($expectedContactEmailAddresses, array_map(function($c){
-                            return $c['email'];
-                        }, $expectedContacts));
+            return $c['email'];
+        }, $expectedContacts));
         $this->assertEquals(3,count($expectedContacts));
         // Test that the static clone has all the correct list items.
         //
@@ -75,7 +76,7 @@ class X2ListTest extends X2DbTestCase {
         // "contact" relation in X2ListItem is expected to some day be
         // removed, when lists can be used for more than just contacts.
         $this->assertEquals($expectedContactEmailAddresses, array_map(function($i)use($modelName){
-                            return X2Model::model($modelName)->findByPk($i->contactId)->email;
+            return X2Model::model($modelName)->findByPk($i->contactId)->email;
         }, $dynClone->listItems));
 
         // Static clone of a static list:
@@ -104,8 +105,10 @@ class X2ListTest extends X2DbTestCase {
 
         // Static clone of a newsletter list:
         $static = $this->lists('staticDuplicateNewsletter');
+
         $modelName = $static->modelName;
         $staticClone = $static->staticDuplicate();
+        $staticClone->refresh ();
         $modelName = $static->modelName;
         $this->assertNotEmpty($staticClone);
         $this->assertEquals(4,count($staticClone->listItems));

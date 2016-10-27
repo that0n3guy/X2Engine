@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 if (typeof x2 === 'undefined') x2 = {};
 
@@ -45,7 +46,6 @@ var Point = x2.geometry.Point;
 function InlineFunnel (argsDict) {
     argsDict = typeof argsDict === 'undefined' ? {} : argsDict;
 
-    x2.BaseFunnel.call (this, argsDict);
     var defaultArgs = {
         completeButtonUrl: null,
         revertButtonUrl: null,
@@ -63,6 +63,7 @@ function InlineFunnel (argsDict) {
         uncompletionPermissions: []
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
+    x2.BaseFunnel.call (this, argsDict);
 
     this._funnelW1 = 160; // width of top of funnel
     this._funnelW2 = 100; // width of bottom of funnel
@@ -128,8 +129,7 @@ InlineFunnel.prototype._addInteractionButtons = function () {
 
         if (this.workflowStatus.stages[i+1]['createDate'] !== null) { // if started
 
-            var revertButtonImage = $('<img>', {
-                src: this.revertButtonUrl,
+            var revertButtonImage = auxlib.fa('fa-undo fa-lg', {
                 title: this.translations['Revert Stage']
             });
             var revertButton = $('<a>', { href: '#' });
@@ -144,10 +144,10 @@ InlineFunnel.prototype._addInteractionButtons = function () {
                 }
             } else { // started but not completed
 
-                var completeButtonImage = $('<img>', {
-                    src: this.completeButtonUrl,
+                var completeButtonImage = auxlib.fa('fa-check-circle fa-lg', {
                     title: this.translations['Complete Stage']
                 });
+
                 if (previousCheck && editPermission) { // can complete
                     var completeButton = $('<a>', { href: '#' });
                     if (parseInt (this.stagesWhichRequireComments[i], 10)) {

@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Manages behavior of a sortable widget
@@ -46,21 +47,36 @@ SortableWidget.sortableWidgets = []; // instances of SortableWidget
  */
 function SortableWidget (argsDict) {
     var defaultArgs = {
+        deleteWidgetUrl: '',
         widgetClass: '', // the name of the associated widget class
         setPropertyUrl: '', // the url used to call the set profile widget property action
+        settingsModelName: null, // The name of the model with the settings field
+        settingsModelId: null,   // The id of the model with the settings field
         profileId: null, // the id of the profile associated with this widget
         widgetType: '', // (profile)
+        widgetUID: null, 
         DEBUG: x2.DEBUG && false,
-        enableResizing: false
+        enableResizing: false,
+        translations: {},
+        urls: {},
+        hasError: false
     };
 
     auxlib.applyArgs (this, defaultArgs, argsDict);
+    this.elementSelector = '#' + this.widgetClass + '-widget-container-' + this.widgetUID;
 
-    this.elementSelector = '#' + this.widgetClass + '-widget-container';
+    x2.Widget.call (this, $.extend ({}, argsDict, {
+        element: this.elementSelector 
+    }));
+
     this.element = $(this.elementSelector); // the widget container
 
     // the widget content container (excludes the top bar)
-    this.contentContainer = $('#' + this.widgetClass + '-widget-content-container');
+    this.contentContainer = $('#' + this.widgetClass + '-widget-content-container-'+this.widgetUID);
+    if (this.enableResizing) {
+        this.resizableContainer = this.contentContainer;
+        this.resizeHandles = null;
+    }
 
     this._settingsMenuContentSelector = this.elementSelector  + ' .widget-settings-menu-content';
 
@@ -68,6 +84,16 @@ function SortableWidget (argsDict) {
 
     this._init ();
 }
+
+SortableWidget.prototype = auxlib.create (x2.Widget.prototype);
+
+SortableWidget.getParentType = function (widgetType) {
+    if ($.inArray (widgetType, ['data', 'profile', 'recordView']) >= 0) {
+        return widgetType;
+    } else {
+        return 'recordView';
+    }
+};
 
 /*
 Public static methods
@@ -111,18 +137,29 @@ SortableWidget.turnOffSortingMode = function (excludedWidget) {
  * @return mixed return value of getWidgetByClass ()
  */
 SortableWidget.getWidgetFromWidgetContainer = function (elem) {
-    var widgetClass = $(elem).attr ('id').replace (/-widget-container/, '');
-    var widget = SortableWidget.getWidgetByClass (widgetClass);
+    var widgetKey = $(elem).attr ('id').replace (/-widget-container-(\w+)?$/, '_$1');
+
+    var widget = SortableWidget.getWidgetByKey (widgetKey);
     return widget;
 };
 
 /**
- * @param string widgetClass
+ * @return string key which uniquely identifies widget
+ */
+SortableWidget.prototype.getWidgetKey = function () {
+    return this.widgetClass + '_' + this.widgetUID;
+};
+
+/**
+ * @param string widgetKey
  * @return mixed sortable widget instance if instance with specified class is found, null otherwise 
  */
-SortableWidget.getWidgetByClass = function (widgetClass) {
+SortableWidget.getWidgetByKey = function (widgetKey) {
     for (var i in SortableWidget.sortableWidgets) {
-        if (SortableWidget.sortableWidgets[i].widgetClass === widgetClass)
+        if (SortableWidget.sortableWidgets[i].widgetClass + '_' +
+            SortableWidget.sortableWidgets[i].widgetUID === 
+            widgetKey)
+
             return SortableWidget.sortableWidgets[i];
     }
     return null;
@@ -136,6 +173,8 @@ SortableWidget.refreshWidgets = function () {
         SortableWidget.sortableWidgets[i].refresh ();
     }
 };
+
+SortableWidget.prototype.afterSort = function () {};
 
 /*
 Private static methods
@@ -160,7 +199,30 @@ SortableWidget.prototype.setProperty = function (key, value, callback) {
             widgetClass: this.widgetClass,
             key: key,
             value: value,
-            widgetType: this.widgetType
+            widgetUID: this.widgetUID,
+            widgetType: this.widgetType,
+            settingsModelName: this.settingsModelName,
+            settingsModelId: this.settingsModelId,
+        },
+        success: function (data) {
+            if (data === 'success') {
+                if (typeof callback !== 'undefined') callback ();
+            }
+        }
+    });
+};
+
+SortableWidget.prototype.setProperties = function (props, callback) {
+    $.ajax ({
+        url: this.setPropertyUrl,
+        type: 'POST',
+        data: {
+            widgetClass: this.widgetClass,
+            props: props,
+            widgetUID: this.widgetUID,
+            widgetType: this.widgetType,
+            settingsModelName: this.settingsModelName,
+            settingsModelId: this.settingsModelId,
         },
         success: function (data) {
             if (data === 'success') {
@@ -213,6 +275,8 @@ Private instance methods
  */
 SortableWidget.prototype._afterMaximize = function () {};
 
+SortableWidget.prototype.afterRefresh = function () {};
+
 /**
  * Sets up behavior of the minimization/maximization button
  */
@@ -224,7 +288,7 @@ SortableWidget.prototype._setUpMinimizationBehavior = function () {
         function (evt) {
 
         evt.preventDefault ();
-        that.DEBUG && console.log ('click'); 
+        that.DEBUG && console.log (that.contentContainer); 
         var minimize = $(that.contentContainer).is (':visible');
         that.setProperty ('minimized', (minimize ? 1 : 0), function () {
             if (minimize) {
@@ -245,6 +309,10 @@ SortableWidget.prototype._setUpMinimizationBehavior = function () {
     });
 };
 
+SortableWidget.prototype.getParentType = function () {
+    return SortableWidget.getParentType (this.widgetType);
+};
+
 /**
  * Sets up behavior of the close button
  */
@@ -259,8 +327,12 @@ SortableWidget.prototype._setUpCloseBehavior = function () {
         that.setProperty ('hidden', 1, function () {
             $(that.element).hide ();
             that._tearDownWidget ();
-            that.contentContainer.children ().remove ();
-            x2[that.widgetType + 'WidgetManager'].addWidgetToHiddenWidgetsMenu (that.element);
+            // remove sort item class to prevent sort jitter
+            $(that.element).removeClass (
+                x2[that.getParentType () + 'WidgetManager'].getWidgetContainerSelector ().
+                replace (/\./, ''));
+            x2[that.getParentType () + 'WidgetManager'].addWidgetToHiddenWidgetsMenu (that.element);
+            $(that.element).children ().remove ();
         });
     });
 };
@@ -291,6 +363,104 @@ SortableWidget.prototype._setUpTitleBarBehavior = function () {
             }
         });
     }
+
+    if (this.element.find ('.relabel-widget-button').length) {
+        this._setUpWidgetRelabelling ();
+    }
+    if (this.element.find ('.delete-widget-button').length) {
+        this._setUpWidgetDeletion ();
+    }
+};
+
+/**
+ * Sets up behavior of widget deletion settings menu button
+ */
+SortableWidget.prototype._setUpWidgetDeletion = function () {
+    var that = this;
+    var deletionDialog$ = $('#delete-widget-dialog-' + this.widgetUID);          
+    deletionDialog$.dialog ({
+        title: this.translations['Are you sure you want to delete this widget?'],
+        autoOpen: false,
+        width: 500,
+        buttons: [
+            {
+                text: this.translations['Cancel'],
+                click: function () {
+                    $(this).dialog ('close');
+                }
+            },
+            {
+                text: this.translations['Delete'],
+                'class': 'urgent',
+                click: function () {
+                    $.ajax ({
+                        url: that.deleteWidgetUrl,
+                        data: {
+                            widgetLayoutName: that.widgetType,
+                            widgetKey: that.widgetClass + '_' + that.widgetUID,
+                            settingsModelName: that.settingsModelName,
+                            settingsModelId: that.settingsModelId,
+                        },
+                        type: 'POST',
+                        success: function (data) {
+                            if (data === 'success') {
+                                $(that.element).remove ();
+                                delete that;
+                                deletionDialog$.dialog ('close');
+                                x2[that.widgetType + 'WidgetManager'].
+                                    afterDelete (that.element);
+                            }
+                        }
+                    });
+                }
+            }
+        ]
+    });
+    this.element.find ('.delete-widget-button').click (function () {
+        deletionDialog$.dialog ('open');
+    });
+};
+
+/**
+ * Sets up behavior of widget rename settings menu button
+ */
+SortableWidget.prototype._setUpWidgetRelabelling = function () {
+    var that = this;
+    var relabellingDialog$ = $('#relabel-widget-dialog-' + this.widgetUID);          
+    relabellingDialog$.dialog ({
+        title: this.translations['Rename Widget'],
+        autoOpen: false,
+        width: 500,
+        buttons: [
+            {
+                text: this.translations['Cancel'],
+                click: function () {
+                    $(this).dialog ('close');
+                }
+            },
+            {
+                text: this.translations['Rename'],
+                'class': 'widget-rename-submit-button',
+                click: function () {
+                    that.setProperty (
+                        'label', relabellingDialog$.find ('.new-widget-name').val (), function () {
+
+                        that.element.find ('.widget-title').html (
+                            relabellingDialog$.find ('.new-widget-name').val ()
+                        );
+                        relabellingDialog$.dialog ('close');
+                    });
+                }
+            }
+        ]
+    });
+    relabellingDialog$.find ('.new-widget-name').keydown (function () {
+        relabellingDialog$.closest ('.ui-dialog').find ('.widget-rename-submit-button').
+            addClass ('highlight'); 
+    });
+    this.element.find ('.relabel-widget-button').click (function () {
+        relabellingDialog$.dialog ('open');
+    });
 };
 
 /**
@@ -321,40 +491,70 @@ SortableWidget.prototype._onResize = function () {};
 /**
  * called by _setUpResizeBehavior () 
  */
-SortableWidget.prototype._afterStop = function () {};
+SortableWidget.prototype._afterStop = function () {
+    var that = this; 
+    that.setProperty ('height', that.element.height ());
+};
 
 /**
  * Sets up widget resize behavior 
  */
 SortableWidget.prototype._setUpResizeBehavior = function () {
     var that = this; 
-    $(this.contentContainer).resizable ({
-        handles: 's', 
+    var handles = this.resizeHandles ? this.resizeHandles : 's';
+
+    var handle$ = null;
+
+    if ($(this.resizableContainer).hasClass ('ui-resizable')) { // we're refreshing
+        // Remove the handle jQuery classes, destroy the widget, and then add the classes back.
+        // This prevents jQuery from removing the handle elements when the widget is destroyed.
+        if (this.resizeHandles) {
+            var handleElems = [];
+            for (var i in handles) {
+                var classes = $(handles[i]).attr ('class')
+                handleElems.push ({
+                    elem$: handles[i],
+                    classes: classes
+                });
+                $(handles[i]).attr ('class', '');
+            }
+        }
+        $(this.resizableContainer).resizable ('destroy');
+        for (var i in handleElems) {
+           handleElems[i].elem$.attr ('class', handleElems[i].classes); 
+        }
+    }
+    $(this.resizableContainer).resizable ({
+        handles: handles, 
         minHeight: 50,
         start: function () {
             /* 
             Make the handle bigger to prevent iframe from triggeing mouseleave event.
             Also prevents widget controls from being hidden during resize.
             */
-            resizeHandle.css ({ 
-                'height': '1000px',
-                'position': 'relative',
-                'top' : '-500px'
-            });
+            if (handle$)
+                handle$.css ({ 
+                    'height': '1000px',
+                    'position': 'relative',
+                    'top' : '-500px'
+                });
         },
         stop: function () {
-            resizeHandle.css ({
-                'height': '',
-                'position': '',
-                'top': '',
-            });
+            if (handle$)
+                handle$.css ({
+                    'height': '',
+                    'position': '',
+                    'top': '',
+                });
             that._afterStop ();
-            that.setProperty ('height', that._iframeElem.attr ('height'));
         },
         resize: function () { that._resizeEvent (); }
     });
-    var resizeHandle = that.contentContainer.find ('.ui-resizable-handle');
+    if (!this.resizeHandles)
+        handle$ = that.resizableContainer.find ('.ui-resizable-handle');
 };
+
+SortableWidget.prototype._resizeEvent = function () {};
 
 /**
  * Detects presence of UI elements (and sets properties accordingly), calls their setup methods
@@ -385,6 +585,25 @@ SortableWidget.prototype._callUIElementSetupMethods = function () {
         this._setUpResizeBehavior ();
     }
 };
+
+/**
+ * Returns a dictionary of variables needed to identifiy this widget's layout
+ */
+SortableWidget.prototype.ajaxIdentity = function(argsDict) {
+    var defaultDict =  {
+        widgetUID: this.widgetUID,
+        widgetClass: this.widgetClass,
+        settingsModelName: this.settingsModelName,
+        settingsModelId: this.settingsModelId,
+        widgetType: this.widgetType
+    };
+
+    for (var i in argsDict) {
+        defaultDict[i] = argsDict[i];
+    }
+
+    return defaultDict;
+}
 
 /**
  * Sets up the widget 

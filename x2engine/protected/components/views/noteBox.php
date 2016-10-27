@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // find height of note box, note message, and use these to find height of widget
 $widgetSettings = Profile::getWidgetSettings();
@@ -62,13 +63,13 @@ $noteContainerFixHeight = $noteContainerHeight + 5;
 <?php
 $saveWidgetHeight = $this->controller->createUrl('/site/saveWidgetHeight');
 Yii::app()->clientScript->registerScript('updateNote', "
-	$(document).ready(updateNotes());	//update on page load
+    $(function () { updateNotes (); });	//update on page load
 	function updateNotes(){
+
 		$.ajax({
 			type: 'POST',
 			url: '".$this->controller->createUrl('/site/getNotes',array('url'=>Yii::app()->request->requestUri))."',
-			success:
-			function (data){
+			success: function (data){
 				//alert('old: '+$('#note-box').html()+'<br><br>new: '+data);
 				//if ($('#note-box').html().length < data.length) {	//only update if theres new data
 				//alert('old: '+$('#note-box').html());
@@ -118,7 +119,8 @@ $(function() {
 <?php echo CHtml::beginForm(); ?>
 
 <div id="note-message-container" style="height: <?php echo $notemessageContainerHeight; ?>px">
-	<?php echo CHtml::textArea('note-message', '', array('style'=>"height: ". $notemessageHeight . "px;")); ?>
+	<?php echo CHtml::textArea('note-message', '', array('class'=> 'x2-textarea', 
+						'style'=>"height: ". $notemessageHeight . "px;")); ?>
 </div>
 
 <?php

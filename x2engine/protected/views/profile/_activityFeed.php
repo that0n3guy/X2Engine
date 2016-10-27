@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerScriptFile(
     Yii::app()->getBaseUrl().'/js/activityFeed.js', CClientScript::POS_END);
@@ -42,12 +43,11 @@ Yii::app()->clientScript->registerScriptFile(
     Yii::app()->getBaseUrl().'/js/jquery-expander/jquery.expander.js', CClientScript::POS_END);
 
 // used for rich editing in new post text field
-Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/ckeditor/ckeditor.js');
-Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/ckeditor/adapters/jquery.js');
-Yii::app()->clientScript->registerScriptFile(Yii::app()->request->baseUrl . '/js/emailEditor.js');
+Yii::app()->clientScript->registerPackage ('emailEditor');
 
 
 Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/multiselect/js/ui.multiselect.js');
+Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/lib/moment-with-locales.min.js');
 
 
 $groups = Groups::getUserGroups(Yii::app()->user->getId());
@@ -81,7 +81,7 @@ x2.activityFeed = new x2.ActivityFeed ({
         'broadcast error message 1' => Yii::t('app','Select at least one user to broadcast to'),
         'broadcast error message 2' => Yii::t('app','Select at least one broadcast method'),
         'Okay' => Yii::t('app','Okay'),
-        'Nevermind' => Yii::t('app','Nevermind'),
+        'Nevermind' => Yii::t('app','Cancel'),
         'Create' => Yii::t('app','Create'),
         'Cancel' => Yii::t('app','Cancel'),
         'Read more' => Yii::t('app','Read') . '&nbsp;' . Yii::t('app', 'More'),
@@ -102,7 +102,7 @@ x2.activityFeed = new x2.ActivityFeed ({
 
 <div id='activity-feed-container' class='x2-layout-island'>
 <div id='page-title-container'>
-    <div class="page-title icon rounded-top activity-feed">
+    <div class="page-title icon rounded-top activity-feed x2Activity">
         <h2><?php echo Yii::t('app','Activity Feed'); ?></h2>
         <span title='<?php echo Yii::t('app', 'Feed Settings'); ?>'>
         <?php
@@ -112,7 +112,7 @@ x2.activityFeed = new x2.ActivityFeed ({
         </span>
         <a href='#' id='feed-filters-button' 
          class='filter-button right'>
-            <span></span>
+            <span class='fa fa-filter'></span>
         </a>
         <div id="menu-links" class="title-bar" style='display: none;'>
             <?php
@@ -134,79 +134,6 @@ x2.activityFeed = new x2.ActivityFeed ({
 <?php
 $this->renderPartial ('_feedFilters');
 ?>
-
-<div id='activity-feed-chart-container' style='display: none;'>
-
-    <select id='chart-type-selector'>
-        <option value='eventsChart'>
-            <?php echo Yii::t('app', 'Events'); ?>
-        </option>
-        <option value='usersChart'>
-            <?php echo Yii::t('app', 'User Events'); ?>
-        </option>
-    </select>
-    <select id='chart-subtype-selector'>
-        <option value='line'>
-            <?php echo Yii::t('app', 'Line Chart'); ?>
-        </option>
-        <option value='pie'>
-            <?php echo Yii::t('app', 'Pie Chart'); ?>
-        </option>
-    </select>
-
-    <?php
-        /*$this->widget('X2Chart', array (
-            'getChartDataActionName' => 'getEventsBetween',
-            'suppressChartSettings' => false,
-            'actionParams' => array (),
-            'metricTypes' => array (
-                'any'=>Yii::t('app', 'All Events'),
-                'notif'=>Yii::t('app', 'Notifications'),
-                'feed'=>Yii::t('app', 'Feed Events'),
-                'comment'=>Yii::t('app', 'Comments'),
-                'record_create'=>Yii::t('app', 'Records Created'),
-                'record_deleted'=>Yii::t('app', 'Records Deleted'),
-                'weblead_create'=>Yii::t('app', 'Webleads Created'),
-                'workflow_start'=>Yii::t('app', 'Workflow Started'),
-                'workflow_complete'=>Yii::t('app', 'Workflow Complete'),
-                'workflow_revert'=>Yii::t('app', 'Workflow Reverted'),
-                'email_sent'=>Yii::t('app', 'Emails Sent'),
-                'email_opened'=>Yii::t('app', 'Emails Opened'),
-                'web_activity'=>Yii::t('app', 'Web Activity'),
-                'case_escalated'=>Yii::t('app', 'Cases Escalated'),
-                'calendar_event'=>Yii::t('app', 'Calendar Events'),
-                'action_reminder'=>Yii::t('app', 'Action Reminders'),
-                'action_complete'=>Yii::t('app', 'Actions Completed'),
-                'doc_update'=>Yii::t('app', 'Doc Updates'),
-                'email_from'=>Yii::t('app', 'Email Received'),
-                'voip_calls'=>Yii::t('app', 'VOIP Calls'),
-                'media'=>Yii::t('app', 'Media')
-            ),
-            'chartType' => 'eventsChart',
-            'getDataOnPageLoad' => true,
-            'hideByDefault' => true
-        ));*/
-    ?>
-
-    <?php
-        /*$usersArr = array ();
-        foreach ($usersDataProvider->data as $user) {
-            $usersArr[$user->username] = $user->firstName.' '.$user->lastName;
-        }
-
-        $this->widget('X2Chart', array (
-            'getChartDataActionName' => 'getEventsBetween',
-            'suppressChartSettings' => false,
-            'actionParams' => array (),
-            'metricTypes' => $usersArr,
-            'chartType' => 'usersChart',
-            'getDataOnPageLoad' => true,
-            'hideByDefault' => true
-        ));*/
-    ?>
-</div>
-
-
 
 <div class="form" id="post-form" style="clear:both">
     <?php $feed=new Events; ?>
@@ -235,44 +162,122 @@ $this->renderPartial ('_feedFilters');
         }
         echo $form->dropDownList($feed,'subtype',
             array_map(
-                'translateOptions',json_decode(Dropdowns::model()->findByPk(113)->options,true)),
+                'translateOptions',
+                Dropdowns::getSocialSubtypes ()),
             array ('class' => 'x2-select'));
         ?>
         <div id='second-row-buttons-container'>
             <?php
+            echo CHtml::hiddenField('geoCoords', '');
             echo CHtml::submitButton(
                 Yii::t('app','Post'),array('class'=>'x2-button','id'=>'save-button'));
+
             if ($isMyProfile) {
                 echo CHtml::button(
                     Yii::t('app','Attach A File/Photo'),
                     array(
-                        'class'=>'x2-button','onclick'=>"$('#attachments').slideToggle();",
+                        'class'=>'x2-button',
+                        'onclick'=>"x2.FileUploader.toggle('activity')",
                         'id'=>"toggle-attachment-menu-button"));
-            }
-            ?>
+            } ?>
+
+            <button id="toggle-location-button" class="x2-button" title="<?php echo Yii::t('app', 'Location Check-In'); ?>" style="display:inline-block; margin-left:10px"><?php
+                echo X2Html::fa('crosshairs fa-lg');
+            ?></button>
+            <textarea id="checkInComment" rows=2 style="display: none" placeholder="<?php echo Yii::t('app', 'Check-in comment'); ?>"></textarea>
         </div>
         </div>
         <?php
+            if (isset($_SERVER['HTTPS'])) {
+                Yii::app()->clientScript->registerScript('geolocationJs', '
+                    $("#toggle-location-button").click(function (evt) {
+                        evt.preventDefault();
+                        if ($("#toggle-location-button").data("location-enabled") === true) {
+                            // Clear geoCoords field and reset style
+                            $("#checkInComment").slideUp();
+                            $("#geoCoords").val("");
+                            $("#toggle-location-button")
+                                .data("location-enabled", false)
+                                .css("color", "");
+                        } else {
+                            // Populate geoCoords field and highlight blue
+                            $("#checkInComment").slideDown();
+                            $("#toggle-location-button")
+                                .data("location-enabled", true)
+                                .css("color", "blue");
+                            if ("geolocation" in navigator) {
+                                navigator.geolocation.getCurrentPosition(function(position) {
+                                var pos = {
+                                  lat: position.coords.latitude,
+                                  lon: position.coords.longitude
+                                };
+
+                                $("#geoCoords").val(JSON.stringify (pos));
+                              }, function() {
+                                console.log("error fetching geolocation data");
+                              });
+                            }
+                        }
+                    });
+                ', CClientScript::POS_READY);
+            } else {
+                Yii::app()->clientScript->registerScript('geolocationJs', '
+                    $("#toggle-location-button").click(function (evt) {
+                        evt.preventDefault();
+                        if ($("#toggle-location-button").data("location-enabled") === true) {
+                            $("#checkInComment").slideUp();
+                            $("#toggle-location-button")
+                                .data("location-enabled", false)
+                                .css("color", "");
+                        } else {
+                            $("#checkInComment").slideDown();
+                            $("#toggle-location-button")
+                                .data("location-enabled", true)
+                                .css("color", "blue");
+                        }
+                    });
+                ', CClientScript::POS_READY);
+            }
+            Yii::app()->clientScript->registerScript('checkInJs', '
+                $("#checkInComment").on("blur", function() {
+                    var comment = $(this).val();
+                    var coordsVal = $("#geoCoords").val();
+                    var coords;
+                    if (coordsVal) {
+                        coords = JSON.parse(coordsVal);
+                        if (!coords) {
+                            coords = {};
+                        }
+                    } else {
+                        coords = {};
+                    }
+                    coords.comment = comment;
+                    $("#geoCoords").val(JSON.stringify(coords));
+                });
+                $("#feed-form input[type=\'submit\'").click(function () {
+                    $("#checkInComment")
+                        .blur()
+                        .val("");
+                });
+            ', CClientScript::POS_READY);
         ?>
     </div>
     <?php $this->endWidget(); ?>
 </div>
 <?php
 if ($isMyProfile) {
-?>
-<div id="attachments" style="display:none;">
-<?php 
-$this->widget(
-    'Attachments',
-    array(
-        'associationType'=>'feed',
-        'associationId'=>Yii::app()->user->getId(),
-        'profileId'=>$profileId,
-    )
-); 
-?>
-</div>
-<?php
+    $this->widget ('FileUploader',array(
+        'id' => 'activity',
+        'url' => '/site/upload',
+        'mediaParams' => array(
+            'profileId' => $profileId, 
+            'associationType' => 'feed',
+            'associationId' => Yii::app()->user->getId(),
+        ),
+        'viewParams' => array (
+            'showButton' => false
+        )
+    ));
 }
 $this->widget('zii.widgets.CListView', array(
     'dataProvider'=>$stickyDataProvider,
@@ -281,24 +286,26 @@ $this->widget('zii.widgets.CListView', array(
         'profileId' => $profileId
     ),
     'id'=>'sticky-feed',
+    'htmlOptions' => array (
+        'style' => $stickyDataProvider->itemCount === 0 ? 'display: none;' : '',
+    ),
     'pager' => array(
-                    'class' => 'ext.infiniteScroll.IasPager',
-                    'rowSelector'=>'.view.top-level',
-                    'listViewId' => 'sticky-feed',
-                    'header' => '',
-                    'options'=>array(
-                        'onRenderComplete'=>'js:function(){
-                            x2.activityFeed.makePostsExpandable ();
-                            if(x2.activityFeed.minimizeFeed){
-                                x2.activityFeed.minimizePosts();
-                            }
-                            if(x2.activityFeed.commentFlag){
-                                $(".comment-link").click();
-                            }
-                        }'
-                    ),
-
-                ),
+        'class' => 'ext.infiniteScroll.IasPager',
+        'rowSelector'=>'.view.top-level',
+        'listViewId' => 'sticky-feed',
+        'header' => '',
+        'options'=>array(
+            'onRenderComplete'=>'js:function(){
+                x2.activityFeed.makePostsExpandable ();
+                if(x2.activityFeed.minimizeFeed){
+                    x2.activityFeed.minimizePosts();
+                }
+                if(x2.activityFeed.commentFlag){
+                    $(".comment-link").click();
+                }
+            }'
+        ),
+    ),
     'baseScriptUrl'=>Yii::app()->request->baseUrl.'/themes/'.Yii::app()->theme->name.'/css/listview',
     'template'=>'{pager} {items}'
 ));
@@ -310,28 +317,27 @@ $this->widget('zii.widgets.CListView', array(
     ),
     'id'=>'activity-feed',
     'pager' => array(
-                    'class' => 'ext.infiniteScroll.IasPager',
-                    'rowSelector'=>'.view.top-level',
-                    'listViewId' => 'activity-feed',
-                    'header' => '',
-                    'options'=>array(
-                        'onRenderComplete'=>'js:function(){
-                            x2.activityFeed.makePostsExpandable ();
-                            if(x2.activityFeed.minimizeFeed){
-                                x2.activityFeed.minimizePosts();
-                            }
-                            if(x2.activityFeed.commentFlag){
-                                $(".comment-link").click();
-                            }
-                            $.each($(".comment-count"),function(){
-                                if($(this).attr("val")>0){
-                                    $(this).parent().click();
-                                }
-                            });
-                        }'
-                    ),
-
-                  ),
+        'class' => 'ext.infiniteScroll.IasPager',
+        'rowSelector'=>'.view.top-level',
+        'listViewId' => 'activity-feed',
+        'header' => '',
+        'options'=>array(
+            'onRenderComplete'=>'js:function(){
+                x2.activityFeed.makePostsExpandable ();
+                if(x2.activityFeed.minimizeFeed){
+                    x2.activityFeed.minimizePosts();
+                }
+                if(x2.activityFeed.commentFlag){
+                    $(".comment-link").click();
+                }
+                $.each($(".comment-count"),function(){
+                    if($(this).attr("val")>0){
+                        $(this).parent().click();
+                    }
+                });
+            }'
+        ),
+    ),
     'baseScriptUrl'=>Yii::app()->request->baseUrl.'/themes/'.Yii::app()->theme->name.'/css/listview',
     'template'=>'{pager} {items}',
 ));
@@ -362,12 +368,12 @@ $this->widget('zii.widgets.CListView', array(
         </div>
     </div>
 </div>
-<div id="broadcast-dialog">
+<div id="broadcast-dialog" style='display: none;'>
     <div class='dialog-explanation'>
         <?php echo Yii::t('app', 'Select a group of users to send this event to via email or notification.'); ?>
     </div>
     <select id='broadcast-dialog-user-select' class='multiselect' multiple='multiple' size='6'>
-        <?php foreach ($usersDataProvider->data as $user) { ?>
+        <?php foreach ($userModels as $user) { ?>
         <option value="<?php echo $user->id; ?>"> <?php echo $user->firstName . ' ' . $user->lastName; ?> </option>
         <?php } ?>
     </select>

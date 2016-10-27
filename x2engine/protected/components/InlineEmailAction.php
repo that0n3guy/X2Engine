@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Provides an action for sending email from a view page with an inline form.
@@ -56,6 +57,10 @@ class InlineEmailAction extends CAction {
 	}
 
 	public function run(){
+        if (Yii::app()->user->isGuest) {
+            Yii::app()->controller->redirect(Yii::app()->controller->createUrl('/site/login'));
+        }
+
 		$this->attachBehaviors($this->behaviors);
 		// Safety net of handlers - they ensure that errors can be caught and seen easily:
 
@@ -73,29 +78,66 @@ class InlineEmailAction extends CAction {
 			$scenario = 'template';
 		}
 		$model->setScenario($scenario);
-
 		$attachments = array();
 
 		if(isset($_POST['InlineEmail'])){
 			// This could indicate either a template change or a form submission.
 			$model->attributes = $_POST['InlineEmail'];
 
-			// Prepare attachments that may have been uploaded on-the-fly (?)
-			$mediaLibraryUsed = false; // is there an attachment from the media library?
-			if(isset($_POST['AttachmentFiles'], $_POST['AttachmentFiles']['id'], $_POST['AttachmentFiles']['temp'])){
+			// Prepare attachments that may have been uploaded on-the-fly
+			if(isset(
+                $_POST['AttachmentFiles'],
+                $_POST['AttachmentFiles']['id'],
+                $_POST['AttachmentFiles']['types'])){
+
 				$ids = $_POST['AttachmentFiles']['id'];
-				$temps = $_POST['AttachmentFiles']['temp'];
+				$types = $_POST['AttachmentFiles']['types'];
 				$attachments = array();
 				for($i = 0; $i < count($ids); $i++){
-					$temp = json_decode($temps[$i]);
-					if($temp){ // attachment is a temp file
-						$tempFile = TempFile::model()->findByPk($ids[$i]);
-						$attachments[] = array('filename' => $tempFile->name, 'folder' => $tempFile->folder, 'temp' => json_decode($temps[$i]), 'id' => $tempFile->id);
-					}else{ // attachment is from media library
-						$mediaLibraryUsed = true;
-						$media = Media::model()->findByPk($ids[$i]);
-						$attachments[] = array('filename' => $media->fileName, 'folder' => $media->uploadedBy, 'temp' => json_decode($temps[$i]), 'id' => $media->id);
-					}
+					$type = $types[$i];
+                    switch ($type) {
+                        case 'temp': // attachment is a temp file
+                            $file = TempFile::model()->findByPk($ids[$i]);
+                            $attachments[] = array(
+                                'filename' => $file->name,
+                                'folder' => $file->folder,
+                                'type' => $type, 
+                                'id' => $file->id,
+                                'model' => $file,
+                            );
+                            break;
+                        case 'media': // attachment is from media library
+                            $file = Media::model()->findByPk($ids[$i]);
+                            $attachments[] = array(
+                                'filename' => $file->fileName,
+                                'folder' => $file->uploadedBy,
+                                'type' => $type,
+                                'id' => $file->id,
+                                'model' => $file,
+                            );
+                            break;
+                         
+                        case 'emailInboxes': // imap-fetched attachment from the emailInboxes module
+                            list ($uid, $part) = explode (',', $ids[$i]);
+                            $message = Yii::app()->controller->getSelectedMailbox ()
+                                ->fetchMessage ($uid);
+                            list ($mimeType, $filename, $size, $attachment, $encoding) = 
+                                $message->downloadAttachment ($part, false, true);
+                            $attachments[] = array(
+                                'filename' => $filename,
+                                'folder' => Yii::app()->user->getName (),
+                                'type' => $type,
+                                'id' => $uid,
+                                'string' => $attachment,
+                                'mimeType' => $mimeType,
+                                'size' => $size,
+                                'encoding' => $encoding,
+                            );
+                            break;
+                         
+                        default:
+                            throw new CException ('Invalid attachment type: '.$type);
+                    }
 				}
 			}
 			$model->attachments = $attachments;
@@ -105,8 +147,10 @@ class InlineEmailAction extends CAction {
 			$failed = false;
 			$message = '';
             $postReplace = isset($_GET['postReplace']) ? $_GET['postReplace'] : 0;
-			if(isset($_GET['loadTemplate']))
-				$model->template = $_GET['loadTemplate']; // A special override for when it's not possible to include the template in $_POST
+			if(isset($_GET['loadTemplate'])) {
+                // A special override for when it's not possible to include the template in $_POST
+				$model->template = $_GET['loadTemplate']; 
+            }
 
 			if($model->prepareBody($postReplace)){
 				if($scenario != 'template'){
@@ -115,8 +159,12 @@ class InlineEmailAction extends CAction {
 					// First check that the user has permission to use the
 					// specified credentials:
 					if($model->credId != Credentials::LEGACY_ID)
-						if(!Yii::app()->user->checkAccess('CredentialsSelect',array('model'=>$model->credentials)))
-							$this->respond(Yii::t('app','Did not send email because you do not have permission to use the specified credentials.'),1);
+						if(!Yii::app()->user->checkAccess(
+                            'CredentialsSelect',array('model'=>$model->credentials))) {
+							$this->respond(
+                                Yii::t('app','Did not send email because you do not have '.
+                                    'permission to use the specified credentials.'),1);
+                        }
 					$sendStatus = $model->send($makeEvent);
 					// $sendStatus = array('code'=>'200','message'=>'sent (testing)');
 
@@ -124,7 +172,10 @@ class InlineEmailAction extends CAction {
 					$message = $sendStatus['message'];
 				} else if($model->modelName == 'Quote' && empty($model->template)) {
 					// Fill in the gap with the default / "semi-legacy" quotes view
-					$model->message = $this->controller->renderPartial('application.modules.quotes.views.quotes.print', array('model' => $model->targetModel,'email' => true), true);
+					$model->message = $this->controller->renderPartial(
+                        'application.modules.quotes.views.quotes.print',
+                        array('model' => $model->targetModel,'email' => true), true);
+
 					// Add a linebreak at the beginning for user-entered notes in the email:
 					$model->insertInBody('<br />',1);
 				}
@@ -133,13 +184,20 @@ class InlineEmailAction extends CAction {
 			// Populate response data:
 			$modelHasErrors = $model->hasErrors();
 			$failed = $failed || $modelHasErrors;
+            $model->attachments = array (); // prevent response json encoding failures
 			$response = array(
 				'scenario' => $scenario,
 				'sendStatus' => $sendStatus,
 				'attributes' => $model->attributes,
 				'modelErrors' => $model->errors,
 				'modelHasErrors' => $modelHasErrors,
-				'modelErrorHtml' => CHtml::errorSummary($model,Yii::t('app', "Please fix the following errors:"), null,array('style'=>'margin-bottom: 5px;')),
+				'modelErrorHtml' => CHtml::errorSummary(
+                    $model,Yii::t('app', "Please fix the following errors:"),
+                    null,
+                    array(
+                        'style'=>'margin-bottom: 5px;',
+                        'class'=>''
+                    )),
 			);
 			if($scenario == 'template') {
 				// There's a chance the inline email form is switching gears into
@@ -158,7 +216,8 @@ class InlineEmailAction extends CAction {
 
 			$this->respond($message,$failed);
 		}else{
-			$this->respond(Yii::t('app', 'Inline email model missing from the request to the server.'), true);
+			$this->respond(
+                Yii::t('app', 'Inline email model missing from the request to the server.'), true);
 		}
 	}
 

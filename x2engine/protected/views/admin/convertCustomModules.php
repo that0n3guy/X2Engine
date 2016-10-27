@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,13 +33,14 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 <div class="page-title"><h2><?php echo Yii::t('admin', 'Convert Custom Modules'); ?></h2></div>
 <div class="form">
     <?php
     if(isset($status) && !empty($status)){
         echo Yii::t('admin', 'Status of Module Conversion')."<br><br>";
+        $hasError = false;
         foreach($status as $module => $data){
             if(empty($data['error'])){
                 echo "<div style='color:green'>";
@@ -52,6 +54,7 @@
                 echo "</ul>";
                 echo "</div>";
             }else{
+                $hasError = true;
                 echo "<div style='color:red'>";
                 echo Yii::t('admin', "Status for: {title}", array(
                     '{title}' => '<b>'.$data['title'].'</b>'
@@ -62,7 +65,7 @@
                 echo "</div>";
             }
         }
-        echo Yii::t('admin', 'All module conversions complete.');
+        if (!$hasError) echo Yii::t('admin', 'All module conversions complete.');
     }else{
         ?>
         <?php echo Yii::t('admin', 'This tool is designed to convert all old custom modules to the latest version.'); ?><br><br>

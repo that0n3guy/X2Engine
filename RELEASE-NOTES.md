@@ -1,3 +1,20 @@
+# 5.0.9 #
+7/13/2015
+
+* Email addresses in To, Cc, and Bcc lists in X2Flow email actions now validate
+  when flows are saved or triggered. Invalid email addresses in any of these
+  fields will prevent the flow from being saved (displaying a warning in the
+  UI). For existing flows, X2Flow Email actions with invalid email addresses
+  will be skipped (with a validation error message written to the trigger log).
+* The old "User" option of the "Post to Activity Feed" flow action has been
+  relabelled "Author".
+
+# 4.2b #
+8/7/2014
+
+* Structural changes to the record view widget code breaks compatibility with 
+  old custom record view widgets.
+
 # 4.1.6b #
 7/3/2014
 
@@ -13,7 +30,8 @@ To update to this and all future beta releases, you must enable beta releases,
 as follows:
 
 1. Create a file "constants-custom.php" in the root level of X2Engine. You can 
-   easily do this by renaming "constants-custom.example.php" to that name (remove ".custom").
+   easily do this by renaming "constants-custom.example.php" to that name 
+   (remove ".custom").
 2. Look for the following line, and in it, change "false" to "true":
   <pre>defined('X2\_UPDATE\_BETA') or define('X2\_UPDATE\_BETA',false);</pre>
 

@@ -1,8 +1,7 @@
 <?php
-
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Provides an inline form for sending email from a view page.
@@ -52,7 +52,24 @@
  */
 class InlineEmailForm extends X2Widget {
 
+    /**
+     * @var string $type
+     */
+    public $type = 'inlineEmail'; 
+
     public $attributes;
+
+    public $instantiateJSClassOnInit = true;
+
+    /**
+     * @var string|null $action inline email form action
+     */
+    public $action; 
+
+    /**
+     * @var bool $enableResizability
+     */
+    public $enableResizability = true; 
 
     public $template = null;
 
@@ -77,18 +94,67 @@ class InlineEmailForm extends X2Widget {
     public $skipEvent = 0;
 
     /**
+     * @var bool $hideFromField
+     */
+    public $hideFromField = false;  
+
+    /**
+     * @var bool $disableTemplates
+     */
+    public $disableTemplates = false;  
+
+    /**
      * @var string the association type of the email templates
      */
-    private $associationType = null;
+    public $associationType = null;
+
+    /**
+     * @var string $JSClass
+     */
+    public $JSClass = 'InlineEmailEditorManager'; 
+
+    public function getPackages () {
+        if (!isset ($this->_packages)) {
+            $this->_packages = array_merge (parent::getPackages (), array (
+                'InlineEmailEditorManager' => array(
+                    'baseUrl' => Yii::app()->request->baseUrl,
+                    'js' => array(
+                        'js/InlineEmailResizable.js',
+                        'js/inlineEmailForm.js',
+                    ),
+                    'depends' => array ('jquery.ui'),
+                ),
+            ));
+        }
+        return $this->_packages;
+    }
+
+    private $_moduleName;
+    public function getModuleName () {
+        if (!isset ($this->_moduleName)) {
+            $this->_moduleName = Yii::app()->controller->module->name;
+        }
+        return $this->_moduleName;
+    }
+
+    public function setModuleName ($moduleName) {
+        $this->_moduleName = $moduleName;
+    }
 
     public function init(){
+        $this->disableTemplates = $this->disableTemplates ||
+            in_array ($this->associationType, 
+                array_keys (Docs::modelsWhichSupportEmailTemplates ()));
 
         // Prepare the model for initially displayed input:
         $this->model = new InlineEmail();
         if(isset($this->targetModel)) {
             $this->model->targetModel = $this->targetModel;
         }
-        $this->associationType = X2Model::getModelName (Yii::app()->controller->module->name);
+
+        if (!$this->associationType) {
+            $this->associationType = X2Model::getModelName ($this->getModuleName ());
+        }
 
         // Bring in attributes set in the configuration:
         $this->model->attributes = $this->attributes;
@@ -96,7 +162,7 @@ class InlineEmailForm extends X2Widget {
         if (empty ($this->template)) {
             // check for a default template
             $defaultTemplateId = Yii::app()->params->profile->getDefaultEmailTemplate (
-                Yii::app()->controller->module->name);
+                $this->getModuleName ());
 
             // if there's a default set for this module
             if ($defaultTemplateId !== null) {
@@ -104,7 +170,9 @@ class InlineEmailForm extends X2Widget {
 
                 // ensure that template is still a valid default
                 if ($defaultTemplateDoc && 
-                    $defaultTemplateDoc->associationType === $this->associationType) {
+                    ($defaultTemplateDoc->associationType === $this->associationType ||
+                    $defaultTemplateDoc->type === 'quote' && 
+                    $this->model->targetModel instanceof Quote)) {
 
                     $this->template = $defaultTemplateId;
                 }
@@ -129,30 +197,9 @@ class InlineEmailForm extends X2Widget {
             $this->insertableAttributes = $this->model->insertableAttributes;
         }
 
-        Yii::app()->clientScript->registerScript('InlineEmailFormJS',"
-        $(function () {
-            x2.inlineEmailEditorManager = new x2.InlineEmailEditorManager ({
-                translations: ".CJSON::encode (array (
-                    'defaultTemplateDialogTitle' => 
-                        Yii::t('app', 'Set a Default Email Template'),
-                    'Cancel' => Yii::t('app', 'Cancel'),
-                    'Save' => Yii::t('app', 'Save'),
-                )).",
-                saveDefaultTemplateUrl: '".
-                    Yii::app()->controller->createUrl (
-                        '/profile/profile/ajaxSaveDefaultEmailTemplate')."'
-            });
-        });
-        ", CClientScript::POS_END);
-
         // Load resources:
-        Yii::app()->clientScript->registerScriptFile(
-            Yii::app()->getBaseUrl().'/js/ckeditor/ckeditor.js');
-        Yii::app()->clientScript->registerScriptFile(
-            Yii::app()->getBaseUrl().'/js/ckeditor/adapters/jquery.js');
-        Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/emailEditor.js');
-        Yii::app()->clientScript->registerScriptFile(
-            Yii::app()->getBaseUrl().'/js/inlineEmailForm.js', CClientScript::POS_END);
+        Yii::app()->clientScript->registerPackage ('emailEditor');
+
         if(!empty($this->insertableAttributes)){
             Yii::app()->clientScript->registerScript('setInsertableAttributes', 
             'x2.insertableAttributes = '.CJSON::encode($this->insertableAttributes).';', 
@@ -172,8 +219,28 @@ class InlineEmailForm extends X2Widget {
         parent::init();
     }
 
+
+    public function getJSClassParams () {
+        return array_merge (parent::getJSClassParams (), array (
+            'translations' => array (
+                'defaultTemplateDialogTitle' => 
+                    Yii::t('app', 'Set a Default Email Template'),
+                'Cancel' => Yii::t('app', 'Cancel'),
+                'Save' => Yii::t('app', 'Save'),
+                'New Message' => Yii::t('app', 'New Message'),
+            ),
+            'disableTemplates' => $this->disableTemplates,
+            'saveDefaultTemplateUrl' => 
+                Yii::app()->controller->createUrl (
+                    '/profile/profile/ajaxSaveDefaultEmailTemplate'),
+            'tmpUploadUrl' => Yii::app()->createUrl('/site/tmpUpload'), 
+            'rmTmpUploadUrl' => Yii::app()->createUrl('/site/removeTmpUpload'),
+            'type' => $this->type,
+            'enableResizability' => $this->enableResizability
+        ));
+    }
+
     public function run(){
-        // First get user credentials:
         $this->render('application.components.views.inlineEmailForm', array(
             'type' => $this->templateType,
             'associationType' => $this->associationType,

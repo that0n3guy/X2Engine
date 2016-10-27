@@ -14,11 +14,12 @@ class NewContactTest extends X2WebTestCase {
 		'contacts' => 'Contacts',
 		'actions' => 'Actions'
 	);
+
+    public function setUp () {
+        $this->markTestIncomplete ();
+    }
 	
 	public function testNewContactAndAccount() {
-        $this->markTestSkipped ();
-        return;
-
 		$this->openX2('/contacts/create');
 		$this->localSelenese('NewContactAndAccount.html');
 	}

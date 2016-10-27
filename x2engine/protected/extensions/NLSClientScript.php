@@ -502,11 +502,14 @@ curl_info:' . print_r(curl_getinfo($this->ch), true) . '
 		$this->registerCoreScript('jquery');
 		
 		//getting url of the document root
-		if (!$this->serverBaseUrl) {
-			$this->serverBaseUrl = strtolower(preg_replace('#/.*$#','',$_SERVER['SERVER_PROTOCOL'])) . '://' . $_SERVER['HTTP_HOST'];
-			if ($_SERVER['SERVER_PORT'] != 80)
-				$this->serverBaseUrl .= ':' . $_SERVER['SERVER_PORT'];
-		}
+        /* x2modstart */ 
+        // commented out since it breaks unit tests
+//		if (!$this->serverBaseUrl) {
+//			$this->serverBaseUrl = strtolower(preg_replace('#/.*$#','',$_SERVER['SERVER_PROTOCOL'])) . '://' . $_SERVER['HTTP_HOST'];
+//			if ($_SERVER['SERVER_PORT'] != 80)
+//				$this->serverBaseUrl .= ':' . $_SERVER['SERVER_PORT'];
+//		}
+        /* x2modend */  
 	}
 
 
@@ -517,14 +520,19 @@ curl_info:' . print_r(curl_getinfo($this->ch), true) . '
 		$this->_putnlscode();
 		
 		//merging
-		if ($this->mergeJs) {
-			$this->_mergeJs(self::POS_HEAD);
-		}
-		if ($this->mergeCss) {
-			$this->_mergeCss();
-		}
+        /* x2modstart */ 
+        // commented out since they're broken by commented out code in init () 
+//		if ($this->mergeJs) {
+//			$this->_mergeJs(self::POS_HEAD);
+//		}
+//		if ($this->mergeCss) {
+//			$this->_mergeCss();
+//		}
+        /* x2modend */  
 
-		parent::renderHead($output);
+        /* x2modstart */ 
+		//parent::renderHead($output);
+        /* x2modend */ 
 	}
 
 	public function renderBodyBegin(&$output) {
@@ -585,6 +593,10 @@ resMap2Request = '.$this->resMap2Request.';
 if (!$.nlsc)
 	$.nlsc={resMap:{}};
 
+/* x2modstart */ 
+$.nlsc.cacheBuster = '.CJSON::encode (Yii::app()->clientScript->getCacheBuster ()).'
+/* x2modend */ 
+
 $.nlsc.normUrl=function(url) {
 	if (!url) return null;
 	if (cont) {
@@ -604,7 +616,16 @@ $.nlsc.normUrl=function(url) {
     url didn\'t already have get parameters before the jQuery cache busting parameter was added.
     */
 	//return url.replace(/\?*(_=\d+)?$/g,"");
-	return url.replace(/(\&|\?)?(_=\d+)?$/g,"");
+	if (url.match (/\?\d+(&|$)/)) {
+	    url = url.replace(/\?(\d+).*$/,"?$1"); // remove all parameters except cache buster
+    }
+
+    // also remove cache busting param. We don\'t want to have an asset reloaded during an AJAX
+    // request just because there\'s a new version
+
+    if ($.nlsc.cacheBuster)
+	    url = url.replace(new RegExp (\'(\\\\&|\\\\?)?\' + $.nlsc.cacheBuster + "$", "g"),"");
+    return url;
     /* x2modend */ 
 }
 $.nlsc.h=function(s) {
@@ -640,13 +661,14 @@ var c = {
 			return true;
 		}
 
-		if (!$.nlsc.fetched) {
-			$.nlsc.fetched=1;
-			$.nlsc.fetchMap();
-		}//if
+        /* x2modstart */     
+//		if (!$.nlsc.fetched) {
+//			$.nlsc.fetched=1;
+//			$.nlsc.fetchMap();
+//		}//if
+        /* x2modend */ 
 		
 		var url = $.nlsc.normUrl(opt.url);
-
 		if (!url) return true;
 		if ($.nlsc.resMap[url]) return false;
 		$.nlsc.resMap[url] = $.nlsc.h(url);
@@ -664,8 +686,15 @@ if ($.browser.msie)
 
 $.ajaxSetup(c);
 
+/* x2modstart */
+$(function () {
+    $.nlsc.fetched=1;
+    $.nlsc.fetchMap ();
+});
+/* x2modend */
+
 })(jQuery);
 
-',	CClientScript::POS_HEAD);
+', CClientScript::POS_HEAD);
 	}
 }

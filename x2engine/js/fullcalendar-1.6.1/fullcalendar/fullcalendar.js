@@ -908,6 +908,7 @@ function EventManager(options, _sources) {
 	t.fetchEvents = fetchEvents;
 	t.addEventSource = addEventSource;
 	t.removeEventSource = removeEventSource;
+	t.removeEventSources = removeEventSources;
 	t.updateEvent = updateEvent;
 	t.renderEvent = renderEvent;
 	t.removeEvents = removeEvents;
@@ -1100,8 +1101,19 @@ function EventManager(options, _sources) {
 		});
 		reportEvents(cache);
 	}
+
+	/* x2modstart */	
+
+	function removeEventSources() {
+	 sources = [];
+
+	 // remove all client events from all sources
+	 cache = [];
+
+	 reportEvents(cache);
+	}
 	
-	
+	/* x2modend */
 	
 	/* Manipulation
 	-----------------------------------------------------------------------------*/
@@ -2384,10 +2396,15 @@ function BasicView(element, calendar, viewName) {
 				        ">" + 
 				        "<div>";
 				if (showNumbers) {
-					html += "<div class='fc-day-number'>" + cellDate.getDate() + "</div>";
+                    /* x2modstart */ 
+                    // converted day numbers into links
+					html += "<div class='fc-day-number'><a href='#' class='day-number-link'>" + 
+                        cellDate.getDate() + "</a></div>";
+                    /* x2modend */ 
 				}
 				html += "<div class='fc-day-content'>" +
-				        "<div style='position:relative'>&nbsp;</div>" +
+				        "<div class='spacer' style='position:relative'>&nbsp;</div>" +
+				        "<div class='fc-indicator-container' style='display:none' ></div>" +
 				        "</div>" +
 				        "</div>" +
 				        "</td>";
@@ -2410,7 +2427,7 @@ function BasicView(element, calendar, viewName) {
 		bodyRows = body.find('tr');
 		bodyCells = body.find('.fc-day');
 		bodyFirstCells = bodyRows.find('td:first-child');
-		bodyCellTopInners = bodyRows.eq(0).find('.fc-day-content > div');
+		bodyCellTopInners = bodyRows.eq(0).find('.fc-day-content > div.spacer');
 		
 		markFirstLast(head.add(head.find('tr'))); // marks first+last tr/th's
 		markFirstLast(bodyRows); // marks first+last td's
@@ -2758,6 +2775,7 @@ function BasicEventRenderer() {
 	
 	
 	function renderEvents(events, modifiedEventId) {
+		trigger('viewRender');
 		reportEvents(events);
 		renderDaySegs(compileSegs(events), modifiedEventId);
 		trigger('eventAfterAllRender');
@@ -3852,6 +3870,7 @@ function AgendaEventRenderer() {
 	
 
 	function renderEvents(events, modifiedEventId) {
+		trigger('viewRender');
 		reportEvents(events);
 		var i, len=events.length,
 			dayEvents=[],

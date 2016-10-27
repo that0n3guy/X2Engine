@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * This is the model class for table "x2_lists".
@@ -71,15 +72,20 @@ class X2List extends X2Model {
 
     public function behaviors(){
         return array(
-            'X2LinkableBehavior' => array(
-                'class' => 'X2LinkableBehavior',
+            'ERememberFiltersBehavior' => array(
+                'class' => 'application.components.behaviors.ERememberFiltersBehavior',
+                'defaults' => array(),
+                'defaultStickOnClear' => false
+            ),
+            'LinkableBehavior' => array(
+                'class' => 'LinkableBehavior',
                 'baseRoute' => '/contacts/contacts/list',
                 'autoCompleteSource' => '/contacts/contacts/getLists',
             ),
             'X2PermissionsBehavior' => array(
-                'class' => 'application.components.permissions.X2PermissionsBehavior'
+                'class' => 'application.components.permissions.'.Yii::app()->params->modelPermissions
             ),
-            'X2FlowTriggerBehavior' => array('class' => 'X2FlowTriggerBehavior'),
+            'FlowTriggerBehavior' => array('class' => 'FlowTriggerBehavior'),
         );
     }
 
@@ -87,7 +93,7 @@ class X2List extends X2Model {
         // NOTE: you should only define rules for those attributes that
         // will receive user inputs.
         return array(
-            array('name, createDate, lastUpdated, modelName', 'required'),
+            array('name, type, createDate, lastUpdated, modelName', 'required'),
             array('id, count, visibility, createDate, lastUpdated', 'numerical', 'integerOnly' => true),
             array('name, modelName', 'length', 'max' => 100),
             array('description', 'length', 'max' => 250),
@@ -145,6 +151,13 @@ class X2List extends X2Model {
 
     public function getDefaultRoute(){
         return '/contacts/contacts/list';
+    }
+
+    public function getDisplayName ($plural=true, $ofModule=true) {
+        return Yii::t('contacts', '{contact} Lists|{contact} List', array(
+            (int) $plural,
+            '{contact}' => Modules::displayName(false, 'Contacts'),
+        ));
     }
 
     public function createLink(){
@@ -224,6 +237,12 @@ class X2List extends X2Model {
         return self::model()->findByPk((int) $id, $condition);
     }
 
+    public function calculateCount () {
+        $criteria = $this->queryCriteria ();
+        return Contacts::model ()->count ($criteria);
+    }
+
+
     /**
      * Returns a CDbCriteria to retrieve all models specified by the list
      * @return CDbCriteria Criteria to retrieve all models in the list
@@ -232,8 +251,10 @@ class X2List extends X2Model {
         $search = new CDbCriteria;
 
         if($this->type == 'dynamic'){
+            $tagJoinCount = 0;
             $logicMode = $this->logicType;
-            $criteria = X2Model::model('X2ListCriterion')->findAllByAttributes(array('listId' => $this->id, 'type' => 'attribute'));
+            $criteria = X2Model::model('X2ListCriterion')
+                ->findAllByAttributes(array('listId' => $this->id, 'type' => 'attribute'));
             foreach($criteria as $criterion){
                 //if this criterion is for a date field, we perform its comparisons differently
                 $dateType = false;
@@ -243,15 +264,20 @@ class X2List extends X2Model {
                         switch($field->type){
                             case 'date':
                             case 'dateTime':
-                                if(ctype_digit((string) $criterion->value) || (substr($criterion->value, 0, 1) == '-' && ctype_digit((string) substr($criterion->value, 1))))
+                                if(ctype_digit((string) $criterion->value) || 
+                                   (substr($criterion->value, 0, 1) == '-' && 
+                                    ctype_digit((string) substr($criterion->value, 1)))) {
                                     $criterion->value = (int) $criterion->value;
-                                else
+                                } else {
                                     $criterion->value = strtotime($criterion->value);
+                                }
                                 $dateType = true;
                                 break;
                             case 'boolean':
                             case 'visibility':
-                                $criterion->value = in_array(strtolower($criterion->value), array('1', 'yes', 'y', 't', 'true')) ? 1 : 0;
+                                $criterion->value = in_array(
+                                    strtolower($criterion->value), 
+                                    array('1', 'yes', 'y', 't', 'true')) ? 1 : 0;
                                 break;
                         }
                         break;
@@ -259,7 +285,8 @@ class X2List extends X2Model {
                 }
 
                 if($criterion->attribute == 'tags' && $criterion->value){
-                    $tags = explode(',', preg_replace('/\s?,\s?/', ',', trim($criterion->value))); //remove any spaces around commas, then explode to array
+                    //remove any spaces around commas, then explode to array
+                    $tags = explode(',', preg_replace('/\s?,\s?/', ',', trim($criterion->value))); 
                     for($i = 0; $i < count($tags); $i++){
                         if(empty($tags[$i])){
                             unset($tags[$i]);
@@ -271,10 +298,9 @@ class X2List extends X2Model {
                             $tags[$i] = 'x2_tags.tag = "'.$tags[$i].'"';
                         }
                     }
-                    $tagConditions = implode(' OR ', $tags);
-
-                    $search->distinct = true;
-                    $search->join = 'JOIN x2_tags ON (x2_tags.itemId=t.id AND x2_tags.type="'.$this->modelName.'" AND ('.$tagConditions.'))';
+                    $tagCondition = implode(' OR ', $tags);
+                    $search->join = 'LEFT JOIN x2_tags ON t.id = x2_tags.itemId';
+                    $search->addCondition("x2_tags.id IS NOT NULL AND x2_tags.type='$this->modelName' AND " ."($tagCondition)", $logicMode);
                 } else if($dateType){
                     //assume for now that any dates in a criterion are at midnight of that day
                     $thisDay = $criterion->value;
@@ -282,27 +308,27 @@ class X2List extends X2Model {
                     switch($criterion->comparison){
                         case '=':
                             $subSearch = new CDbCriteria();
-                            $subSearch->compare($criterion->attribute, '>='.$thisDay, false, 'AND');
-                            $subSearch->compare($criterion->attribute, '<'.$nextDay, false, 'AND');
+                            $subSearch->compare('t.'.$criterion->attribute, '>='.$thisDay, false, 'AND');
+                            $subSearch->compare('t.'.$criterion->attribute, '<'.$nextDay, false, 'AND');
                             $search->mergeWith($subSearch, $logicMode);
                             break;
                         case '<>':
                             $subSearch = new CDbCriteria();
-                            $subSearch->compare($criterion->attribute, '<'.$thisDay, false, 'OR');
-                            $subSearch->compare($criterion->attribute, '>='.$nextDay, false, 'OR');
+                            $subSearch->compare('t.'.$criterion->attribute, '<'.$thisDay, false, 'OR');
+                            $subSearch->compare('t.'.$criterion->attribute, '>='.$nextDay, false, 'OR');
                             $search->mergeWith($subSearch, $logicMode);
                             break;
                         case '>':
-                            $search->compare($criterion->attribute, '>='.$thisDay, true, $logicMode);
+                            $search->compare('t.'.$criterion->attribute, '>='.$thisDay, true, $logicMode);
                             break;
                         case '<':
-                            $search->compare($criterion->attribute, '<'.$thisDay, true, $logicMode);
+                            $search->compare('t.'.$criterion->attribute, '<'.$thisDay, true, $logicMode);
                             break;
                         case 'notEmpty':
-                            $search->addCondition($criterion->attribute.' IS NOT NULL AND '.$criterion->attribute.'!=""', $logicMode);
+                            $search->addCondition('t.'.$criterion->attribute.' IS NOT NULL AND '.'t.'.$criterion->attribute.'!=""', $logicMode);
                             break;
                         case 'empty':
-                            $search->addCondition('('.$criterion->attribute.'="" OR '.$criterion->attribute.' IS NULL)', $logicMode);
+                            $search->addCondition('('.'t.'.$criterion->attribute.'="" OR '.'t.'.$criterion->attribute.' IS NULL)', $logicMode);
                             break;
                         //the following comparitors are not supported for dates
                         //case 'list':
@@ -313,36 +339,36 @@ class X2List extends X2Model {
                 }else{
                     switch($criterion->comparison){
                         case '=':
-                            $search->compare($criterion->attribute, $criterion->value, false, $logicMode);
+                            $search->compare('t.'.$criterion->attribute, $criterion->value, false, $logicMode);
                             break;
                         case '>':
-                            $search->compare($criterion->attribute, '>='.$criterion->value, true, $logicMode);
+                            $search->compare('t.'.$criterion->attribute, '>='.$criterion->value, true, $logicMode);
                             break;
                         case '<':
-                            $search->compare($criterion->attribute, '<='.$criterion->value, true, $logicMode);
+                            $search->compare('t.'.$criterion->attribute, '<='.$criterion->value, true, $logicMode);
                             break;
                         case '<>': // must test for != OR is null, because both mysql and yii are stupid
-                            $search->addCondition('('.$criterion->attribute.' IS NULL OR '.$criterion->attribute.'!='.CDbCriteria::PARAM_PREFIX.CDbCriteria::$paramCount.')', $logicMode);
+                            $search->addCondition('('.'t.'.$criterion->attribute.' IS NULL OR '.'t.'.$criterion->attribute.'!='.CDbCriteria::PARAM_PREFIX.CDbCriteria::$paramCount.')', $logicMode);
                             $search->params[CDbCriteria::PARAM_PREFIX.CDbCriteria::$paramCount++] = $criterion->value;
                             break;
                         case 'notEmpty':
-                            $search->addCondition($criterion->attribute.' IS NOT NULL AND '.$criterion->attribute.'!=""', $logicMode);
+                            $search->addCondition('t.'.$criterion->attribute.' IS NOT NULL AND '.'t.'.$criterion->attribute.'!=""', $logicMode);
                             break;
                         case 'empty':
-                            $search->addCondition('('.$criterion->attribute.'="" OR '.$criterion->attribute.' IS NULL)', $logicMode);
+                            $search->addCondition('('.'t.'.$criterion->attribute.'="" OR '.'t.'.$criterion->attribute.' IS NULL)', $logicMode);
                             break;
                         case 'list':
-                            $search->addInCondition($criterion->attribute, explode(',', $criterion->value), $logicMode);
+                            $search->addInCondition('t.'.$criterion->attribute, explode(',', $criterion->value), $logicMode);
                             break;
                         case 'notList':
-                            $search->addNotInCondition($criterion->attribute, explode(',', $criterion->value), $logicMode);
+                            $search->addNotInCondition('t.'.$criterion->attribute, explode(',', $criterion->value), $logicMode);
                             break;
                         case 'noContains':
-                            $search->compare($criterion->attribute, '<>'.$criterion->value, true, $logicMode);
+                            $search->compare('t.'.$criterion->attribute, '<>'.$criterion->value, true, $logicMode);
                             break;
                         case 'contains':
                         default:
-                            $search->compare($criterion->attribute, $criterion->value, true, $logicMode);
+                            $search->compare('t.'.$criterion->attribute, $criterion->value, true, $logicMode);
                     }
                 }
             }
@@ -386,7 +412,8 @@ class X2List extends X2Model {
     }
 
     /**
-     * Generates an array of links for the VCR controls based on the specified dataprovider and current ID
+     * Generates an array of links for the VCR controls based on the specified dataprovider and 
+     * current ID
      * @param CActiveDataProvider $dataProvider the data provider of the most recent gridview
      * @param Integer $id the ID of the current record
      * @return Array array of VCR links and stats
@@ -425,15 +452,46 @@ class X2List extends X2Model {
 
         // get search conditions (WHERE, JOIN, ORDER BY, etc) from the criteria
         $searchConditions = Yii::app()->db->getCommandBuilder()
-                        ->createFindCommand($tableSchema, $criteria)->getText();
-
-        $rowNumberQuery = Yii::app()->db->createCommand(
-                'SELECT r-1 FROM (
-                SELECT *,@rownum:=@rownum + 1 AS r 
-                FROM ('.$searchConditions.') t1, (SELECT @rownum:=0) r) t2 WHERE t2.id='.$modelId
-        );
+            ->createFindCommand($tableSchema, $criteria)->getText();
+        
+        
+        /*
+         * VCR Button Row Number Selection Query
+         * 
+         * This complicated block of code defines where a record is in the row
+         * set to determine its position for VCR controls. This relies on SQL
+         * variables and incrementing the variable in each row of the result set
+         * from the subquery. A version of this query in plain MySQL looks like:
+         * SELECT r-1 
+         *   FROM (
+         *       SELECT *,@rownum:=@rownum + 1 AS r 
+         *       FROM ('.$searchConditions.') t1, (SELECT @rownum:=0) r) t2 
+         *   WHERE t2.id='.$modelId
+         */
+        $varPrefix = '@'; //Current prefix is MySQL specific
+        $varName = $varPrefix.'rownum';
+        $varText = 'SET '.$varName.' = 0'; // Current declaration is MySQL specific
+        Yii::app()->db->createCommand()
+                ->setText($varText)
+                ->execute();
+        $subQuery = Yii::app()->db->createCommand()
+                ->select('*, ('.$varName.':='.$varName.'+1) r')
+                ->from('('.$searchConditions.') t1')
+                ->getText();
+        $rowNumberQuery = Yii::app()->db->createCommand()
+                ->select('(r-1)')
+                ->from('('.$subQuery.') t2')
+                ->where('t2.id=:t2_id');
+        
+//        $rowNumberQuery = Yii::app()->db->createCommand('
+//            SELECT r-1 
+//            FROM (
+//                SELECT *,@rownum:=@rownum + 1 AS r 
+//                FROM ('.$searchConditions.') t1, (SELECT @rownum:=0) r) t2 
+//            WHERE t2.id='.$modelId
+//        );
         // attach params from $criteria to this query
-        $rowNumberQuery->params = $criteria->params;
+        $rowNumberQuery->params = array_merge(array(':t2_id'=>$modelId),$criteria->params);
         $rowNumber = $rowNumberQuery->queryScalar();
 
         if($rowNumber === false){ // the specified record isn't in this list
@@ -472,18 +530,20 @@ class X2List extends X2Model {
              */
             if($vcrIndex > 0 && isset($vcrModels[0])){ // there's a record before the current one
                 $vcrData['prev'] = CHtml::link(
-                                '<', array('view', 'id' => $vcrModels[0]['id']), array('title' => $vcrModels[0]['name'], 'class' => 'x2-button'));
+                    '<', array('view', 'id' => $vcrModels[0]['id']), 
+                    array('title' => $vcrModels[0]['name'], 'class' => 'x2-button'));
             }else{
                 $vcrData['prev'] = CHtml::link(
-                                '<', 'javascript:void(0);', array('class' => 'x2-button disabled'));
+                    '<', 'javascript:void(0);', array('class' => 'x2-button disabled'));
             }
 
             if(count($vcrModels) - 1 > $vcrIndex){ // there's a record after the current one
                 $vcrData['next'] = CHtml::link(
-                                '>', array('view', 'id' => $vcrModels[$vcrIndex + 1]['id']), array('title' => $vcrModels[$vcrIndex + 1]['name'], 'class' => 'x2-button'));
+                    '>', array('view', 'id' => $vcrModels[$vcrIndex + 1]['id']), 
+                    array('title' => $vcrModels[$vcrIndex + 1]['name'], 'class' => 'x2-button'));
             }else{
                 $vcrData['next'] = CHtml::link(
-                                '>', 'javascript:void(0);', array('class' => 'x2-button disabled'));
+                    '>', 'javascript:void(0);', array('class' => 'x2-button disabled'));
             }
 
             return $vcrData;
@@ -560,9 +620,18 @@ class X2List extends X2Model {
                     ),
                     'sort' => array(
                         //messing with attributes may cause columns to become unsortable
-                        'attributes' => array('name', 'email', 'phone', 'address', 'opened'
+                        'attributes' => array(
+                            'name', 
+                            'email', 
+                            'phone', 
+                            'address', 
+                            'sent',
+                            'opened',
+                            'clicked',
+                            'unsubscribed',
+                            'doNotEmail',
                         ),
-                        'defaultOrder' => 'opened DESC',
+                        'defaultOrder' => 'opened DESC, sent DESC, name DESC',
                     ),
                 ));
     }
@@ -800,8 +869,19 @@ class X2List extends X2Model {
         if($this->type == 'dynamic'){
             $this->criteriaInput = array();
             foreach(array('attribute', 'comparison', 'value') as $property){
-                if(isset($values[$property]))
+                if(isset($values[$property])){
                     $this->criteriaInput[$property] = $values[$property];
+                } else {
+                    $this->criteriaInput[$property] = array();
+                }
+            }
+            if(count($this->criteriaInput['attribute']) !== count($this->criteriaInput['value'])){
+                $this->addError('', Yii::t('contacts','Invalid list criteria.'));
+            }else{
+                $criteria = array_combine ($this->criteriaInput['attribute'], $this->criteriaInput['value']);
+                if (array_key_exists ('tags', $criteria) && empty($criteria['tags'])) {
+                    $this->addError ('tags', Yii::t ('contacts', 'Tag list must be non-empty'));
+                }
             }
         }
         parent::setAttributes($values, $safeOnly);
@@ -812,6 +892,47 @@ class X2List extends X2Model {
             $this->processCriteria();
         }
         return parent::afterSave();
+    }
+
+    /**
+     * Filter array of lists based on attributes of this list
+     */
+    public function filter (array $lists) {
+        $filterAttrs = array ();
+        foreach ($this->getAttributes () as $attr => $val) {
+            if (isset ($val) && $val !== '') {
+                if ($attr === 'assignedTo') {
+                    $filterAttrs[$attr] = $this->compareAssignment ($val);
+                    if (is_array ($filterAttrs[$attr])) {
+                        $filterAttrs[$attr] =  array_map (function ($elem) {
+                            return strtolower ($elem); 
+                        }, $filterAttrs[$attr]);
+                    }
+                } else {
+                    $filterAttrs[$attr] = $val;
+                }
+            }
+        }
+
+        $filteredLists = array ();
+        foreach ($lists as $list) {
+            $pass = true;
+            foreach ($filterAttrs as $attr => $val) {
+                if ($attr === 'assignedTo') {
+                    if (!is_array ($val) ||
+                        !in_array (strtolower ($list->$attr), $val)) {
+
+                        $pass = false;
+                        break;
+                    }
+                } elseif (!preg_match ("/$val/i", (string) $list->$attr)) {
+                    $pass = false;
+                    break;
+                }
+            }
+            if ($pass) $filteredLists[] = $list;
+        }
+        return $filteredLists;
     }
 
 }

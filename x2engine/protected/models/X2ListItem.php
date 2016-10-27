@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * This is the model class for table "x2_list_items".
@@ -44,6 +45,8 @@
  * @property integer $result
  */
 class X2ListItem extends CActiveRecord {
+    public $verifyCode; // CAPTCHA for weblead form
+
 	/**
 	 * Returns the static model of the specified AR class.
 	 * @return ContactListItem the static model class
@@ -67,11 +70,18 @@ class X2ListItem extends CActiveRecord {
 		// will receive user inputs.
 		return array(
 			array('listId', 'required'),
-			array('contactId, listId, sent, opened, clicked, unsubscribed', 'numerical', 'integerOnly'=>true),
+			array(
+                'contactId, listId, sent, opened, clicked, unsubscribed',
+                'numerical',
+                'integerOnly'=>true
+            ),
 			array('uniqueId', 'length', 'max'=>32),
 			// The following rule is used by search().
 			// Please remove those attributes that should not be searched.
 			array('contactId, listId, uniqueId, result, opened', 'safe', 'on'=>'search'),
+            array(
+                'verifyCode', 'captcha', 'allowEmpty' => !CCaptcha::checkRequirements(),
+                    'on' => 'webFormWithCaptcha', 'captchaAction' => 'site/webleadCaptcha')
 		);
 	}
 
@@ -90,10 +100,11 @@ class X2ListItem extends CActiveRecord {
 	/**
 	 * Yii needs this since this model does not have a primary key column in db
 	 * If this isn't here, referring to this as a relation in other models will fail
+     * -Commented out since this started causing issues in Yii 1.1.16-
 	 */
-	public function primaryKey() {
-		return array('contactId','listId');
-	}
+//	public function primaryKey() {
+//		return array('id','contactId','listId');
+//	}
 
 	/**
 	 * @return array customized attribute labels (name=>label)

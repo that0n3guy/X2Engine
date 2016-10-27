@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Model implementing encrypted, generic credentials storage.
@@ -135,8 +136,43 @@ class Credentials extends CActiveRecord {
 	 * Model classes to include/list as valid for storing auth data
 	 * @var array
 	 */
-	protected $validModels = array('EmailAccount', 'GMailAccount');
+	protected $validModels = array(
+        'EmailAccount',
+        'GMailAccount',
+        'MandrillAccount',
+        'MailjetAccount',
+        'MailgunAccount',
+        'Office365EmailAccount',
+        'OutlookEmailAccount',
+        'SendgridAccount',
+        'SESAccount',
+        'YahooEmailAccount',
+        'TwitterApp',
+        'GoogleProject',
+        'JasperServer',
+    );
 
+	/**
+	 * Model classes which support the IMAP protocol
+	 * @var array
+	 */
+    protected static $imapModels = array(
+        'EmailAccount',
+        'GMailAccount',
+        'Office365EmailAccount',
+        'OutlookEmailAccount',
+        'YahooEmailAccount',
+    );
+
+    public function afterDelete () {
+        parent::afterDelete ();
+         
+        EmailInboxes::model ()->updateAll (
+            array (
+                'credentialId' => null
+            ), 'credentialId=:id', array (':id' => $this->id));
+         
+    }
 
 	public function attributeLabels() {
 		return array(
@@ -150,17 +186,34 @@ class Credentials extends CActiveRecord {
 		);
 	}
 
+    public function relations () {
+        return array(
+            'user' => array(self::BELONGS_TO, 'User', array ('userId' => 'id')),
+        );
+    }
 
 	public function behaviors(){
 		return array(
 			'JSONEmbeddedModelFieldsBehavior' => array(
-				'class' => 'application.components.JSONEmbeddedModelFieldsBehavior',
+				'class' => 'application.components.behaviors.JSONEmbeddedModelFieldsBehavior',
 				'transformAttributes' => array('auth'),
 				'templateAttr' => 'modelClass',
 				'encryptedFlagAttr' => 'isEncrypted',
 			),
 		);
 	}
+
+    public function afterSave () {
+        if ($this->modelClass && 
+            in_array ($this->modelClass, array ('TwitterApp', 'GoogleProject', 'JasperServer'))) {
+
+            $modelClass = $this->modelClass;
+            $prop = $modelClass::getAdminProperty ();
+            Yii::app()->settings->$prop = $this->id;
+            Yii::app()->settings->save ();
+        }
+        parent::afterSave ();
+    }
 
 	public function beforeDelete(){
 		Yii::app()->db->createCommand()->delete('x2_credentials_default',"credId=:id", array(':id'=>$this->id));
@@ -248,7 +301,8 @@ class Credentials extends CActiveRecord {
 	 */
 	public function getDefaultCredentials($refresh=false){
 		if(!isset(self::$_defaultCredentials) || $refresh){
-			$allDefaults = Yii::app()->db->createCommand()->select('*')->from('x2_credentials_default')->queryAll();
+			$allDefaults = Yii::app()->db->createCommand()
+                ->select('*')->from('x2_credentials_default')->queryAll();
 			self::$_defaultCredentials = array_fill_keys(array_map(function($d){
 								return $d['userId'];
 							}, $allDefaults), array());
@@ -264,7 +318,21 @@ class Credentials extends CActiveRecord {
 	 */
 	public function getDefaultSubstitutes(){
 		return array(
-			'email' => array('EmailAccount', 'GMailAccount'),
+			'email' => array(
+                'EmailAccount',
+                'GMailAccount',
+                'MandrillAccount',
+                'MailjetAccount',
+                'MailgunAccount',
+                'Office365EmailAccount',
+                'OutlookEmailAccount',
+                'SendgridAccount',
+                'SESAccount',
+                'YahooEmailAccount',
+            ),
+            'twitter' => array ('TwitterApp'),
+            'googleProject' => array ('GoogleProject'),
+            'jasperServer' => array ('JasperServer'),
 //			'google' => array('GMailAccount'),
 		);
 	}
@@ -275,7 +343,18 @@ class Credentials extends CActiveRecord {
 	public function getDefaultSubstitutesInv() {
 		return array(
 			'EmailAccount' => array('email'),
-			'GMailAccount' => array('email') // ,'google'),
+			'GMailAccount' => array('email'), // ,'google'),
+			'MandrillAccount' => array('email'),
+			'MailjetAccount' => array('email'),
+			'MailgunAccount' => array('email'),
+			'Office365EmailAccount' => array('email'),
+			'OutlookEmailAccount' => array('email'),
+			'SendgridAccount' => array('email'),
+			'SESAccount' => array('email'),
+			'YahooEmailAccount' => array('email'),
+            'TwitterApp' => array ('twitter'),
+            'GoogleProject' => array ('googleProject'),
+            'JasperServer' => array ('jasperServer'),
 		);
 	}
 
@@ -316,12 +395,25 @@ class Credentials extends CActiveRecord {
 		return $this->_isInUseBySystem;
 	}
 
+    public function getAuthModel () {
+		if(!$this->auth instanceof JSONEmbeddedModel)
+			$this->instantiateField('auth');
+        return $this->auth;
+    }
+    
 	/**
 	 * Returns an appropriate title for create/update pages.
 	 * @return type
 	 */
 	public function getPageTitle() {
-		return $this->isNewRecord ? Yii::t('app', "New {service}", array('{service}' => $this->serviceLabel)) : Yii::t('app', 'Editing:')." <em>{$this->name}</em> ({$this->serviceLabel})";
+        if (method_exists ($this->getAuthModel (), 'getPageTitle')) {
+
+            return $this->getAuthModel ()->getPageTitle ();
+        } else {    
+		    return $this->isNewRecord ? 
+                Yii::t('app', "New {service}", array('{service}' => $this->serviceLabel)) : 
+                Yii::t('app', 'Editing:')." <em>{$this->name}</em> ({$this->serviceLabel})";
+        }
 	}
 
 	/**
@@ -339,6 +431,9 @@ class Credentials extends CActiveRecord {
 	public function getServiceLabels(){
 		return array(
 			'email' => Yii::t('app', 'Email Account'),
+			'twitter' => Yii::t('app', 'Twitter App'),
+			'googleProject' => Yii::t('app', 'Google Project'),
+			'jasperServer' => Yii::t('app', 'Jasper Server'),
 			// 'google' => Yii::t('app','Google Account')
 		);
 	}
@@ -388,18 +483,25 @@ class Credentials extends CActiveRecord {
      *  attributes.
 	 */
 	public static function getCredentialOptions (
-        $model,$name,$type='email',$uid=null,$htmlOptions=array()){
+        $model,$name,$type='email',$uid=null,$htmlOptions=array(),$excludeLegacy=false,$imapOnly=false){
 
 		// First get credentials available to the user:
 		$defaultUserId = in_array($uid,self::$sysUseId) ? 
             $uid : 
             ($uid !==null ? $uid : Yii::app()->user->id); // The "user" (actual user or system role)
 		$uid = Yii::app()->user->id; // The actual user
+
         // Users can always use their own credentials, it's assumed
 		$criteria = new CDbCriteria(array('params'=>array(':uid'=>$uid))); 
 		$staticModel = self::model();
 		$staticModel->userId = self::SYS_ID;
 		$criteria->addCondition('userId=:uid');
+
+        // Exclude accounts types that do not support IMAP if requested
+        if ($imapOnly) {
+            $criteria->addInCondition ('modelClass', self::$imapModels);
+        }
+
 		// Include system-owned credentials
 		if(Yii::app()->user->checkAccess(
             'CredentialsSelectSystemwide',array('model'=>$staticModel))) {
@@ -409,6 +511,7 @@ class Credentials extends CActiveRecord {
 			$defaultUserId = $uid;
         }
 		$staticModel->private = 0;
+
 		// Include non-private credentials if the user has access to them
 		if(Yii::app()->user->checkAccess(
             'CredentialsSelectNonPrivate',array('model'=>$staticModel))) {
@@ -433,13 +536,14 @@ class Credentials extends CActiveRecord {
 		}
 		// Compose options for the selector
 		foreach($credRecords as $cred) {
+			if ($imapOnly && $type == 'email' && $cred->auth->disableInbox) continue;
 			$credentials[$cred->id] = $cred->name;
 			if($type == 'email') {
 				$credentials[$cred->id] = Formatter::truncateText($credentials[$cred->id].
                     ' : "'.$cred->auth->senderName.'" <'.$cred->auth->email.'>',50);
             }
 		}
-		if($type == 'email') {// Legacy email delivery method(s)
+		if($type == 'email' && !$excludeLegacy) {// Legacy email delivery method(s)
 			$credentials[self::LEGACY_ID] = Yii::t('app','System default (legacy)');
         }
 		$options = array();
@@ -474,10 +578,14 @@ class Credentials extends CActiveRecord {
      *  credentials with modelClass "EmailAccount" and "GMailAccount"
 	 * @param integer $uid The user ID or system role ID for which the input is being generated
 	 * @param array $htmlOptions HTML options to pass to {@link CHtml::activeDropDownList()}
+	 * @param array $excludeLegacy Exclude the sendmail legacy option
+	 * @param array $imapOnly Hide models which do not support IMAP
 	 * @return string
 	 */
-	public static function selectorField($model,$name,$type='email',$uid=null,$htmlOptions=array()) {
-        $retDict = self::getCredentialOptions ($model,$name,$type,$uid,$htmlOptions);
+	public static function selectorField(
+        $model,$name,$type='email',$uid=null,$htmlOptions=array(),$excludeLegacy=false,$imapOnly=false) {
+
+        $retDict = self::getCredentialOptions ($model,$name,$type,$uid,$htmlOptions,$excludeLegacy,$imapOnly);
         $credentials = $retDict['credentials'];
         $htmlOptions = $retDict['htmlOptions'];
 		return CHtml::activeDropDownList($model,$name,$credentials,$htmlOptions);

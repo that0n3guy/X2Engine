@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('zii.widgets.grid.CDataColumn');
 
@@ -40,6 +41,30 @@ Yii::import('zii.widgets.grid.CDataColumn');
  * Display column for attributes of X2Model subclasses.
  */
 class X2ButtonColumn extends CButtonColumn {
+
+    public $viewButtonImageUrl = false; 
+    public $updateButtonImageUrl = false; 
+    public $deleteButtonImageUrl = false; 
+    public $name;
+    
+    public $viewButtonUrl='
+        $data instanceof X2Model ? 
+            Yii::app()->createUrl(
+                "/".lcfirst (X2Model::getModuleName (get_class ($data)))."/view",
+                array("id"=>$data->primaryKey)) :
+            Yii::app()->controller->createUrl("view", array("id"=>$data->primaryKey))';
+    public $updateButtonUrl='
+        $data instanceof X2Model ? 
+            Yii::app()->createUrl(
+                "/".lcfirst (X2Model::getModuleName (get_class ($data)))."/update",
+                array("id"=>$data->primaryKey)) :
+            Yii::app()->controller->createUrl("update", array("id"=>$data->primaryKey))';
+    public $deleteButtonUrl='
+        $data instanceof X2Model ? 
+            Yii::app()->createUrl(
+                "/".lcfirst (X2Model::getModuleName (get_class ($data)))."/delete",
+                array("id"=>$data->primaryKey)) :
+            Yii::app()->controller->createUrl("delete", array("id"=>$data->primaryKey))';
 
     /**
 	 * Registers the client scripts for the button column.
@@ -56,7 +81,8 @@ class X2ButtonColumn extends CButtonColumn {
                 /* x2modstart */ 
 				$js[]= "
                     $(document).unbind ('click.CButtonColumn".$id."');
-                    $(document).on ('click.CButtonColumn".$id."','#{$this->grid->id} a.{$class}',$function);
+                    $(document).on (
+                        'click.CButtonColumn".$id."','#{$this->grid->id} a.{$class}',$function);
                 ";
                 /* x2modend */ 
 			}
@@ -64,6 +90,24 @@ class X2ButtonColumn extends CButtonColumn {
 
 		if($js!==array())
 			Yii::app()->getClientScript()->registerScript(__CLASS__.'#'.$this->id, implode("\n",$js));
+	}
+
+
+	/**
+	 * Initializes the default buttons (view, update and delete).
+	 */
+	protected function initDefaultButtons()
+	{
+        $this->viewButtonLabel = 
+            "<span class='fa fa-search' title='".CHtml::encode (Yii::t('app', 'View record'))."'>
+             </span>";
+        $this->updateButtonLabel = 
+            "<span class='fa fa-edit' title='".CHtml::encode (Yii::t('app', 'Edit record'))."'>
+             </span>";
+        $this->deleteButtonLabel = 
+            "<span class='fa fa-times x2-delete-icon' 
+              title='".CHtml::encode (Yii::t('app', 'Delete record'))."'></span>";
+        parent::initDefaultButtons ();
 	}
 
 }

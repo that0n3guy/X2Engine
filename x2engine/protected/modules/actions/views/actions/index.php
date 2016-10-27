@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,8 +33,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
+Yii::app()->clientScript->registerCssFile(Yii::app()->theme->baseUrl.'/css/actionHistory.css');
 Yii::app()->clientScript->registerResponsiveCss('responsiveActionsCss',"
 
 @media (max-width: 759px) {
@@ -48,23 +50,26 @@ Yii::app()->clientScript->registerResponsiveCss('responsiveActionsCss',"
 
     #action-list > .items {
         margin-right: 0 !important;
+        border: none !important;
     }
 
 }
 
 ");
 
-$menuItems = array(
-	array('label'=>Yii::t('actions','Action List')),
-	array('label'=>Yii::t('actions','Create'),'url'=>array('create')),
-        array('label'=>Yii::t('actions', 'Import Actions'), 'url'=>array('admin/importModels', 'model'=>'Actions'), 'visible'=>Yii::app()->params->isAdmin),
-        array('label'=>Yii::t('actions', 'Export Actions'), 'url'=>array('admin/exportModels', 'model'=>'Actions'), 'visible'=>Yii::app()->params->isAdmin),
+$menuOptions = array(
+    'list', 'create', 'import', 'export',
 );
-$this->actionMenu = $this->formatMenu($menuItems);
+$this->insertMenu($menuOptions, $model);
+
 
 ?>
 <div class="responsive-page-title page-title icon actions" id="page-header">
-    <h2><?php echo Yii::t('actions','Actions');?></h2>
+    <h2>
+    <?php echo Yii::t('actions','{module}', array(
+        '{module}' => Modules::displayName(),
+    ));?>
+    </h2>
     <?php 
     echo ResponsiveHtml::gripButton ();
     ?>
@@ -74,38 +79,44 @@ $this->actionMenu = $this->formatMenu($menuItems);
         disabled until fixed header is added
         echo CHtml::link(Yii::t('actions','Back to Top'),'#',array('class'=>'x2-button right','id'=>'scroll-top-button')); */
         echo CHtml::link(Yii::t('actions','Filters'),'#',array('class'=>'controls-button x2-button right','id'=>'advanced-controls-toggle')); 
-        echo CHtml::link(Yii::t('actions','New Action'),array('/actions/actions/create'),array('class'=>'controls-button x2-button right','id'=>'create-button')); 
+        echo CHtml::link(
+            Yii::t('actions','New {module}', array(
+                '{module}' => Modules::displayName(false),
+            )),
+            array('/actions/actions/create'),
+            array('class'=>'controls-button x2-button right','id'=>'create-button')
+        ); 
         echo CHtml::link(Yii::t('actions','Switch to Grid'),array('index','toggleView'=>1),array('class'=>'x2-button right')); ?>
         </div>
 </div>
-<?php echo $this->renderPartial('_advancedControls',$params,true); ?>
-<?php
+<?php 
+echo $this->renderPartial('_advancedControls',$params,true);
 $this->widget('zii.widgets.CListView', array(
-			'id'=>'action-list',
-			'dataProvider'=>$dataProvider,
-			'itemView'=>'application.modules.actions.views.actions._viewIndex',
-			'htmlOptions'=>array('class'=>'action list-view','style'=>'width:100%'),
-            'viewData'=>$params,
-			'template'=>'{items}{pager}',
-            'afterAjaxUpdate'=>'js:function(){
-                clickedFlag=false;
-                lastClass="";
-                $(\'#advanced-controls\').after(\'<div class="form" id="action-view-pane" style="float:right;width:0px;display:none;padding:0px;"></div>\');
-            }',
-        'pager' => array(
-                    'class' => 'ext.infiniteScroll.IasPager',
-                    'rowSelector'=>'.view',
-                    'listViewId' => 'action-list',
-                    'header' => '',
-                    'options' => array(
-                        'history' => true,
-                        'triggerPageTreshold' => 2,
-                        'trigger'=>Yii::t('app','Load More'),
-                        'scrollContainer'=>'.items',
-                        'container'=>'.items',
-                    ),
-                  ),
-		));
+    'id'=>'action-list',
+    'dataProvider'=>$dataProvider,
+    'itemView'=>'application.modules.actions.views.actions._viewIndex',
+    'htmlOptions'=>array('class'=>'action x2-list-view list-view','style'=>'width:100%'),
+    'viewData'=>$params,
+    'template'=>'{items}{pager}',
+    'afterAjaxUpdate'=>'js:function(){
+        clickedFlag=false;
+        lastClass="";
+        $(\'#advanced-controls\').after(\'<div class="form x2-layout-island" id="action-view-pane" style="float:right;width:0px;display:none;padding:0px;"></div>\');
+    }',
+    'pager' => array(
+        'class' => 'ext.infiniteScroll.IasPager',
+        'rowSelector'=>'.view',
+        'listViewId' => 'action-list',
+        'header' => '',
+        'options' => array(
+            'history' => true,
+            'triggerPageTreshold' => 2,
+            'trigger'=>Yii::t('app','Load More'),
+            'scrollContainer'=>'.items',
+            'container'=>'.items',
+        ),
+      ),
+));
 ?>
 
 <script>
@@ -128,7 +139,7 @@ $this->widget('zii.widgets.CListView', array(
         $('#advanced-controls').after('<div class="form" id="action-view-pane" style="float:right;width:0px;display:none;padding:0px;"></div>');
     });
     <?php 
-	if (IS_IPAD) { 
+	if (AuxLib::isIPad ()) { 
 		echo "$(document).on('vclick', '.view', function (e) {" ;
 	} else {
 		echo "$(document).on('click','.view',function(e){";
@@ -195,20 +206,7 @@ $this->widget('zii.widgets.CListView', array(
 		width:99%;
 		height:800px;
 	}
-    #action-list .items{
-        clear:none;
-        max-height:800px;
-        overflow-y:auto;
-    }
-    #action-list .view{
-        clear:none;
-    }
-    #action-list .view:hover{
-        background-color:#FFFFC2;
-    }
-    .important{
-        background-color:#FFFFC2;
-    }
+
     .complete{
         color:green;
     }

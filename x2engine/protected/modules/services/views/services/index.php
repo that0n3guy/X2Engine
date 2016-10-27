@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,19 +33,12 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-$menuItems = array(
-    array('label'=>Yii::t('services','All Cases')),
-    array('label'=>Yii::t('services','Create Case'), 'url'=>array('create')),
-    array('label'=>Yii::t('services','Create Web Form'), 'url'=>array('createWebForm')),
-    array('label'=>Yii::t('services','Case Report'), 'url'=>array('servicesReport')),
-    array('label'=>Yii::t('services', 'Import Services'), 'url'=>array('admin/importModels', 'model'=>'Services'), 'visibility'=>Yii::app()->params->isAdmin),
-    array('label'=>Yii::t('services', 'Export Services'), 'url'=>array('admin/exportModels', 'model'=>'Services'), 'visibility'=>Yii::app()->params->isAdmin),
-
+$menuOptions = array(
+    'index', 'create', 'createWebForm', 'import', 'export',
 );
-
-$this->actionMenu = $this->formatMenu($menuItems);
+$this->insertMenu($menuOptions);
 
 Yii::app()->clientScript->registerScript('search', "
 $('.search-button').click(function(){
@@ -80,14 +74,14 @@ if($field) {
 $this->widget('X2GridView', array(
 	'id'=>'services-grid',
 	'title'=>Yii::t('services','Service Cases'),
-	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize'),
+	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize','showHidden'),
 	'template'=> 
         '<div id="x2-gridview-top-bar-outer" class="x2-gridview-fixed-top-bar-outer">'.
         '<div id="x2-gridview-top-bar-inner" class="x2-gridview-fixed-top-bar-inner">'.
         '<div id="x2-gridview-page-title" '.
          'class="page-title icon services x2-gridview-fixed-title">'.
         '{title}{buttons}{filterHint}'.
-        
+        '{massActionButtons}'.
         '{summary}{topPager}{items}{pager}',
     'fixedHeader'=>true,
 	'dataProvider'=>$model->searchWithStatusFilter(),
@@ -122,17 +116,17 @@ $this->widget('X2GridView', array(
 			'name'=>'account',
 			'header'=>Yii::t('contacts', 'Account'),
 			'type'=>'raw',
-			'value'=>'$data->contactIdModel? (isset($data->contactIdModel->companyModel) ? $data->contactIdModel->companyModel->getLink() : "") : ""'
+			'value'=>'isset ($data->contactIdModel) ? ($data->contactIdModel ? (isset($data->contactIdModel->companyModel) ? $data->contactIdModel->companyModel->getLink() : "") : "") : ""'
 		),
         'status'=>array(
 			'name'=>'status',
 			'type'=>'raw',
-			'value'=>'Yii::t("services",$data->status)',
+			'value'=>'Yii::t("services",$data->renderAttribute("status"))',
 		),
         'impact'=>array(
 			'name'=>'impact',
 			'type'=>'raw',
-			'value'=>'Yii::t("services",$data->impact)',
+			'value'=>'Yii::t("services",$data->renderAttribute("impact"))',
 		),
 /*		'name'=>array(
 			'name'=>'name',

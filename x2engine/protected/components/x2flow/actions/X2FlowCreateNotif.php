@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * X2FlowAction that creates a notification
@@ -48,21 +49,32 @@ class X2FlowCreateNotif extends X2FlowAction {
 
     public function paramRules(){
         $notifTypes = array('auto' => 'Auto', 'custom' => 'Custom');
-        $assignmentOptions = array('{assignedTo}' => '{'.Yii::t('studio', 'Owner of Record').'}') + X2Model::getAssignmentOptions(false, false); // '{assignedTo}', no groups, no 'anyone'
+        $assignmentOptions = array(
+            '{assignedTo}' => '{'.Yii::t('studio', 'Owner of Record').'}',
+            '{user.username}' => '{'.Yii::t('studio', 'Current User').'}'
+        ) + X2Model::getAssignmentOptions (false, false); // '{assignedTo}', no groups, no 'anyone'
 
-        return array(
+        return array_merge (parent::paramRules (), array (
             'title' => Yii::t('studio', $this->title),
             // 'info' => Yii::t('studio',$this->info),
             'options' => array(
-                array('name' => 'user', 'label' => Yii::t('studio', 'User'), 'type' => 'assignment', 'options' => $assignmentOptions), // just users, no groups or 'anyone'
+                array(
+                    'name' => 'user', 
+                    'label' => Yii::t('studio', 'User'),
+                    'type' => 'assignment',
+                    'options' => $assignmentOptions
+                ), // just users, no groups or 'anyone'
                 // array('name'=>'type','label'=>'Type','type'=>'dropdown','options'=>$notifTypes),
-                array('name' => 'text', 'label' => Yii::t('studio', 'Message'), 'optional' => 1),
-                ));
+                array(
+                    'name' => 'text', 
+                    'label' => Yii::t('studio', 'Message'), 
+                    'optional' => 1
+                ),
+            )));
     }
 
     public function execute(&$params){
         $options = &$this->config['options'];
-
         $notif = new Notification;
         $notif->user = $this->parseOption('user', $params);
         $notif->createdBy = 'API';
@@ -82,7 +94,8 @@ class X2FlowCreateNotif extends X2FlowAction {
         if ($notif->save()) {
             return array (true, "");
         } else {
-            return array(false, array_shift($notif->getErrors()));
+            $errors = $notif->getErrors ();
+            return array(false, array_shift($errors));
         }
 
     }

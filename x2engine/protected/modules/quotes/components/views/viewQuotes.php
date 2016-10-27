@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,10 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-?>
-
-<?php
+ **********************************************************************************/
 
 // get field names
 $fields=Fields::model()->findAllByAttributes(array('modelName'=>'Quote'));
@@ -48,7 +46,7 @@ foreach($fields as $field) {
 
 ?>
 
-<div class="row viewQuote" style="overflow: visible;">
+<div class="row viewQuote" style="overflow: visible;" >
 <?php
 $viewButton = CHtml::link(
 	'['. Yii::t('products', 'View') .']',
@@ -63,18 +61,31 @@ $updateButton = $canDo['QuickUpdate'] ? ' '. CHtml::link(
 ):'';
 $deleteButton = $canDo['QuickDelete'] ? ' '. CHtml::ajaxLink(
 	'['. Yii::t('quotes', 'Delete') .']', 
-	Yii::app()->createUrl('/quotes/quotes/quickDelete', array('id'=>$quote->id, 'recordId'=>$recordId)),
+	Yii::app()->createUrl(
+        '/quotes/quotes/quickDelete', array('id'=>$quote->id, 'recordId'=>$recordId)),
 	array(
 		'success' => "function(html) { x2.inlineQuotes.reloadAll(); }",
-        'beforeSend' => 'function(){return confirm('.json_encode(Yii::t('quotes','Are you sure you want to delete this quote?')).');}'
+        'beforeSend' => 'function(){
+            return confirm('.
+                json_encode(Yii::t('quotes','Are you sure you want to delete this quote?')).');
+        }'
 	),
-	array('id'=> "delete-quote-{$quote->id}", 'title'=>Yii::t('quotes', "Delete Quote"), 'live'=>false)
+	array(
+        'id'=> "delete-quote-{$quote->id}",
+        'title'=>Yii::t('quotes', "Delete Quote"),
+        'live'=>false
+    )
 ):'';
-$emailButton = (!in_array($modelName, array("X2Leads", "Opportunity"))) ? CHtml::link(
-    '['. Yii::t('products','Email') .']',
-    'javascript:void(0)',
-    array('id'=>"email-quote-{$quote->id}", 'onClick'=>"x2.inlineQuotes.sendEmail({$quote->id},".json_encode($quote->templateModel?$quote->templateModel->id:0).")")
-):'';
+$emailButton = 
+    CHtml::link(
+        '['. Yii::t('products','Email') .']',
+        'javascript:void(0)',
+        array(
+            'id'=>"email-quote-{$quote->id}", 
+            'onClick'=>"x2.inlineQuotes.sendEmail(
+                {$quote->id},".json_encode($quote->templateModel?$quote->templateModel->id:0).")"
+        )
+    );
 $printButton = CHtml::link(
     '['. Yii::t('quotes','Print') .']',
     'javascript:void(0)',
@@ -106,7 +117,8 @@ if($quote->type != 'invoice') {
 ?>
 
 <?php /*** Begin Quote Details ***/ ?>
-<div id="quote-detail-<?php echo $quote->id; ?>">
+<div id="quote-detail-<?php echo $quote->id; ?>" class='quote-detail-container'>
+<div class='quote-detail-container-inner'>
 
 <table class="quote-detail-table">
 	<tbody>
@@ -177,6 +189,7 @@ echo $quote->productTable();
 
 ?>
 
+</div>
 </div>
 
 <br />

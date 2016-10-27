@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,89 +33,40 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-?>
+ **********************************************************************************/
 
-<?php
-if(Yii::app()->settings->googleIntegration) { // menu if google integration is enables has additional options
-	$menuItems = array(
-		array('label'=>Yii::t('calendar','Calendar'), 'url'=>array('index')),
-		array('label'=>Yii::t('calendar', 'My Calendar Permissions'), 'url'=>array('myCalendarPermissions')),
-		array('label'=>Yii::t('calendar','List'),'url'=>array('list')),
-		array('label'=>Yii::t('calendar','Create')),
-		array('label'=>Yii::t('calendar', 'Sync My Actions To Google Calendar'), 'url'=>array('syncActionsToGoogleCalendar')),
-	);
-} else {
-	$menuItems = array(
-		array('label'=>Yii::t('calendar','Calendar'), 'url'=>array('index')),
-		array('label'=>Yii::t('calendar', 'My Calendar Permissions'), 'url'=>array('myCalendarPermissions')),
-		array('label'=>Yii::t('calendar','List'),'url'=>array('list')),
-		array('label'=>Yii::t('calendar','Create')),
-	);
-}
-$this->actionMenu = $this->formatMenu($menuItems);
+$modTitle = Modules::displayName();
+
+$menuOptions = array(
+    'index', 'create'
+);
+$this->insertMenu($menuOptions);
 ?>
-<h2><?php echo Yii::t('calendar','Create Shared Calendar'); ?></h2>
+<div class="calendar page-title">
+<h2>
+    <?php echo Yii::t('calendar','Create {module}', array(
+        '{module}' => $modTitle,
+    )); ?>
+</h2>
+</div>
 
 
 <?php 
-$form=$this->beginWidget('CActiveForm', array(
-   'id'=>'calendar-form',
-   'enableAjaxValidation'=>false,
-));
 
-$users = User::getNames();
-unset($users['Anyone']);
-unset($users['admin']);
+
+$users = User::getUserIds();
+unset($users['']);
+unset($users[Yii::app()->user->id]);
 	
-echo $this->renderPartial('application.components.views._form', 
-	array(
-		'model'=>$model,
-		'form'=>$form,
-		'users'=>$users,
-		'modelName'=>'calendar',
-		'isQuickCreate'=>true, // let us create the CActiveForm in this file
+echo $this->renderPartial('_form', 
+	 array(
+		 'model'=>$model,
+                 'googleIntegration'=>$googleIntegration,
+                 'client' => $client,
+                 'googleCalendarList' => $googleCalendarList,
+		 'users'=>$users,
+		 'modelName'=>'calendar',
+		 'isQuickCreate'=>true, // let us create the CActiveForm in this file
 	)
 );
-?>
-
-
-<div class="x2-layout form-view" style="margin-bottom: 0;">
-	<div class="formSection">
-		<div class="formSectionHeader">
-			<span class="sectionTitle"><?php echo Yii::t('calendar', 'Google'); ?></span>
-		</div>
-	</div>
-</div>
-
-<div class="form" style="border:1px solid #ccc; border-top: 0; padding: 0; margin-top:-1px; border-radius:0;-webkit-border-radius:0; background:#eee;">
-	<table frame="border">
-		<td>
-			<?php if($googleIntegration) { ?>
-				<?php if ($client->getAccessToken()) { ?>
-					<?php echo $form->labelEx($model, 'googleCalendar'); ?>
-					<?php echo $form->checkbox($model, 'googleCalendar'); ?>
-					<?php echo $form->labelEx($model, 'googleCalendarName'); ?>
-					<?php echo $form->dropDownList($model, 'googleCalendarId', $googleCalendarList); ?>
-					<br />
-					<?php echo CHtml::link(Yii::t('calendar', "Don't link to Google Calendar"), $this->createUrl('') . '?unlinkGoogleCalendar'); ?>
-				<?php } else { ?>
-					<?php echo CHtml::link(Yii::t('calendar', "Link to Google Calendar"), $client->createAuthUrl()); ?>
-				<?php } ?>
-			<?php } else { ?>
-					<?php echo $form->labelEx($model, 'googleCalendar'); ?>
-					<?php echo $form->checkbox($model, 'googleCalendar'); ?>
-					<?php echo $form->labelEx($model, 'googleFeed'); ?>
-					<?php echo $form->textField($model, 'googleFeed', array('size'=>75)); ?>
-			<?php } ?>
-		</td>
-	</table>
-</div>
-
-<?php
-echo '	<div class="row buttons">'."\n";
-echo '		'.CHtml::submitButton(Yii::t('app','Create'),array('class'=>'x2-button','id'=>'save-button','tabindex'=>24))."\n";
-echo "	</div>\n";
-$this->endWidget();
-
 ?>

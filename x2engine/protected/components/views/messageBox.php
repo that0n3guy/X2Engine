@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 <div id="motd-box"><?php echo Yii::t('app',$content);?></div>
 <?php
@@ -43,7 +44,7 @@ if(Yii::app()->params->isAdmin)
 <?php
 echo CHtml::beginForm();
 
-echo CHtml::textArea('message','',array('cols'=>16,'onclick'=>'clearText(this)'));
+echo CHtml::textArea('message','',array('class' => 'x2-textarea', 'cols'=>16,'onclick'=>'clearText(this)'));
 echo CHtml::ajaxSubmitButton('Submit',
 	array('/site/motd'),
 	array('update'=>'#motd-box'),

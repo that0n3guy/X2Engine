@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 $this->actionMenu = $this->formatMenu(array(
 	array('label'=>Yii::t('profile','Social Feed')),
@@ -70,16 +71,27 @@ $("#feed-form textarea").bind("focus blur",function(){ x2.forms.toggleText(this)
 		echo $form->dropDownList($feed,'visibility',array(1=>Yii::t('actions','Public'),0=>Yii::t('actions','Private')));
         echo $form->dropDownList($feed,'subtype',json_decode(Dropdowns::model()->findByPk(14)->options,true));
 		echo CHtml::submitButton(Yii::t('app','Post'),array('class'=>'x2-button','id'=>'save-button'));
-		echo CHtml::button(Yii::t('app','Attach A File/Photo'),array('class'=>'x2-button','onclick'=>"$('#attachments').toggle();"));
+		echo CHtml::button(Yii::t('app','Attach A File/Photo'),array('class'=>'x2-button','onclick'=>"x2.FileUploader.toggle('activity')"));
 		?>
 	</div>
 	<?php $this->endWidget(); ?>
 </div>
 
 
-<div id="attachments" style="display:none;">
-<?php $this->widget('Attachments',array('associationType'=>'feed','associationId'=>Yii::app()->user->getId())); ?>
-</div>
+<?php 
+$this->widget ('FileUploader',array(
+    'id' => 'activity',
+    'url' => '/site/upload',
+    'mediaParams' => array(
+        'profileId' => $profileId, 
+        'associationType' => 'feed',
+        'associationId' => Yii::app()->user->getId(),
+    ),
+    'viewParams' => array (
+        'showButton' => false
+    )
+));
+?>
 <?php 
 $allFlag=(isset($_GET['filter']) && $_GET['filter']=='all') || !isset($_GET['filter']);
 $publicFlag=isset($_GET['filter']) && $_GET['filter']=='public';

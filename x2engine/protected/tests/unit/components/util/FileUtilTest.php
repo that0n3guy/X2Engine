@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.components.util.FileUtil');
 
@@ -71,8 +72,16 @@ class FileUtilTest extends FileOperTestCase {
         $this->useFtp('testRrmDirWithPat');
     }
 
+    public function testRrmDirWithPatSsh(){
+        $this->useSsh('testRrmDirWithPat');
+    }
+
     public function testRrmDirWithoutPatFtp(){
         $this->useFtp('testRrmDirWithoutPat');
+    }
+
+    public function testRrmDirWithoutPatSsh(){
+        $this->useSsh('testRrmDirWithoutPat');
     }
 
     /**
@@ -93,9 +102,10 @@ class FileUtilTest extends FileOperTestCase {
      */
     public function assertRecursiveCcopy($SR, $TR, $RT, $C, $tss, $tst){
         // A thing to note: the current working directory is protected/tests
-        $relSource = implode(DIRECTORY_SEPARATOR, array('data', 'output', 'test-'.$this->testTime));
+        $testDir = implode(DIRECTORY_SEPARATOR, array('x2engine','protected','tests'));
+        $relSource = implode(DIRECTORY_SEPARATOR, array($testDir, 'data', 'output', 'test-'.$this->testTime));
         $absSource = realpath('.').DIRECTORY_SEPARATOR.$relSource;
-        $relTarget = implode(DIRECTORY_SEPARATOR, array('..', 'test-FileUtil', 'test-FileUtil-subdir'));
+        $relTarget = implode(DIRECTORY_SEPARATOR, array($testDir, '..', 'test-FileUtil', 'test-FileUtil-subdir'));
         $absTarget = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, 'test-FileUtil', 'test-FileUtil-subdir'));
         $source = $SR ? $relSource : $absSource;
         $target = $TR ? $relTarget : $absTarget;
@@ -170,8 +180,88 @@ class FileUtilTest extends FileOperTestCase {
         $this->removeTestDirs();
     }
 
+    public function testCcopy2 () {
+        $this->setupTestDirs();
+        $target = $this->baseDir.FileUtil::rpath("/subdir1/testFile");
+        $destPath = implode(DIRECTORY_SEPARATOR, array('sub', 'directory', 'structure'));
+
+        $destDiffName = implode(
+            DIRECTORY_SEPARATOR, array($this->baseDir, 'subdir2', $destPath, 'notTestFile'));
+        $destSameName = implode(
+            DIRECTORY_SEPARATOR, array($this->baseDir, 'subdir2', $destPath, 'testFile'));
+        $destSameNameDiffCase = implode(
+            DIRECTORY_SEPARATOR, array($this->baseDir, 'subdir2', $destPath, 'TESTfILE'));
+
+        FileUtil::ccopy($target, $destDiffName);
+        // ensure that file can be copied even though source and destination basenames differ
+        $this->assertFileExists($destDiffName);
+
+        FileUtil::ccopy($target, $destSameName);
+        $this->assertFileExists($destSameName);
+
+        FileUtil::ccopy($target, $destSameNameDiffCase);
+        // ensure that file can be copied even though source and destination basenames differ
+        $this->assertFileExists($destSameNameDiffCase);
+
+        // cleanup
+        $this->assertTrue (unlink($destDiffName));
+        $this->assertTrue (unlink($destSameName));
+        $this->assertTrue (unlink($destSameNameDiffCase));
+        $destPath = explode('/', $destPath);
+        while(!empty($destPath)){
+            rmdir($this->baseDir.FileUtil::rpath('/subdir2/'.implode('/', $destPath)));
+            array_pop($destPath);
+        }
+
+        $this->removeTestDirs();
+    }
+
+    public function testCaseInsensitiveCopyFix () {
+        $outdir = implode(
+            DIRECTORY_SEPARATOR, 
+            array(Yii::app()->basePath, 'tests', 'data', 'output', 'testCaseInsensitivityCopyFix')
+        );
+        $testFile = $outdir.DIRECTORY_SEPARATOR.'test.php';
+        $newTestFile = $outdir.DIRECTORY_SEPARATOR.'Test.php';
+        FileUtil::rrmdir($outdir);
+        $caseInsensitiveCopyFix = TestingAuxLib::setPublic (
+            'FileUtil', 'caseInsensitiveCopyFix', true);
+
+        // ensure that nothing occurs if target doesn't exist
+        $this->assertFalse (
+            $caseInsensitiveCopyFix (
+                $testFile,
+                $testFile
+            ));
+
+        system ("mkdir $outdir");
+        system ("touch $testFile");
+        $this->assertTrue (file_exists ($testFile));
+
+        // ensure that nothing occurs if filenames are identical
+        $this->assertFalse (
+            $caseInsensitiveCopyFix (
+                $testFile,
+                $testFile
+            ));
+
+        // ensure that nothing occurs if filenames differ
+        $this->assertFalse (
+            $caseInsensitiveCopyFix (
+                $testFile,
+                $newTestFile
+            ));
+
+        FileUtil::rrmdir($outdir);
+        FileUtil::rrmdir($outdir);
+    }
+
     public function testCcopyFtp(){
         $this->useFtp("testCcopy");
+    }
+
+    public function testCcopySsh(){
+        $this->useSsh("testCcopy");
     }
 
     public function testFailPathRmDir(){
@@ -183,6 +273,10 @@ class FileUtilTest extends FileOperTestCase {
 
     public function testFailPathRmDirFtp(){
         $this->useFtp("testFailPathRmDir");
+    }
+
+    public function testFailPathRmDirSsh(){
+        $this->useSsh("testFailPathRmDir");
     }
 
     public function testFormatSize(){
@@ -251,7 +345,7 @@ class FileUtilTest extends FileOperTestCase {
         // Specifying only one path. The return value should originate from
         // index.php's directory!
         $relpath = FileUtil::relpath($file);
-        $this->assertEquals('../../framework/YiiBase.php', $relpath);
+        $this->assertEquals('x2engine/framework/YiiBase.php', $relpath);
         // Test on Windows!
         $startPoint = 'C:\\Program Files (x86)\\Something\\SomethingElse\\..\\something.exe';
         $endPoint = 'C:\\Windows\\Something\\..\\Something\\SomethingMore/library.dll';
@@ -277,6 +371,7 @@ class FileUtilTest extends FileOperTestCase {
         $winChroot = "C:\\Inetpub\\Ftproot\\LocalUser\\testuser";
         $relative = "../test/dir";
 
+        FileUtil::$fileOper = 'ftp';
         FileUtil::$ftpChroot = $chrootDir;
         $this->assertEquals("/some/directory", FileUtil::ftpStripChroot($absolute));
         $this->assertEquals($relative, FileUtil::ftpStripChroot($relative));
@@ -284,6 +379,7 @@ class FileUtilTest extends FileOperTestCase {
         $this->assertEquals("/some/directory", FileUtil::ftpStripChroot($absolute));
         FileUtil::$ftpChroot = $winChroot;
         $this->assertEquals("\\some\\test\\file.txt", FileUtil::ftpStripChroot($absoluteWin));
+        FileUtil::$fileOper = 'php';
     }
 
     public function testFtpInit() {
@@ -295,6 +391,17 @@ class FileUtilTest extends FileOperTestCase {
             $this->assertEquals('php', FileUtil::$fileOper);
         } else
             $this->markTestSkipped('Skipping: X2_FTP_FILEOPER is disabled.');
+    }
+
+    public function testSshInit() {
+        if (X2_SCP_FILEOPER) {
+            $this->assertEquals('php', FileUtil::$fileOper);
+            FileUtil::sshInit(X2_SCP_HOST, X2_SCP_USER, X2_SCP_PASS);
+            $this->assertEquals('scp', FileUtil::$fileOper);
+            FileUtil::sshClose();
+            $this->assertEquals('php', FileUtil::$fileOper);
+        } else
+            $this->markTestSkipped('Skipping: X2_SCP_FILEOPER is disabled.');
     }
 
 }

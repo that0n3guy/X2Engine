@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,64 +32,64 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 
+x2.WebleadFormDesigner = (function(){
 
-
-function WebleadFormDesigner (argsList) {
-	WebFormDesigner.call (this, argsList);	
-}
-
-WebleadFormDesigner.prototype = auxlib.create (WebFormDesigner.prototype);
-
-/*
-Public static methods
-*/
-
-/*
-Private static methods
-*/
-
-/*
-Public instance methods
-*/
-
-WebleadFormDesigner.prototype._setUpGenerateLeadMenu = function () {
-
-    $('#generate-lead-checkbox').change (function () {
-        if ($(this).is (':checked')) {
-            $('#generate-lead-form').slideDown ();
-        } else {
-            $('#generate-lead-form').slideUp ();
-        }
-    });
-};
-
-/*
-Private instance methods
-*/
-
-WebleadFormDesigner.prototype._updateExtraFields = function (form) {
-
-    if(typeof form.generateLead !== 'undefined') {
-        if (parseInt (form.generateLead, 10) === 1) {
-            $('#generate-lead-checkbox').prop ('checked', true);
-        } else {
-            $('#generate-lead-checkbox').prop ('checked', false);
-        }
-        $('#generate-lead-checkbox').change ();
+    function WebleadFormDesigner (argsList) {
+        x2.WebFormDesigner.call (this, argsList);  
     }
 
-    if(typeof form.leadSource !== 'undefined') {
-        $('#leadSource').val (form.leadSource);
+    WebleadFormDesigner.prototype = auxlib.create (x2.WebFormDesigner.prototype);
+
+    /*
+    Public instance methods
+    */
+
+    WebleadFormDesigner.prototype._setUpGenerateAssociatedRecordMenu = function () {
+
+        $('#generate-lead-checkbox').change (function () {
+            if ($(this).is (':checked')) {
+                $('#generate-lead-form').slideDown ();
+            } else {
+                $('#generate-lead-form').slideUp ();
+            }
+        });
+    };
+
+    /*
+    Private instance methods
+    */
+
+    WebleadFormDesigner.prototype._updateExtraFields = function (form) {
+
+        if(typeof form.generateLead !== 'undefined') {
+            if (parseInt (form.generateLead, 10) === 1) {
+                $('#generate-lead-checkbox').prop ('checked', true);
+            } else {
+                $('#generate-lead-checkbox').prop ('checked', false);
+            }
+            $('#generate-lead-checkbox').change ();
+        }
+        if(typeof form.generateAccount !== 'undefined') {
+            if (parseInt (form.generateAccount, 10) === 1) {
+                $('#generate-account-checkbox').prop ('checked', true);
+            } else {
+                $('#generate-account-checkbox').prop ('checked', false);
+            }
+            $('#generate-account-checkbox').change ();
+        }
+
+        if(typeof form.leadSource !== 'undefined') {
+            $('#leadSource').val (form.leadSource);
+        }
+
+    };
+
+    WebleadFormDesigner.prototype._init = function () {
+        this._setUpGenerateAssociatedRecordMenu ();
+        x2.WebFormDesigner.prototype._init.call (this);
     }
-
-};
-
-WebleadFormDesigner.prototype._init = function () {
-    this._setUpGenerateLeadMenu ();
-    WebFormDesigner.prototype._init.call (this);
-}
-
-
+    return WebleadFormDesigner;
+})();

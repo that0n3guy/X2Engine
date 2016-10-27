@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * This is the model class for table "x2_relationships".
@@ -44,148 +45,246 @@
  * @property string $secondType
  * @property integer $secondId
  */
-class Relationships extends CActiveRecord {
-	/**
-	 * Returns the static model of the specified AR class.
-	 * @return Relationships the static model class
-	 */
-	public static function model($className=__CLASS__)
-	{
-		return parent::model($className);
-	}
+class Relationships extends X2ActiveRecord {
 
-	/**
-	 * @return string the associated database table name
-	 */
-	public function tableName()
-	{
-		return 'x2_relationships';
-	}
+    /**
+     * Returns the static model of the specified AR class.
+     * @return Relationships the static model class
+     */
+    public static function model($className=__CLASS__) {
+        return parent::model($className);
+    }
 
-	/**
-	 * @return array validation rules for model attributes.
-	 */
-	public function rules()
-	{
-		// NOTE: you should only define rules for those attributes that
-		// will receive user inputs.
-		return array(
-			array('firstId, secondId', 'numerical', 'integerOnly'=>true),
-			array('firstType, secondType', 'length', 'max'=>100),
-			array('firstType,secondType', 'linkables','on'=>'api'),
-			array('firstType,firstId, secondType, secondId','required','on'=>'api'),
-			// The following rule is used by search().
-			// Please remove those attributes that should not be searched.
-			array('firstType, firstId, secondType, secondId', 'safe', 'on'=>'search,api'),
-		);
-	}
+    /**
+     * @return array model titles indexed by type name for types for which the current user has 
+     *  module view permissions
+     */
+    public static function getRelationshipTypeOptions () {
+        $options = X2Model::getModelTypesWhichSupportRelationships (true);
+        foreach ($options as $model => $title) {
+            $accessLevel = $model::model ()->getAccessLevel ();
+            if ($accessLevel === X2PermissionsBehavior::QUERY_NONE) {
+                unset ($options[$model]);
+            }
+        }
+        return $options;
+    }
 
-	/**
-	 * @return array relational rules.
-	 */
-	public function relations()
-	{
-		// NOTE: you may need to adjust the relation name and the related
-		// class name for the relations automatically generated below.
-		return array(
-		);
-	}
+    /**
+     * @return string the associated database table name
+     */
+    public function tableName() {
+        return 'x2_relationships';
+    }
 
-	/**
-	 * @return array customized attribute labels (name=>label)
-	 */
-	public function attributeLabels()
-	{
-		return array(
-			'id' => 'ID',
-			'firstType' => 'First Type',
-			'firstId' => 'First',
-			'secondType' => 'Second Type',
-			'secondId' => 'Second',
-		);
-	}
-	
-	
-	/**
-	 * Creates a relationship between two models.
-	 *
-	 * Before the relationship is created, this function checks that the relationship
-	 * does not already exist
-	 * @param X2Model $firstType name of the class for the first model in this relationship
-	 * @param X2Model $firstId id of the first model in this relationship
-	 * @param X2Model $secondType name of the class for the second model in this relationship
-	 * @param X2Model $secondId id of the second model in this relationship
-	 * @return true if the relationship was created, false if it already exists
-	 *
-	 */
-	public static function create($firstType, $firstId, $secondType, $secondId) {
-		$relationship = Relationships::model()
-            ->findByAttributes(
-                array('firstType'=>$firstType, 'firstId'=>$firstId, 'secondType'=>$secondType,
-                    'secondId'=>$secondId));
+    /**
+     * @return array validation rules for model attributes.
+     */
+    public function rules() {
+        // NOTE: you should only define rules for those attributes that
+        // will receive user inputs.
+        return array(
+            array('firstId, secondId', 'numerical', 'integerOnly'=>true),
+            array('firstType, secondType, firstLabel, secondLabel', 'length', 'max'=>100),
+            array('firstType, secondType', 'linkables','on'=>'api'),
+            array('firstType, firstId, secondType, secondId','required','on'=>'api'),
+            array('firstType, secondType','validateType'),
+            array('firstId, secondId','validateModel'),
+            // The following rule is used by search().
+            // Please remove those attributes that should not be searched.
+            array(
+                'firstType, firstId, firstLabel, secondType, secondId, secondLabel', 
+                'safe', 'on'=>'search,api'),
+        );
+    }
 
-		if($relationship)
-			return false;
+    /**
+     * Ensure that type corresponds to child of X2Model which supports relationships 
+     */
+    public function validateType ($attr) {
+        $value = $this->$attr;
+        $validTypes = X2Model::getModelTypesWhichSupportRelationships (true);
+        if (!class_exists ($value) || !isset ($validTypes[$value])) {
+            $this->addError ($attr, Yii::t('app', 'Invalid record type') );
+        }
+    }
 
-		$relationship = Relationships::model()->
-            findByAttributes(
-                array('firstType'=>$secondType, 'firstId'=>$secondId, 'secondType'=>$firstType,
-                    'secondId'=>$firstId));
+    /**
+     * Assuming that type is valid, ensure that id corresponds to an existing record 
+     */
+    public function validateModel ($attr) {
+        $value = $this->$attr;
+        $position = preg_replace ('/Id$/', '', $attr);
+        $type = $this->{$position.'Type'};
+        if (!$type::model ()->findByPk ($value)) {
+            $this->addError ($attr, Yii::t('app', 'Record could not be found'));
+        }
+    }
 
-		if($relationship)
-			return false;
-		
-		$relationship = new Relationships;
-		$relationship->firstType=$firstType;
-		$relationship->firstId=$firstId;
-		$relationship->secondType=$secondType;
-		$relationship->secondId=$secondId;
-		$relationship->save();
-		
-		return true;
-	}
+    /**
+     * @return bool true if relationship already exists, false otherwise 
+     */
+    public function hasDuplicates () {
+        return ((int) Yii::app()->db->createCommand ()
+            ->select ('count(*)')
+            ->from ('x2_relationships')
+            ->where ('
+                firstType=:firstType0 AND firstId=:firstId0 AND secondType=:secondType0 AND
+                secondId=:secondId0', 
+                array (
+                    ':firstType0' => $this->firstType,
+                    ':firstId0' => $this->firstId,
+                    ':secondType0' => $this->secondType,
+                    ':secondId0' => $this->secondId,
+                ))
+            ->orWhere ('
+                firstType=:firstType1 AND firstId=:firstId1 AND secondType=:secondType1 AND
+                secondId=:secondId1', 
+                array (
+                    ':firstType1' => $this->secondType,
+                    ':firstId1' => $this->secondId,
+                    ':secondType1' => $this->firstType,
+                    ':secondId1' => $this->firstId,
+                ))
+            ->queryScalar ()) > 0;
+    }
 
-	/**
-	 * Retrieves a list of models based on the current search/filter conditions.
-	 * @return CActiveDataProvider the data provider that can return the models based on the search/filter conditions.
-	 */
-	public function search()
-	{
-		// Warning: Please modify the following code to remove attributes that
-		// should not be searched.
+    /**
+     * Add duplicate validation  
+     */
+    public function beforeValidate () {
+        $valid = parent::beforeValidate ();
+        if ($valid) {
+            if ($this->hasDuplicates ()) {
+                $this->addError ('secondType', Yii::t('app', 'Relationship already exists'));
+                $this->addErrors (
+                    array_map (
+                        function () { return null; }, 
+                        array_flip (array ('firstType', 'firstId', 'secondId'))));
+                $valid = false;
+            }
+        }
+        return $valid;
+    }
 
-		$criteria=new CDbCriteria;
+    /**
+     * @return array relational rules.
+     */
+    public function relations() {
+        // NOTE: you may need to adjust the relation name and the related
+        // class name for the relations automatically generated below.
+        return array(
+        );
+    }
 
-		$criteria->compare('id',$this->id);
-		$criteria->compare('firstType',$this->firstType,true);
-		$criteria->compare('firstId',$this->firstId);
-		$criteria->compare('secondType',$this->secondType,true);
-		$criteria->compare('secondId',$this->secondId);
+    /**
+     * @return array customized attribute labels (name=>label)
+     */
+    public function attributeLabels() {
+        return array(
+            'id' => 'ID',
+            'firstType' => 'First Type',
+            'firstId' => 'First',
+            'firstLabel' => 'First Label',
+            'secondType' => 'Second Type',
+            'secondId' => 'Second',
+            'secondLabel' => 'Second Label',
+        );
+    }
 
-		return new CActiveDataProvider(get_class($this), array(
-			'criteria'=>$criteria,
-		));
-	}
+    /**
+     * @param string $myType 
+     * @param string $myId 
+     * @return string
+     * @throws CException
+     */
+    public function getLabel ($myType, $myId) {
+        if ($this->firstType === $myType && $this->firstId == $myId) {
+            return $this->secondLabel;
+        } elseif ($this->secondType === $myType && $this->secondId == $myId) {
+            return $this->firstLabel;
+        }
+        throw new CException ('myType and myId don\'t match either related model');
+    }
 
-	/**
-	 * 
-	 */
-	public function linkables($attribute, $params) {
-		if(!class_exists($this->$attribute))
-			$this->addError($attribute,Yii::t('app','Class "{class}" specified for {attribute} does not exist, so cannot create relationships with it.',array('{class}'=>$this->$attribute)));
-		// See if the active record class has the linkable behavior:
-		$staticModel = CActiveRecord::model($this->$attribute);
-		$has = false;
-		foreach($staticModel->behaviors() as $name=>$config){
-			if($config['class'] == 'X2LinkableBehavior'){
-				$has = true;
-				break;
-			}
-		}
-		if(!$has)
-			$this->addError($attribute,Yii::t('app','Class "{class}" specified for {attribute} does not have X2LinkableBehavior, and thus cannot be used with relationships.',array('{class}'=>$this->$attribute)));
-		$model = $staticModel->findByPk($attribute=='firstType' ? $this->firstId : $this->secondId);
-		if(!$model)
-			$this->addError($attribute,Yii::t('app','Model record not found for {attribute}.'));
-	}
+    public function setFirstModel (X2Model $model) {
+        $this->firstType = get_class ($model);
+        $this->firstId = $model->id;
+    }
+
+    public function setSecondModel (X2Model $model) {
+        $this->secondType = get_class ($model);
+        $this->secondId = $model->id;
+    }
+
+    /**
+     * @param string $myType 
+     * @param string $myId 
+     * @return null|CActiveRecord
+     * @throws CException
+     */
+    private $_otherModel = array ();
+    public function getOtherModel ($myType, $myId) {
+        if (!isset ($this->_otherModel[$myType.$myId])) {
+            if ($this->firstType === $myType && $this->firstId == $myId) {
+                $model = X2Model::model ($this->secondType)->findByPk ($this->secondId);
+            } elseif ($this->secondType === $myType && $this->secondId == $myId) {
+                $model = X2Model::model ($this->firstType)->findByPk ($this->firstId);
+            } else {
+                throw new CException ('myType and myId don\'t match either related model');
+            }
+            $this->_otherModel[$myType.$myId] = $model;
+        }
+        return $this->_otherModel[$myType.$myId];
+    }
+    
+    /**
+     * Retrieves a list of models based on the current search/filter conditions.
+     * @return CActiveDataProvider the data provider that can return the models based on the 
+     *  search/filter conditions.
+     */
+    public function search() {
+        // Warning: Please modify the following code to remove attributes that
+        // should not be searched.
+
+        $criteria=new CDbCriteria;
+
+        $criteria->compare('id',$this->id);
+        $criteria->compare('firstType',$this->firstType,true);
+        $criteria->compare('firstId',$this->firstId);
+        $criteria->compare('firstLabel',$this->firstLabel);
+        $criteria->compare('secondType',$this->secondType,true);
+        $criteria->compare('secondId',$this->secondId);
+        $criteria->compare('secondLabel',$this->secondLabel);
+
+        return new CActiveDataProvider(get_class($this), array(
+            'criteria'=>$criteria,
+        ));
+    }
+
+    public function linkables($attribute, $params) {
+        if(!class_exists($this->$attribute))
+            $this->addError(
+                $attribute,
+                Yii::t('app','Class "{class}" specified for {attribute} does not exist, so cannot create relationships with it.',array('{class}'=>$this->$attribute)));
+
+        // See if the active record class has the linkable behavior:
+        $staticModel = CActiveRecord::model($this->$attribute);
+        $has = false;
+        foreach($staticModel->behaviors() as $name=>$config){
+            if($config['class'] == 'LinkableBehavior'){
+                $has = true;
+                break;
+            }
+        }
+        if(!$has)
+            $this->addError(
+                $attribute,
+                Yii::t('app','Class "{class}" specified for {attribute} does not have LinkableBehavior, and thus cannot be used with relationships.',array('{class}'=>$this->$attribute)));
+
+        $model = $staticModel->findByPk($attribute=='firstType' ? $this->firstId : $this->secondId);
+        if(!$model)
+            $this->addError($attribute,Yii::t('app','Model record not found for {attribute}.'));
+    }
+
 }

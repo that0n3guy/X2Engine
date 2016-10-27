@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,17 +33,17 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // Yii::app()->clientScript->registerScript('formEditor', "
 // ",CClientScript::POS_READY);
 
 Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/x2formEditor.js');
-Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/colResizable-1.3.min.js');
+Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/lib/colResizable/colResizable.js');
 
 if(isset($layoutModel) && !empty($layoutModel->layout)){
     Yii::app()->clientScript->registerScript('loadForm', '
-	loadFormJson(\''.preg_replace('/\\"/u', '\\\\"', addcslashes($layoutModel->layout, "'\\")).'\');
+	x2.formEditor.loadFormJson(\''.preg_replace('/\\"/u', '\\\\"', addcslashes($layoutModel->layout, "'\\")).'\');
 	', CClientScript::POS_READY);
 }
 
@@ -71,7 +72,7 @@ $('#copyLayoutButton').click(function() {
 	if(!window.layoutChanged || confirm('".addslashes(Yii::t('admin', 'Leave without saving changes?'))."')) {
 		var layoutName = prompt('".addslashes(Yii::t('admin', 'Please enter a name for the new layout.'))."');
 		if(layoutName != null && layoutName != '') {
-			$('#layoutHiddenField').val(generateFormJson());
+			$('#layoutHiddenField').val(x2.formEditor.generateFormJson());
 			$('#formEditorForm').attr('action','".CHtml::normalizeUrl(array('createFormLayout'))."?model='+$('#modelList').val()+'&newLayout=1&layoutName='+encodeURI(layoutName));
 			$('#formEditorForm').unbind('submit').submit();
 		}
@@ -123,7 +124,7 @@ echo CHtml::hiddenField('layout', '', array('id' => 'layoutHiddenField'));
                 ?>
                 <?php echo CHtml::label(Yii::t('admin', 'Scenario'), 'scenario'); ?>
                 <?php
-                echo CHtml::dropDownList('id', empty($layoutModel) ? 'Default' : $layoutModel->scenario, $scenarios, array(
+                echo CHtml::dropDownList('scenario', empty($layoutModel) ? 'Default' : $layoutModel->scenario, $scenarios, array(
                     'id' => 'scenario'
                 ));
                 ?>
@@ -244,6 +245,26 @@ echo CHtml::hiddenField('layout', '', array('id' => 'layoutHiddenField'));
 <?php } ?>
 <?php if(!empty($id)){ ?>
     <div class="formContainer span-15">
+        <!-- Preview Tabs -->
+        <div id="preview" style='display:none'>
+            <ul>
+                <li>
+                    <a href='#preview-form'>
+                        <?php echo Yii::t('admin', 'Form')?>
+                    </a>
+                </li>
+                <li>
+                    <a href='#preview-view'>
+                        <?php echo Yii::t('admin', 'View')?>
+                    </a>
+                </li>
+            </ul>
+            <div id='preview-form'>
+            </div>
+            <div id='preview-view'>
+            </div>
+        </div>
+
         <div class="x2-layout form-view editMode" id="formEditor">
             <div id="formEditorControls">
                 <a href="javascript:void(0)" id="addRow" class="x2-button"><?php echo Yii::t('admin', 'Add Row'); ?></a>

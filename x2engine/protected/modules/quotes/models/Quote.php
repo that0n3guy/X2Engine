@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.models.X2Model');
 
@@ -115,7 +116,8 @@ class Quote extends X2Model {
 	 */
 	public function getAdjustmentLines(){
 		if(!isset($this->_adjustmentLines))
-			$this->_adjustmentLines = array_filter($this->lineItems,function($li){return $li->isTotalAdjustment;});
+			$this->_adjustmentLines = array_filter(
+                $this->lineItems,function($li){return $li->isTotalAdjustment;});
 		return $this->_adjustmentLines;
 	}
 
@@ -124,7 +126,8 @@ class Quote extends X2Model {
 	 */
 	public function getProductLines(){
 		if(!isset($this->_productLines))
-			$this->_productLines = array_filter($this->lineItems,function($li){return !$li->isTotalAdjustment;});
+			$this->_productLines = array_filter(
+                $this->lineItems,function($li){return !$li->isTotalAdjustment;});
 		return $this->_productLines;
 	}
 
@@ -143,9 +146,11 @@ class Quote extends X2Model {
         // NOTE: you may need to adjust the relation name and the related
         // class name for the relations automatically generated below.
         return array_merge(parent::relations(), array(
-                    'products' => array(self::HAS_MANY, 'QuoteProduct', 'quoteId', 'order' => 'lineNumber ASC'),
-                    'contact' => array(self::BELONGS_TO, 'Contacts', array('associatedContacts' => 'nameId'))
-                ));
+            'products' => array(
+                self::HAS_MANY, 'QuoteProduct', 'quoteId', 'order' => 'lineNumber ASC'),
+            'contact' => array(
+                self::BELONGS_TO, 'Contacts', array('associatedContacts' => 'nameId'))
+        ));
     }
 
 	/**
@@ -157,16 +162,16 @@ class Quote extends X2Model {
 
 	public function behaviors() {
 		return array_merge(parent::behaviors(), array(
-					'X2LinkableBehavior' => array(
-						'class' => 'X2LinkableBehavior',
-						'module' => 'quotes'
-					),
-					'ERememberFiltersBehavior' => array(
-						'class' => 'application.components.ERememberFiltersBehavior',
-						'defaults' => array(),
-						'defaultStickOnClear' => false
-					)
-				));
+            'LinkableBehavior' => array(
+                'class' => 'LinkableBehavior',
+                'module' => 'quotes'
+            ),
+            'ERememberFiltersBehavior' => array(
+                'class' => 'application.components.behaviors.ERememberFiltersBehavior',
+                'defaults' => array(),
+                'defaultStickOnClear' => false
+            )
+        ));
 	}
 
 	/**
@@ -181,7 +186,12 @@ class Quote extends X2Model {
 	 * @return array Array of QuoteProduct instances representing the item set after changes.
 	 * @throws CException
 	 */
-	public function setLineItems(array $items, $save = false) {
+	public function setLineItems(array $items, $save = false, $skipProcessing=false) {
+        if ($skipProcessing) {
+            $this->_lineItems = $items;
+            return;
+        }
+
 		$this->_deleteLineItems = array();
 		if (count($items) === 0) {
 			QuoteProduct::model()->deleteAllByAttributes(array('quoteId' => $this->id));
@@ -205,6 +215,11 @@ class Quote extends X2Model {
 		$itemSet = array();
 		$existingItems = array();
 		foreach ($this->lineItems as $item) {
+            if ($item->isNewRecord) {
+                // this line might not be needed anymore. Used to be used for record duplication,
+                // but now now skipProcessing is used instead, bypassing this line.
+                $item->save();
+            }
 			$existingItems[$item->id] = $item;
 			$existingItemIds[] = (int) $item->id;
 		}
@@ -261,11 +276,14 @@ class Quote extends X2Model {
             Yii::app()->settings->currency:$this->currency;
 
 		$curSym = Yii::app()->locale->getCurrencySymbol($defaultCurrency);
+        if (is_null($curSym))
+            $curSym = $defaultCurrency;
+
 		foreach($this->_lineItems as $lineItem) {
 			$lineItem->quoteId = $this->id;
-                        $product = X2Model::model('Products')->findByAttributes(array('name'=>$lineItem->name));
-                        if (isset($product))
-                            $lineItem->productId = $product->id;
+            $product = X2Model::model('Products')->findByAttributes(array('name'=>$lineItem->name));
+            if (isset($product))
+                $lineItem->productId = $product->id;
             if(empty($lineItem->currency))
 				$lineItem->currency = $defaultCurrency;
 			if($lineItem->isPercentAdjustment) {
@@ -310,9 +328,11 @@ class Quote extends X2Model {
 		if(isset($this->_lineItems)){
 			foreach($this->_lineItems as $item){
 				$item->quoteId = $this->id;
-                                $product = X2Model::model('Products')->findByAttributes(array('name'=>$item->name));
-                                if (isset($product))
-                                    $item->productId = $product->id;
+                $product = X2Model::model('Products')->findByAttributes(array(
+                    'name'=>$item->name
+                ));
+                if (isset($product))
+                    $item->productId = $product->id;
 				$item->save();
 			}
 		}
@@ -324,10 +344,29 @@ class Quote extends X2Model {
 		}
 	}
 
+    public function getContactId () {
+        list ($name, $id) = Fields::nameAndId ($this->associatedContacts);
+        return $id;
+    }
+
+    public function getAccountId () {
+        list ($name, $id) = Fields::nameAndId ($this->accountName);
+        return $id;
+    }
+
 	/**
 	 * Creates an action history event record in the contact/account
 	 */
 	public function createActionRecord() {
+		if(!empty($this->contactId)) {
+            $this->createAssociatedAction ('contacts', $this->contactId);
+		}
+		if(!empty($this->accountName)) {
+            $this->createAssociatedAction ('accounts', $this->accountId);
+		}
+	}
+
+    public function createAssociatedAction ($type, $id) {
 		$now = time();
 		$actionAttributes = array(
 			'type' => 'quotes',
@@ -340,23 +379,12 @@ class Quote extends X2Model {
 			'completedBy' => $this->createdBy,
 			'updatedBy' => $this->updatedBy
 		);
-		$ids = explode(',',$this->associatedContacts);
-		if(!empty($ids)) {
-			$cid = trim($ids[0]);
-			$action = new Actions();
-			$action->attributes = $actionAttributes;
-			$action->associationType = 'contacts';
-			$action->associationId = $cid;
-			$action->save();
-		}
-		if(!empty($this->accountName)) {
-			$action = new Actions();
-			$action->attributes = $actionAttributes;
-			$action->associationType = 'accounts';
-			$action->associationId = $this->accountName;
-			$action->save();
-		}
-	}
+        $action = new Actions();
+        $action->attributes = $actionAttributes;
+        $action->associationType = $type;
+        $action->associationId = $id;
+        $action->save();
+    }
 
 	/**
 	 * Creates an event record for the creation of the model.
@@ -394,6 +422,10 @@ class Quote extends X2Model {
 	 * @return string
 	 */
 	public function productTable($emailTable = false) {
+        if (!YII_UNIT_TESTING)
+            Yii::app()->clientScript->registerCssFile (
+                Yii::app()->getModule('quotes')->assetsUrl.'/css/productTable.css'
+            );
 		$pad = 4;
 		// Declare styles
 		$tableStyle = 'border-collapse: collapse; width: 100%;';
@@ -411,23 +443,33 @@ class Quote extends X2Model {
 		// Declare element templates
 		$thProduct = '<th style="'.$thProductStyle.'">{c}</th>';
 		$tdDef = '<td style="'.$defaultStyle.'">{c}</td>';
-		$th = '<th style="'.$thStyle.'">{c}</th>';
 		$td = '<td style="'.$tdStyle.'">{c}</td>';
 		$tdFooter = '<td style="'.$tdFooterStyle.'">{c}</td>';
 		$tdBox = '<td style="'.$tdBoxStyle.'">{c}</td>';
 		$hr = '<hr style="width: 100%;height:2px;background:black;" />';
 		$tr = '<tr>{c}</tr>';
 		$colRange = range(2,7);
-		$span = array_combine($colRange,array_map(function($s){return "<td colspan=\"$s\"></td>";},$colRange));
+		$span = array_combine($colRange,array_map(function($s){
+            return "<td colspan=\"$s\"></td>";},$colRange));
 		$span[1] = '<td></td>';
 
 		$markup = array();
 
 		// Table opening and header
-		$markup[] = "<table style=\"$tableStyle\"><thead>";
-		$row = array(str_replace('{c}',Yii::t('products','Line Item'),$thProduct));
-		foreach(array('Unit Price','Quantity','Adjustment','Comments','Price') as $columnHeader) {
-			$row[] = str_replace('{c}',Yii::t('products',$columnHeader),$th);
+		$markup[] = "<table class='quotes-product-table' style=\"$tableStyle\"><thead>";
+        $row = array ();
+		foreach(array(
+            'Line Item' => '20%; min-width: 200px;',
+            'Unit Price' => '17.5%',
+            'Quantity' => '15%',
+            'Adjustment' => '15%',
+            'Comments' => '15%',
+            'Price' => '20%'
+        ) as $columnHeader => $width) {
+            $row[] = 
+                '<th style="'.$thStyle."width: $width;".'">'.
+                    Yii::t('products',$columnHeader).
+                '</th>';
 		}
 		$markup[] = str_replace('{c}',implode("\n",$row),$tr);
 
@@ -608,9 +650,9 @@ class Quote extends X2Model {
 		$criteria = new CDbCriteria;
 		$parameters = array('limit' => ceil($pageSize));
 		$criteria->scopes = array('findAll' => array($parameters));
-		$criteria->addCondition("(t.type!='invoice' and type!='dummyQuote') OR t.type IS NULL");
+		$criteria->addCondition("(t.type!='invoice' and t.type!='dummyQuote') OR t.type IS NULL");
 
-		return $this->searchBase($criteria, $pageSize, $uniqueId);
+		return $this->searchBase($criteria, $pageSize);
 	}
 
 	public function searchInvoice() {
@@ -622,27 +664,24 @@ class Quote extends X2Model {
 		return $this->searchBase($criteria);
 	}
 
+    public function getName () {
+        if ($this->name == '') {
+            return $this->id;
+        } else {
+            return $this->name;
+        }
+    }
+
 	public function searchAdmin() {
 		$criteria = new CDbCriteria;
 
 		return $this->searchBase($criteria);
 	}
 
-	public function searchBase($criteria, $pageSize=null, $uniqueId=null) {
+	public function searchBase(
+        $criteria, $pageSize=null, $showHidden = false) {
 
-		$dateRange = Yii::app()->controller->partialDateRange($this->expectedCloseDate);
-		if ($dateRange !== false)
-			$criteria->addCondition('expectedCloseDate BETWEEN ' . $dateRange[0] . ' AND ' . $dateRange[1]);
-
-		$dateRange = Yii::app()->controller->partialDateRange($this->createDate);
-		if ($dateRange !== false)
-			$criteria->addCondition('createDate BETWEEN ' . $dateRange[0] . ' AND ' . $dateRange[1]);
-
-		$dateRange = Yii::app()->controller->partialDateRange($this->lastUpdated);
-		if ($dateRange !== false)
-			$criteria->addCondition('lastUpdated BETWEEN ' . $dateRange[0] . ' AND ' . $dateRange[1]);
-
-		return parent::searchBase($criteria, $pageSize, $uniqueId);
+		return parent::searchBase($criteria, $pageSize, $showHidden);
 	}
 
 	/**
@@ -724,36 +763,31 @@ class Quote extends X2Model {
 	 * Clear out records associated with this quote before deletion.
 	 */
 	public function beforeDelete(){
-
 		QuoteProduct::model()->deleteAllByAttributes(array('quoteId'=>$this->id));
-		Relationships::model()->deleteAllByAttributes(array('firstType' => 'quotes', 'firstId' => $this->id));// delete associated actions
-		Actions::model()->deleteAllByAttributes(array('associationId'=>$this->id, 'associationType'=>'quotes'));
-//		$event = new Events;
-//		$event->type = 'record_deleted';
-//		$event->subtype = 'quote';
-//		$event->associationType = $this->myModelName;
-//		$event->associationId = $this->id;
-//		$event->text = $this->name;
-//		$event->user = $this->assignedTo;
-//		$event->save();
-		$name = $this->name;
-		// generate action record, for history
+
+        // for old relationships generated with incorrect type name
+		Relationships::model()->deleteAllByAttributes(
+            array('firstType' => 'quotes', 'firstId' => $this->id));
+
+		// generate action record for history
 		$contact = $this->contact;
 		if(!empty($contact)){
 			$action = new Actions;
 			$action->associationType = 'contacts';
-			$action->type = 'quotes';
+			$action->type = 'quotesDeleted';
 			$action->associationId = $contact->id;
 			$action->associationName = $contact->name;
-			$action->assignedTo = Yii::app()->getSuModel()->username; //  Yii::app()->user->getName();
-			$action->completedBy = Yii::app()->getSuModel()->username; // Yii::app()->user->getName();
+			$action->assignedTo = Yii::app()->getSuModel()->username; 
+			$action->completedBy = Yii::app()->getSuModel()->username;
 			$action->createDate = time();
 			$action->dueDate = time();
 			$action->completeDate = time();
 			$action->visibility = 1;
 			$action->complete = 'Yes';
-			$action->actionDescription = "Deleted Quote: <span style=\"font-weight:bold;\">{$this->id}</span> {$this->name}";
-			$action->save(); // Save after deletion of the model so that this action itself doensn't get deleted
+			$action->actionDescription = 
+                "Deleted Quote: <span style=\"font-weight:bold;\">{$this->id}</span> {$this->name}";
+            // Save after deletion of the model so that this action itself doensn't get deleted
+			$action->save(); 
 		}
 		return parent::beforeDelete();
 	}

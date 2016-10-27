@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,12 +33,16 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('media', 'All Media'), 'url'=>array('index')),
-	array('label'=>Yii::t('media', 'Upload')),
-));
+$menuOptions = array(
+    'index', 'upload',
+);
+$this->insertMenu($menuOptions);
+
+Yii::app()->clientScript->registerCssFile(
+    Yii::app()->controller->module->assetsUrl.'/css/media.css');
+
 ?>
 <div class="page-title icon media">
 <h2><?php echo Yii::t('media','Upload Media File'); ?></h2>
@@ -48,7 +53,7 @@ $this->actionMenu = $this->formatMenu(array(
    'enableAjaxValidation'=>false,
 )); ?>
 
-<div class="x2-layout form-view" style="margin-bottom: 0;">
+<div id='media-form' class="x2-layout form-view" style="margin-bottom: 0;">
 	<div class="formSection showSection">
 		<div class="formSectionHeader">
 			<span class="sectionTitle"><?php echo Yii::t('media', 'Select File'); ?></span>
@@ -57,10 +62,11 @@ $this->actionMenu = $this->formatMenu(array(
 			<table>
 				<tbody>
 					<tr class="formSectionRow">
-						<td style="background: #FAFAFA;">
+						<td>
 							<div class="x2-file-wrapper">
-							    <input type="file" class="x2-file-input" name="upload" onChange="var validName = mediaCheckName(this); if(validName) {mediaFileUpload(this.form, $(this), '<?php echo Yii::app()->createUrl('/site/tmpUpload'); ?>', '<?php echo Yii::app()->createUrl('/site/removeTmpUpload'); ?>'); }">
+							    <input type="file" class="x2-file-input" name="upload" onChange="x2.uploadMedia(this)">
 							    <input type="button" class="x2-button" value="<?php echo Yii::t('media', 'Choose File'); ?>">
+                                <span class="error"></span>
 							    <?php echo CHtml::image(Yii::app()->theme->getBaseUrl().'/images/loading.gif',Yii::t('app','Loading'),array('id'=>'choose-file-saving-icon', 'style'=>'position: absolute; width: 14px; height: 14px; filter: alpha(opacity=0); -moz-opacity: 0.00; opacity: 0.00;')); ?>
 							    <span class="filename"></span>
 							    <input type="hidden" class="temp-file-id" name="TempFileId" value="">
@@ -73,6 +79,11 @@ $this->actionMenu = $this->formatMenu(array(
 									<?php echo Yii::t('media', 'Forbidden File Extensions:') . ' ' . Media::forbiddenFileTypes(); ?>
 								</span>
 							</div>
+                            <?php if ($model->hasErrors('path')) { ?>
+                            <div>
+                                <?php echo X2Html::fa('warning') .$form->error($model,'path', array('style'=>'display:inline-block')); ?>
+                            </div>
+                            <?php } ?>
 						</td>
 					</tr>
 				</tbody>
@@ -111,96 +122,49 @@ $this->actionMenu = $this->formatMenu(array(
 			<table>
 				<tbody>
 					<tr class="formSectionRow">
-						<td style="width: 300px">
+						<td style="">
 							<div class="formItem leftLabel">
 								<label><?php echo Yii::t('media', 'Association Type'); ?></label>
-								<div class="formInputBox" style="width: 200px; height: auto;">
-									<?php echo $form->dropDownList($model,'associationType',
-										array(
-											'none'=>Yii::t('actions','None'),
-											'contacts'=>Yii::t('actions','Contact'),
-											'opportunities'=>Yii::t('actions','Opportunity'),
-											'accounts'=>Yii::t('actions','Account'),
-											'bg'=>Yii::t('media', 'Background'),
-										), array('onChange'=>'showAssociationAutoComplete(this)')); ?>
+								<div class="formInputBox" style="height: auto;">
+									<?php 
+                                    $linkableModels = 
+                                        X2Model::getModelTypesWhichSupportRelationships(true);
+                                    $this->widget ('MultiTypeAutocomplete', array (
+                                        'selectName' => 'Media[associationType]',
+                                        'hiddenInputName' => 'Media[associationId]',
+                                        'selectValue' => '',
+                                        'options' => array_merge (
+                                            array ('' => Yii::t('app', 'None')),
+                                            array_diff_key ($linkableModels, array_flip (array (
+                                                'Media',
+                                                'Groups',
+                                                'X2List',
+                                                'Actions',
+                                                'Reports',
+                                            ))),
+                                            array ('bg' => Yii::t('app', 'Background'))
+                                        ),
+                                        'staticOptions' => array (
+                                            '', 'bg'
+                                        ), 
+                                        'htmlOptions' => array (
+                                            'class' => 'media-association-type',
+                                        ),
+                                    ));
+//                                    echo $form->dropDownList($model,'associationType',
+//										array(
+//											'none'=>Yii::t('actions','None'),
+//											'contacts'=>Yii::t('actions','Contact'),
+//											'opportunities'=>Yii::t('actions','Opportunity'),
+//											'accounts'=>Yii::t('actions','Account'),
+//											'bg'=>Yii::t('media', 'Background'),
+//										), array('onChange'=>'showAssociationAutoComplete(this)')); ?>
 								</div>
 							</div>
 							
 						</td>
 					</tr>
 					
-					<tr class="formSectionRow">
-						<td style="width: 300px">
-							<div class="formItem leftLabel">
-								<label><?php echo Yii::t('media', 'Association Name'); ?></label>
-								<div class="formInputBox" style="width: 200px; height: auto;">
-									<?php
-									
-										// contacts association auto-complete
-										$linkSource = $this->createUrl(X2Model::model('Contacts')->autoCompleteSource);
-										$this->widget('zii.widgets.jui.CJuiAutoComplete', array(
-											'name'=>'auto_select',
-											'source' => $linkSource,
-											'options'=>array(
-												'minLength'=>'2',
-												'select'=>'js:function( event, ui ) {
-													$("#association-id").val(ui.item.id);
-													$(this).val(ui.item.value);
-													return false;
-												}',
-											),
-											'htmlOptions'=>array(
-												'style'=>'display:none;',
-												'id'=>'contacts-auto-select',
-											),
-										));
-										
-										// accounts association auto-complete
-										$linkSource = $this->createUrl(X2Model::model('Accounts')->autoCompleteSource);
-										$this->widget('zii.widgets.jui.CJuiAutoComplete', array(
-											'name'=>'auto_select',
-											'source' => $linkSource,
-											'options'=>array(
-												'minLength'=>'2',
-												'select'=>'js:function( event, ui ) {
-													$("#association-id").val(ui.item.id);
-													$(this).val(ui.item.value);
-													return false;
-												}',
-											),
-											'htmlOptions'=>array(
-												'style'=>'display:none;',
-												'id'=>'accounts-auto-select',
-											),
-										));
-										
-										// opportunities association auto-complete
-										$linkSource = $this->createUrl(X2Model::model('Opportunity')->autoCompleteSource);
-										$this->widget('zii.widgets.jui.CJuiAutoComplete', array(
-											'name'=>'auto_select',
-											'source' => $linkSource,
-											'options'=>array(
-												'minLength'=>'2',
-												'select'=>'js:function( event, ui ) {
-													$("#association-id").val(ui.item.id);
-													$(this).val(ui.item.value);
-													return false;
-												}',
-											),
-											'htmlOptions'=>array(
-												'style'=>'display:none;',
-												'id'=>'opportunities-auto-select',
-											),
-										));
-
-										
-										echo $form->hiddenField($model, 'associationId', array('id'=>'association-id'));
-									?>
-								</div>
-							</div>
-							
-						</td>
-					</tr>
 				</tbody>
 			</table>
 		</div>
@@ -256,7 +220,7 @@ $this->actionMenu = $this->formatMenu(array(
 
 <?php
 echo '	<div class="row buttons">'."\n";
-echo '		'.CHtml::submitButton(Yii::t('media','Upload'),array('class'=>'x2-button','id'=>'save-button','tabindex'=>24))."\n";
+echo '		'.CHtml::submitButton(Yii::t('media','Upload'),array('class'=>'x2-button','id'=>'save-button','tabindex'=>24, 'style' =>'display: inline-block'))."\n";
 echo "	</div>\n";
 $this->endWidget();
 ?>
@@ -264,7 +228,23 @@ $this->endWidget();
 <?php
 // place the saving icon over the 'Choose File' button (which starts invisible)
 Yii::app()->clientScript->registerScript('savingIcon',"
-$(function() {	
-	x2.forms.initX2FileInput();
-});");
+
+    x2.uploadMedia = function(elem) {
+        $('#choose-file-saving-icon').css({opacity: 1.0});
+        var validName = mediaCheckName(elem);
+        var tmpUploadUrl = '". Yii::app()->createUrl('/site/tmpUpload') ."';
+        var rmTmpUploadUrl = '". Yii::app()->createUrl('/site/removeTmpUpload') ."';
+        if (validName) {
+            var status = mediaFileUpload(
+                elem.form, $(elem),
+                tmpUploadUrl,
+                rmTmpUploadUrl
+            );
+        }
+    };
+
+    $(function() {
+	    x2.forms.initX2FileInput();
+    });
+");
 ?>

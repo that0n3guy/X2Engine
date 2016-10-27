@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.modules.docs.models.*');
 Yii::import('application.modules.actions.models.*');
@@ -152,6 +153,22 @@ class InlineEmail extends CFormModel {
     public $emailBody = '';
     public $preview = false;
     public $stageEmail = false;
+
+    /**
+     * @var bool $requireSubjectOnCustom Allows subject requirement to be bypassed.   
+     * TODO: remove this once scenario code is refactored
+     */
+    public $requireSubjectOnCustom = true; 
+
+
+      
+    /**
+     * @var bool $emailInboxesEmailSync If true, new action weiloutbound email
+     */
+    public $emailInboxesEmailSync = true; 
+     
+
+
     private $_recipientContacts;
 
     /**
@@ -207,13 +224,26 @@ class InlineEmail extends CFormModel {
      * @return array
      */
     public function rules(){
-        return array(
-            array('to, subject', 'required', 'on' => 'custom'),
+        $rules = array(
+            array('to', 'required', 'on' => 'custom'),
             // array('modelName,modelId', 'required', 'on' => 'template'),
             array('message', 'required', 'on' => 'custom'),
             array('to,cc,bcc', 'parseMailingList'),
             array('emailSendTime', 'date', 'allowEmpty' => true, 'timestampAttribute' => 'emailSendTimeParsed'),
             array('to, cc, credId, bcc, message, template, modelId, modelName, subject', 'safe'),
+             
+            array('emailInboxesEmailSync', 'safe'),
+             
+        );
+        if ($this->requireSubjectOnCustom) {
+            $rules[] = array('subject', 'required', 'on' => 'custom');
+        }
+        return $rules;
+    }
+
+    public function relations () {
+        return array(
+            'credentials' => array(self::BELONGS_TO, 'Credentials', array ('credId' => 'id')),
         );
     }
 
@@ -233,12 +263,15 @@ class InlineEmail extends CFormModel {
             'modelName' => Yii::t('app', 'Model Name'),
             'modelId' => Yii::t('app', 'Model ID'),
 			'credId' => Yii::t('app','Send As:'),
+             
+			'emailInboxesEmailSync' => Yii::t('app','Log email'),
+             
         );
     }
 
     public function behaviors() {
         return array(
-            'emailDelivery' => array('class' => 'application.components.EmailDeliveryBehavior')
+            'emailDelivery' => array('class' => 'application.components.behaviors.EmailDeliveryBehavior')
         );
     }
 
@@ -254,7 +287,7 @@ class InlineEmail extends CFormModel {
      */
     public static function insertedPattern($name, $inside, $re = 0, $reFlags = ''){
         $tn = constant('self::'.strtoupper($name.'tag'));
-        $tag = "<!--Begin$tn-->~inside~<!--End$tn--!>";
+        $tag = "<!--Begin$tn-->~inside~<!--End$tn-->";
         if($re)
             $tag = '/'.preg_quote($tag)."/$reFlags";
         return str_replace('~inside~', $inside, $tag);
@@ -308,12 +341,45 @@ class InlineEmail extends CFormModel {
                 $header .= '<br />';
             }
 
-            // Attachments info (include links to media items if
+            // Attachments info
             if(!empty($this->attachments)){
                 $header .= '<br /><hr />';
                 $header .= CHtml::tag('strong', array(), Yii::t('media', 'Attachments:'))."<br />";
+                $i = 0;
                 foreach($this->attachments as $attachment){
-                    $header .= CHtml::tag('span', array('class' => 'email-attachment-text'), $attachment['filename']).'<br />';
+                    if ($i++) $header .= '<br />';
+
+                    if ($attachment['type'] === 'temp') {
+                        // attempt to convert temporary file to media record
+
+                        if ($this->modelId && $this->modelName) {
+                            $associationId = $this->modelId;
+                            $associationType = X2Model::getAssociationType ($this->modelName);
+                        } elseif ($contact = reset($recipientContacts)) {
+
+                            $associationId = $contact->id;
+                            $associationType = 'contacts';
+                        }
+                        if (isset ($associationId) && 
+                            ($media = $attachment['model']->convertToMedia (array (
+                                'associationType' => $associationType,
+                                'associationId' => $associationId,
+                                )))) {
+
+                            $attachment['type'] = 'media';
+                            $attachment['id'] = $media->id;
+                        }
+                    }
+
+                    if ($attachment['type'] === 'media' && 
+                        ($media = Media::model ()->findByPk ($attachment['id']))) {
+                        
+                        $header .= $media->getLink ().'&nbsp;|&nbsp;'.$media->getDownloadLink ();
+                    } else {
+                        $header .= CHtml::tag(
+                            'span', array('class' => 'email-attachment-text'),
+                            $attachment['filename']).'<br />';
+                    }
                 }
             }
 
@@ -440,7 +506,7 @@ class InlineEmail extends CFormModel {
         if(!isset($this->_recipientContacts)){
             $contacts = array();
             foreach($this->recipients as $target){
-                $contacts[$target[1]] = Contacts::model()->findByAttributes(array('email' => $target[1]));
+                $contacts[$target[1]] = Contacts::model()->findByEmail($target[1]);
             }
             $this->_recipientContacts = $contacts;
         }
@@ -472,8 +538,14 @@ class InlineEmail extends CFormModel {
     public function checkDoNotEmailFields () {
         $allRecipientContacts = array();
         foreach($this->recipients as $target){
-            foreach (Contacts::model()->findAllByAttributes(
-                array('email' => $target[1])) as $contact) {
+            foreach (
+                Contacts::model()->findAllByAttributes(
+                    array('email' => $target[1]),
+                    'visibility!=:private OR assignedTo!="Anyone"',
+                    array ( 
+                        ':private' => X2PermissionsBehavior::VISIBILITY_PRIVATE
+                    )
+                ) as $contact) {
 
                 $allRecipientContacts[] = $contact;
             }
@@ -514,7 +586,7 @@ class InlineEmail extends CFormModel {
      */
     public function getTargetModel(){
         if(!isset($this->_targetModel)){
-            if(isset($this->modelId, $this->modelName)){
+            if(!empty ($this->modelId) && !empty ($this->modelName)){
                 $this->_targetModel = X2Model::model($this->modelName)->findByPk($this->modelId);
                 if($this->_targetModel === null)
                     $this->_targetModel = false;
@@ -560,8 +632,8 @@ class InlineEmail extends CFormModel {
             if(!Yii::app()->params->noSession){
                 $trackUrl = Yii::app()->createExternalUrl('/actions/actions/emailOpened', array('uid' => $this->uniqueId, 'type' => 'open'));
             }else{
-		// This might be a console application! In that case, there's
-		// no controller application component available.
+                // This might be a console application! In that case, there's
+                // no controller application component available.
                 $url = rtrim(Yii::app()->absoluteBaseUrl,'/');
 
                 if(!empty($url))
@@ -653,6 +725,7 @@ class InlineEmail extends CFormModel {
     public function insertTrackingImage($replace = false){
         $recipientContacts = $this->recipientContacts;
         if(count($recipientContacts) == 1){ 
+
             // Note, if there is more than one contact in the recipient list, it is
             // impossible to distinguish who opened the email, because both will be
             // sent the same email. Thus it will be disabled for this use case until
@@ -668,7 +741,9 @@ class InlineEmail extends CFormModel {
                         // Reset unique ID and insert a new tracking image with a new unique ID
                         $this->_trackingImage = null;
                         $this->_uniqueId = null;
-                        $this->message = replace_string($matchImg[0], self::insertedPattern('track', $this->trackingImage), $this->message);
+                        $this->message = replace_string(
+                            $matchImg[0], self::insertedPattern('track', $this->trackingImage), 
+                            $this->message);
                     }else{
                         $this->_trackingImage = $matchImg[1];
                         if(preg_match(self::UIDREGEX, $this->_trackingImage, $matchId)){
@@ -679,6 +754,17 @@ class InlineEmail extends CFormModel {
                 }
                 if($insertNew){
                     $this->insertInBody(self::insertedPattern('track', $this->trackingImage));
+                }
+            }
+        }
+    }
+
+    public static function extractTrackingUid($body) {
+        $pattern = '/(<img[^>]*\/?>)/';
+        if (preg_match_all ($pattern, $body, $matchImg) && isset($matchImg[0])) {
+            foreach ($matchImg[0] as $match) {
+                if (preg_match (self::UIDREGEX, $match, $matchId)) {
+                    return $matchId[1];
                 }
             }
         }
@@ -761,10 +847,55 @@ class InlineEmail extends CFormModel {
     public function send($createEvent = true){
         $this->insertTrackingImage();
         $this->status = $this->deliver();
-        if($this->status['code'] == '200')
+        if($this->status['code'] == '200') {
             $this->recordEmailSent($createEvent); // Save all the actions and events
+            
+            $this->copyToSent();
+            
+            $this->clearTemporaryFiles ($this->attachments);
+            if (isset($this->targetModel)) {
+                X2Flow::trigger ('OutboundEmailTrigger', array(
+                    'model' => $this->targetModel,
+                    'subject' => $this->subject,
+                    'body' => $this->message,
+                    'to' => $this->to,
+                    'from' => $this->from,
+                ));
+            }
+        }
         return $this->status;
     }
+
+    
+    /**
+     * Copy a sent message to the specified sent folder if associated with an inbox
+     * @return bool success
+     */
+    public function copyToSent() {
+        if ($this->credentials) {
+            $username = Yii::app()->user->getName();
+            $inbox = EmailInboxes::model()->findByAttributes (array(
+                'credentialId' => $this->credentials->id,
+                'assignedTo' => $username,
+                'shared' => false,
+            ));
+            if (!$inbox) {
+                // Check for a shared inbox if this isn't the user's inbox
+                $inbox = EmailInboxes::model()->findByAttributes (array(
+                    'credentialId' => $this->credentials->id,
+                    'shared' => true,
+                ));
+                if (!$inbox || !$inbox->isAssignedTo($username)) {
+                    $inbox = null;
+                }
+            }
+            if ($inbox && !empty ($inbox->settings['copyToSent']))
+                return $inbox->copyToSent ($this->asa('emailDelivery')->getSentMIMEMessage ());
+        } else {
+            return false;
+        }
+    }
+    
 
     /**
      * Save the tracking record for this email, but only if an image was inserted.
@@ -793,6 +924,12 @@ class InlineEmail extends CFormModel {
      * form (if that's how this model is being used) is submitted.
      */
     public function recordEmailSent($makeEvent = true){
+         
+        if (!$this->emailInboxesEmailSync) {
+            // don't log outbound email user unset emailInboxesEmailSync
+            return;
+        } 
+         
 
         // The email record, with action header for display purposes:
         $emailRecordBody = $this->insertInBody(self::insertedPattern('ah', $this->actionHeader), 1, 1);
@@ -814,13 +951,49 @@ class InlineEmail extends CFormModel {
             $action->completedBy = $this->userProfile->username;
             $action->createDate = $now;
             $action->dueDate = $now;
+            $action->subject = $this->subject;
             $action->completeDate = $now;
             $action->complete = 'Yes';
             $action->actionDescription = $emailRecordBody;
+            
+            if ($this->credentials && !empty($this->credentials->modelClass)) {
+                // Check if the current user has an enabled inbox, then infer the sent folder
+                // name and retrieve the UIDVALIDITY
+                $user = User::model()->findByPk (Yii::app()->user->getId());
+                $inbox = EmailInboxes::model()->findAllByAttributes (array(
+                    'credentialId' => $this->credentials->id,
+                ));
+                $inbox = array_filter ($inbox, function($i) use($user) {return $i->isVisibleTo ($user);});
+
+                if (count($inbox) > 0) {
+                    // Select the first inbox: if multiple inboxes were found, they are associated with
+                    // the same logical email account, so log once to the first inbox
+                    $inbox = $inbox[0];
+                    $emailFolderName = ($this->credentials->modelClass === 'GMailAccount') ? '[Gmail]/Sent Mail' : 'Sent';
+                    if (!empty ($inbox->settings['copyToSent']))
+                        $emailFolderName = $inbox->settings['copyToSent'];
+
+                    try {
+                        $folders = $inbox->getFolders ();
+                    } catch (EmailConfigException $e) {
+                        $folders = array();
+                    }
+                    if (in_array ($emailFolderName, $folders)) {
+                        // Mark the inboxId, sent folder name, and folder's UIDVALIDITY
+                        $action->emailFolderName = $emailFolderName;
+                        $action->emailInboxId = $inbox->id;
+                        // $action->emailImapUid = ;
+                        $status = $inbox->status();
+                        $uidValidity = property_exists ($status, 'uidvalidity') ? $status->uidvalidity : null;
+                        $action->emailUidValidity = $uidValidity;
+                    }
+                }
+            }
+            
 
             // These attributes are context-sensitive and subject to change:
             $action->associationId = $model->id;
-            $action->associationType = $model->module;
+            $action->associationType = ucfirst($model->module);
             $action->type = 'email';
             $action->visibility = isset($model->visibility) ? $model->visibility : 1;
             $action->assignedTo = $this->userProfile->username;
@@ -866,7 +1039,8 @@ class InlineEmail extends CFormModel {
             }
         }
 
-        // Create action history events and event feed events for all contacts that were in the recipient list:
+        // Create action history events and event feed events for all contacts that were in the 
+        // recipient list:
         if($this->contactFlag){
             foreach($recipientContacts as $email => $contact){
                 $contact->lastActivity = $now;
@@ -874,7 +1048,7 @@ class InlineEmail extends CFormModel {
 
                 $skip = false;
                 $skipEvent = false;
-                if($this->modelName == 'Contacts'){
+                if($this->targetModel && get_class ($this->targetModel) === 'Contacts'){
                     $skip = $this->targetModel->id == $contact->id;
                 }else if($this->modelName == 'Quote'){
                     // An event has already been made for issuing the quote and

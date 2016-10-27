@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,10 +33,12 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
+Yii::import('application.tests.mocks.*');
 Yii::import('application.models.*');
 Yii::import('application.components.*');
+Yii::import('application.components.behaviors.*');
 Yii::import('application.components.permissions.*');
 Yii::import('application.components.util.*');
 Yii::import('application.modules.users.models.*');
@@ -63,9 +66,45 @@ abstract class X2DbTestCase extends CDbTestCase {
         return array();
     }
 
+    protected static $skipAllTests = false;
+    
+    protected static $loadFixtures = X2_LOAD_FIXTURES;
+    protected static $loadFixturesForClassOnly = X2_LOAD_FIXTURES_FOR_CLASS_ONLY;
+
     private static $_referenceFixtureRecords = array();
 
     private static $_referenceFixtureRows = array();
+    
+    private $_oldSession;
+    
+    public function setUp () {
+        // if loadFixturesForClassOnly was true, reenable fixture loading since we've already
+        // skipped the loading of the fixtures directory and still want to have fixtures loaded
+        // on a per test case basis
+        if (self::$loadFixturesForClassOnly)
+            $this->getFixtureManager ()->loadFixtures = true;
+
+        if(X2_TEST_DEBUG_LEVEL > 0){
+            $timer = TestingAuxLib::getCaseTimer ();
+            $timer->start ();
+        }
+        TestingAuxLib::log ("running test case: ".$this->getName ());
+
+        if (static::$skipAllTests) {
+            $this->markTestSkipped ();
+        }
+        if(isset($_SESSION)){
+            $this->_oldSession = $_SESSION;
+        }
+        $this->fixtures = is_array ($this->fixtures) ? $this->fixtures : array ();
+        parent::setUp ();
+    }
+
+    public static function getPath ($arg) {
+        $reflect = new ReflectionClass ($arg);
+        return ltrim (
+            preg_replace ('/^'.preg_quote (__DIR__, '/').'/', '', $reflect->getFileName ()), '/');
+    }
 
     /**
      * Performs environmental set-up similar to that in {@link ApplicationConfigBehavior}
@@ -105,34 +144,48 @@ abstract class X2DbTestCase extends CDbTestCase {
      * sets up some special environment variables before proceeding.
      */
     public static function setUpBeforeClass(){
+        if (!YII_UNIT_TESTING) throw new CException ('YII_UNIT_TESTING must be set to true');
+        Yii::app()->cache->flush ();
         self::setUpAppEnvironment(); 
+
         // Load "reference fixtures", needed for reference, which do not need
         // to be reloaded after every single test method:
         $testClass = get_called_class();
+        if(X2_TEST_DEBUG_LEVEL > 0){
+            $timer = TestingAuxLib::getClassTimer ();
+            $timer->start ();
+        }
+        TestingAuxLib::log ("running test class: ".self::getPath ($testClass));
+
         $refFix = call_user_func("$testClass::referenceFixtures");
         $fm = Yii::app()->getComponent('fixture');
         self::$_referenceFixtureRows = array();
         self::$_referenceFixtureRecords = array();
         if(is_array($refFix)){
+            Yii::import('application.components.X2Settings.*');
             $fm->load($refFix);
-            foreach($refFix as $alias => $table){
-                $tableName = is_array($table) ? $table[0] : $table;
-                self::$_referenceFixtureRows[$alias] = $fm->getRows($alias);
-                if(strpos($tableName, ':') !== 0){
-                    foreach(self::$_referenceFixtureRows[$alias] as $rowAlias => $row){
-                        $model = CActiveRecord::model($tableName);
-                        $key = $model->getTableSchema()->primaryKey;
-                        if(is_string($key))
-                            $pk = $row[$key];
-                        else{
-                            foreach($key as $k)
-                                $pk[$k] = $row[$k];
+            if(self::$loadFixtures || self::$loadFixturesForClassOnly){
+                foreach($refFix as $alias => $table){
+                    $tableName = is_array($table) ? $table[0] : $table;
+                    self::$_referenceFixtureRows[$alias] = $fm->getRows($alias);
+                    if(strpos($tableName, ':') !== 0){
+                        foreach(self::$_referenceFixtureRows[$alias] as $rowAlias => $row){
+                            $model = CActiveRecord::model($tableName);
+                            $key = $model->getTableSchema()->primaryKey;
+                            if(is_string($key))
+                                $pk = $row[$key];
+                            else{
+                                foreach($key as $k)
+                                    $pk[$k] = $row[$k];
+                            }
+                            self::$_referenceFixtureRecords[$alias][$rowAlias] = 
+                                $model->findByPk($pk);
                         }
-                        self::$_referenceFixtureRecords[$alias][$rowAlias] = $model->findByPk($pk);
                     }
                 }
             }
         }
+
         self::setUpAppEnvironment2(); 
         parent::setUpBeforeClass();
     }
@@ -141,10 +194,33 @@ abstract class X2DbTestCase extends CDbTestCase {
      * Override that copies the original key/iv back
      */
     public static function tearDownAfterClass(){
+        if(X2_TEST_DEBUG_LEVEL > 0){
+            $timer = TestingAuxLib::getClassTimer ();
+            TestingAuxLib::log ("time elapsed for test class: {$timer->stop ()->getTime ()}");
+        }
+
         parent::tearDownAfterClass();
         self::tearDownAppEnvironment();
     }
 
+    public function tearDown () {
+        // try to replace mocks with original components in case mocks were set during test case
+        TestingAuxLib::restoreX2WebUser ();
+        TestingAuxLib::restoreX2AuthManager ();
+        TestingAuxLib::restoreController ();
+        self::$skipAllTests = false;
+        self::$loadFixtures = X2_LOAD_FIXTURES;
+        self::$loadFixturesForClassOnly = X2_LOAD_FIXTURES_FOR_CLASS_ONLY;
+        if(isset($this->_oldSession)){
+            $_SESSION = $this->_oldSession;
+        }
+        if(X2_TEST_DEBUG_LEVEL > 0){
+            $timer = TestingAuxLib::getCaseTimer ();
+            TestingAuxLib::log ("time elapsed for test case: {$timer->stop ()->getTime ()}");
+        }
+        return parent::tearDown ();
+    }
+    
     /**
      * Assert thet the model can be saved without error and, if errors are present, print
      * out the corresponding error messages.
@@ -153,9 +229,29 @@ abstract class X2DbTestCase extends CDbTestCase {
     public function assertSaves (CActiveRecord $model) {
         $saved = $model->save ();
         if ($model->hasErrors ()) {
-            VERBOSE_MODE && print_r ($model->getErrors ());
+            X2_TEST_DEBUG_LEVEL > 1 && print_r ($model->getErrors ());
         }
         $this->assertTrue ($saved);
+    }
+
+    public function assertUpdates (CActiveRecord $model, array $attrs=null) {
+        $this->assertTrue ($model->update ($attrs));
+    }
+    
+    /**
+     * Checks that two arrays have the same values regardless of order
+     */
+    public function assertArrayEquals(array $a, array $b) {
+        $equality = false;
+        if (count(array_diff($a, $b)) === 0) {
+            foreach ($a as $k => $v) {
+                if (!in_array($v, $b)) {
+                    break;
+                }
+            }
+            $equality = true;
+        }
+        $this->assertTrue($equality);
     }
 
     public function __get($name) {
@@ -174,9 +270,68 @@ abstract class X2DbTestCase extends CDbTestCase {
                 }
             }
             throw new Exception('Record alias invalid/not specified.');
-        } else
+        } else {
             return parent::__call($name, $params);
+        }
     }
+
+    /**
+     * Polyfill for PHPUnit v4.4+ since PHPUnit now aborts test and marks as risky if ob_start is
+     * used
+     */
+    public $_outputBuffer = '';
+    public $_oldBuffer = '';
+    public function obStart () {
+        // PHPUnit seems to be doing internal output buffering, this is intended to clear that 
+        // buffer
+        if($this->_oldBuffer = ob_get_contents()){
+            ob_clean (); 
+        }
+        $that = $this;
+        // documentation for setOutputCallback method is poor, but seems to do what 
+        // $output_callback parameter of ob_start does: 
+        // http://php.net/manual/en/function.ob-start.php
+        $this->setOutputCallback (function ($output) use ($that) {
+            $that->_outputBuffer .= $output; // collect output
+            return ''; // hide output
+        });
+    }
+
+    /**
+     * Polyfill for PHPUnit v4.4+ since PHPUnit now aborts test and marks as risky if ob_start is
+     * used
+     */
+    public function obClean () {
+        $this->_outputBuffer = '';
+    }
+
+    /**
+     * Polyfill for PHPUnit v4.4+ since PHPUnit now aborts test and marks as risky if ob_start is
+     * used
+     */
+    public function obEndClean () {
+        if(ob_get_contents()){
+            ob_clean (); 
+        }
+        $this->_outputBuffer = '';
+        $this->setOutputCallback (function ($output) {
+            return $output; // display output 
+        });
+        echo $this->_oldBuffer; // add old buffer contents to PHPUnit's output buffer
+    }
+
+    protected function assertModelArrayEquality (array $expected, array $actual, $sort=true) {
+        $expectedIds = array_map (function ($model) {
+            return $model->id; 
+        }, $expected);
+        if ($sort) sort ($expectedIds);
+        $actualIds = array_map (function ($model) {
+            return $model->id; 
+        }, $actual);
+        if ($sort) sort ($actualIds);
+        $this->assertEquals ($expectedIds, $actualIds);
+    }
+
 }
 
 ?>

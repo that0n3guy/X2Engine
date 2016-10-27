@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 if (typeof x2 === 'undefined') x2 = {};
 
@@ -60,20 +61,22 @@ Public instance methods
 
 ColorPicker.prototype.setUp = function (element, replaceHash /* optional */) {
     var that = this;
-    replaceHash = typeof replaceHash === 'undefined' ? false : true;
+    if ($(element).next ('.sp-replacer').length) return; // already set up
+    replaceHash = typeof replaceHash === 'undefined' ? false : replaceHash;
 
     $(element).spectrum ({
         move: function (color) {
             $(element).data ('ignoreChange', true);
         },
         hide: function (color) {
+
             that.removeCheckerImage ($(element));
             $(element).data ('ignoreChange', false);
 
             if (replaceHash) {
-                var text = color.toHexString ().replace (/#/, '');
+                var text = color.toHexString ().toUpperCase ().replace (/#/, '');
             } else {
-                var text = color.toHexString ();
+                var text = color.toHexString ().toUpperCase ();
             }
 
             $(element).val (text);
@@ -99,8 +102,12 @@ ColorPicker.prototype.setUp = function (element, replaceHash /* optional */) {
                 var text = color;
             }
 
-            $(this).next ('div.sp-replacer').find ('.sp-preview-inner').css (
-                'background', '#' + text);
+            // set the color of the color picker element
+            $(element).spectrum ('set', text);
+            // now hide and show it, triggering the hide event handler defined above, converting 
+            // inputted color value to a hex value
+            $(element).spectrum ('show');
+            $(element).spectrum ('hide');
         }
     });
 
@@ -130,7 +137,7 @@ Private instance methods
 ColorPicker.prototype._initializeX2ColorPicker = function () {
     var that = this;
     $('.x2-color-picker').each (function () {
-        that.setUp ($(this), true);
+        that.setUp ($(this), !$(this).hasClass ('x2-color-picker-hash'));
     });
 };
 

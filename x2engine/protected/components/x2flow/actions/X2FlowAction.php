@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,10 +33,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
- * Color utilities (unused)
  *
  * @package application.components.x2flow
  */
@@ -49,13 +49,19 @@ abstract class X2FlowAction extends X2FlowItem {
      */
     abstract public function execute(&$params);
 
+    public function paramRules () {
+        return array (
+            'id' => null
+        );
+    }
+
     /**
      * Checks if all the config variables and runtime params are ship-shape
      * Ignores param requirements if $params isn't provided
      * Returns an array with two elements. The first element indicates whether an error occured,
      * the second contains a log message.
      */
-    public function validate(&$params=array(), $flowId) {
+    public function validate(&$params=array(), $flowId=null) {
         $paramRules = $this->paramRules();
         if(!isset($paramRules['options'],$this->config['options']))
             return array (false, Yii::t('admin', "Flow item validation error"));
@@ -63,8 +69,12 @@ abstract class X2FlowAction extends X2FlowItem {
         if(isset($paramRules['modelRequired'])) {
             if(!isset($params['model']))    // model not provided when required
                 return array (false, Yii::t('admin', "Flow item validation error"));
-            if($paramRules['modelRequired'] != 1 && $paramRules['modelRequired'] !== get_class($params['model']))    // model is not the correct type
+            if($paramRules['modelRequired'] != 1 && 
+                $paramRules['modelRequired'] !== get_class($params['model'])) {
+
+                // model is not the correct type
                 return array (false, Yii::t('admin', "Flow item validation error"));
+            }
         }
         return $this->validateOptions($paramRules);
     }
@@ -107,14 +117,15 @@ abstract class X2FlowAction extends X2FlowItem {
                 $value = $attr['value'];
                 if(is_string($value)){
                     if(strpos($value, '=') === 0){
-                        $evald = Formatter::parseFormula($value, $params);
+                        $evald = X2FlowFormatter::parseFormula($value, $params);
                         if(!$evald[0])
                             return false;
                         $value = $evald[1];
                     } elseif($params !== null){
 
                         if(is_string($value) && isset($params['model'])){
-                            $value = Formatter::replaceVariables($value, $params['model'], $type);
+                            $value = X2FlowFormatter::replaceVariables(
+                                $value, $params, $type);
                         }
                     }
                 }

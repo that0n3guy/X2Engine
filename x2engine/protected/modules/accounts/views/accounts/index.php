@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,23 +33,18 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-
-$menuItems = array(
-    array('label'=>Yii::t('accounts','All Accounts')),
-    array('label'=>Yii::t('accounts','Create Account'), 'url'=>array('create')),
-    array('label'=>Yii::t('accounts','Accounts Report'), 'url'=>array('accountsReport')),
-    array('label'=>Yii::t('accounts',"Import Accounts"), 'url'=>array('admin/importModels', 'model'=>'Accounts')),
-    array('label'=>Yii::t('accounts','Export Accounts'), 'url'=>array('admin/exportModels', 'model'=>'Accounts')),
-);
+ **********************************************************************************/
 
 $opportunityModule = Modules::model()->findByAttributes(array('name'=>'opportunities'));
 $contactModule = Modules::model()->findByAttributes(array('name'=>'contacts'));
 
-if($opportunityModule->visible && $contactModule->visible)
-	$menuItems[] = array('label'=>Yii::t('app', 'Quick Create'), 'url'=>array('/site/createRecords', 'ret'=>'accounts'), 'linkOptions'=>array('id'=>'x2-create-multiple-records-button', 'class'=>'x2-hint', 'title'=>Yii::t('app', 'Create a Contact, Account, and Opportunity.')));
+$menuOptions = array(
+    'all', 'create', 'report', 'import', 'export',
+);
+if ($opportunityModule->visible && $contactModule->visible)
+    $menuOptions[] = 'quick';
+$this->insertMenu($menuOptions);
 
-$this->actionMenu = $this->formatMenu($menuItems);
 
 Yii::app()->clientScript->registerScript('search', "
 $('.search-button').click(function(){
@@ -63,52 +59,47 @@ $('.search-form form').submit(function(){
 });
 ");
 ?>
-<div class="search-form" style="display:none">
-<?php $this->renderPartial('_search',array(
-	'model'=>$model,
-)); ?>
-</div><!-- search-form -->
 <?php
 $this->widget('X2GridView', array(
 	'id'=>'accounts-grid',
-	'title'=>Yii::t('accounts','Accounts'),
-	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize'),
+	'title'=>Modules::displayName(),
+	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize', 'showHidden'),
 	'template'=>
         '<div id="x2-gridview-top-bar-outer" class="x2-gridview-fixed-top-bar-outer">'.
         '<div id="x2-gridview-top-bar-inner" class="x2-gridview-fixed-top-bar-inner">'.
         '<div id="x2-gridview-page-title" '.
          'class="page-title icon accounts x2-gridview-fixed-title">'.
         '{title}{buttons}{filterHint}'.
-        
+        '{massActionButtons}'.
         '{summary}{topPager}{items}{pager}',
     'fixedHeader'=>true,
-	'dataProvider'=>$model->search(),
-	// 'enableSorting'=>false,
-	// 'model'=>$model,
-	'filter'=>$model,
-	'pager'=>array('class'=>'CLinkPager','maxButtonCount'=>10),
-	// 'columns'=>$columns,
-	'modelName'=>'Accounts',
-	'viewName'=>'accounts',
-	// 'columnSelectorId'=>'contacts-column-selector',
-	'defaultGvSettings'=>array(
-		'gvCheckbox' => 30,
-		'name' => 184,
-		'type' => 153,
-		'annualRevenue' => 108,
-		'phone' => 115,
-		'lastUpdated' => 77,
-		'assignedTo' => 99,
-	),
-	'specialColumns'=>array(
-		'name'=>array(
-			'name'=>'name',
-			'header'=>Yii::t('accounts','Name'),
-			'value'=>'CHtml::link($data->name,array("view","id"=>$data->id))',
-			'type'=>'raw',
-		),
-	),
-	'enableControls'=>true,
-	'fullscreen'=>true,
+    'dataProvider'=>$model->search(),
+    // 'enableSorting'=>false,
+    // 'model'=>$model,
+    'filter'=>$model,
+    'pager'=>array('class'=>'CLinkPager','maxButtonCount'=>10),
+    // 'columns'=>$columns,
+    'modelName'=>'Accounts',
+    'viewName'=>'accounts',
+    // 'columnSelectorId'=>'contacts-column-selector',
+    'defaultGvSettings'=>array(
+        'gvCheckbox' => 30,
+        'name' => 184,
+        'type' => 153,
+        'annualRevenue' => 108,
+        'phone' => 115,
+        'lastUpdated' => 77,
+        'assignedTo' => 99,
+    ),
+    'specialColumns'=>array(
+        'name'=>array(
+            'name'=>'name',
+            'header'=>Yii::t('accounts','Name'),
+            'value'=>'CHtml::link($data->renderAttribute("name"), array("view", "id"=>$data->id))',
+            'type'=>'raw',
+        ),
+    ),
+    'enableControls'=>true,
+    'fullscreen'=>true,
 ));
 ?>

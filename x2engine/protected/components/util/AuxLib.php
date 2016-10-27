@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Standalone class with miscellaneous utility functions
@@ -118,7 +119,7 @@ class AuxLib {
 
         // declare nested namespaces one at a time if they don't already exist, starting at the root
         $passVarsToClientScript = "
-            (function () {
+            ;(function () {
                 if (typeof ".$rootNamespace." === 'undefined') ".$rootNamespace." = {};
                 var namespaces = ".CJSON::encode ($namespaces).";
                 var prevNameSpace = ".$rootNamespace.";
@@ -191,6 +192,48 @@ class AuxLib {
         Yii::log ($logMessage, 'error', 'application.debug');
     }
 
+    /**
+     * Render a hex dump to the debug log
+     * Adapted from: https://stackoverflow.com/a/4225813
+     */
+    public static function debugLogHd ($data) {
+        if (!YII_DEBUG) return;
+        static $from = '';
+        static $to = '';
+        static $width = 16; # number of bytes per line
+        static $pad = '.'; # padding for non-visible characters
+
+        if ($from==='') {
+            for ($i=0; $i<=0xFF; $i++) {
+                $from .= chr($i);
+                $to .= ($i >= 0x20 && $i <= 0x7E) ? chr($i) : $pad;
+            }
+        }
+
+        $hex = str_split(bin2hex($data), $width*2);
+        $chars = str_split(strtr($data, $from, $to), $width);
+
+        $output = "\n"; // begin on next line
+        $offset = 0;
+        foreach ($hex as $i => $line) {
+            $hexBytes = str_split($line, 16);
+            $hexContent = implode(' ', str_split($hexBytes[0],2));
+            if (isset($hexBytes[1]))
+                $hexContent .= '  '.implode(' ', str_split($hexBytes[1],2));
+            $output .= sprintf('%06X  %-48s',$offset, $hexContent). ' |' . $chars[$i] . "|\n";
+            $offset += $width;
+        }
+        self::debugLog ($output);
+    }
+
+    /**
+     * Generic version of debugLogR 
+     */
+    public static function logR ($arr, $route) {
+        $logMessage = print_r ($arr, true);
+        Yii::log ($logMessage, 'error', 'application.'.$route);
+    }
+
     public static function debugLogExport ($arr) {
         if (!YII_DEBUG) return;
         $logMessage = var_export ($arr, true);
@@ -207,6 +250,27 @@ class AuxLib {
         return preg_match('/msie/i', $userAgentStr);
     }
 
+    public static function isAndroid () {
+        $userAgentStr = strtolower(Yii::app()->request->userAgent);
+        return preg_match('/android/', $userAgentStr);
+    }
+
+    public static function isIPad () {
+        $userAgentStr = strtolower(Yii::app()->request->userAgent);
+        return preg_match('/ipad/', $userAgentStr);
+    }
+
+    public static function getLayoutType () {
+        $pathInfo = strtolower(Yii::app()->request->getPathInfo ());
+        if (AuxLib::isIE8 () || strpos ($pathInfo, 'admin') === 0 ||
+            preg_match ('/flowDesigner(\/\d+)?$/', $pathInfo)) {
+
+            return 'static';
+        } else {
+            return 'responsive';
+        }
+    }
+
     /**
      * @return mixed The IE version if available, otherwise infinity 
      */
@@ -219,14 +283,6 @@ class AuxLib {
             $ver = INF;
         }
         return $ver;
-    }
-
-    /**
-     * @return bool returns true if user is using mobile app, false otherwise 
-     */
-    public static function isMobile () {
-        return (Yii::app()->request->cookies->contains('x2mobilebrowser') && 
-                Yii::app()->request->cookies['x2mobilebrowser']->value);
     }
 
     public static function setCookie ($key, $val, $time) {
@@ -273,13 +329,11 @@ class AuxLib {
         return '('.implode (',', $arr).')';
     }
 
+    /**
+     * @deprecated 
+     */
     public static function coerceToArray (&$arr) {
-        if (is_string ($arr)) {
-            $arr = array ($arr);
-        } else if (is_array ($arr)) {
-        } else {
-            throw new CException ('Invalid argument type');
-        }
+        $arr = ArrayUtil::coerceToArray ($arr);
     }
 
     /**
@@ -288,12 +342,12 @@ class AuxLib {
      *  debug_backtrace does have an optional limit argument, but it wasn't introduced until php
      *  5.4.0.
      */
-    public static function printStackTrace ($limit=null) {
+    public static function trace ($limit=null) {
         if ($limit !== null) {
-            AuxLib::debugLogR (
+            /**/AuxLib::debugLogR (
                 array_slice (debug_backtrace (DEBUG_BACKTRACE_IGNORE_ARGS), 0, $limit));
         } else {
-            AuxLib::debugLogR (debug_backtrace (DEBUG_BACKTRACE_IGNORE_ARGS));
+            /**/AuxLib::debugLogR (debug_backtrace (DEBUG_BACKTRACE_IGNORE_ARGS));
         }
     }
 
@@ -309,5 +363,39 @@ class AuxLib {
         return $dropdownData;
     }
 
+    public static function println ($message) {
+        /**/print ($message."\n");
+    }
 
+    public static function issetIsArray ($param) {
+        return (isset ($param) && is_array ($param));
+    }
+
+    public static function captureOutput ($fn) {
+        ob_start();
+        ob_implicit_flush(false);
+        $fn ();
+        return ob_get_clean();
+    }
+
+    // Determines if the user is using a Mac
+    public static function isMac () {
+        $user_agent = getenv ("HTTP_USER_AGENT");
+        return (strpos ($user_agent, "Mac") !== false);
+    }
+
+    // Returns if the current request was made with ajax
+    public static function isAjax () {
+        return (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest');
+
+    }
+
+    public static function getRequestUrl () {
+        $protocol = !empty ($_SERVER['HTTPS']) ? 'https' : 'http';
+		$baseUrl = $protocol . '://' . $_SERVER['HTTP_HOST'];
+		$uri = $_SERVER['REQUEST_URI'];
+        return $baseUrl.$uri;
+    }
+    
+    
 }

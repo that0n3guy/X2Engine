@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // Check for iPhone screen size
 //    if($.mobile.media("screen and (min-width: 320px)")) {
@@ -56,26 +57,25 @@
 //    }
 //});
 
+
 var x2_ScaleFix = {
-viewportmeta : document.querySelector && document.querySelector('meta[name="viewport"]'),
-ua : navigator.userAgent,
-gestureStart : function()
-{
-x2_ScaleFix.viewportmeta.content = "width=device-width, minimum-scale=0.25, maximum-scale=1.6";
-},
-init : function()
-{
-if (x2_ScaleFix.viewportmeta && /iPhone|iPad/.test(x2_ScaleFix.ua) && !/Opera Mini/.test(x2_ScaleFix.ua))
-{
-x2_ScaleFix.viewportmeta.content = "width=device-width, minimum-scale=1.0, maximum-scale=1.0";
-document.addEventListener("gesturestart", x2_ScaleFix.gestureStart, false);
-}
-window.onorientationchange = function()
-{
-document.body.scrollLeft = 0;
+    viewportmeta : document.querySelector && document.querySelector('meta[name="viewport"]'),
+    ua : navigator.userAgent,
+    gestureStart : function() {
+        x2_ScaleFix.viewportmeta.content = "width=device-width, minimum-scale=0.25, maximum-scale=1.6";
+    },
+    init : function() {
+        if (x2_ScaleFix.viewportmeta && /iPhone|iPad/.test(x2_ScaleFix.ua) && !/Opera Mini/.test(x2_ScaleFix.ua)) {
+        x2_ScaleFix.viewportmeta.content = "width=device-width, minimum-scale=1.0, maximum-scale=1.0";
+        document.addEventListener("gesturestart", x2_ScaleFix.gestureStart, false);
+        }
+    window.onorientationchange = function()
+        {
+            document.body.scrollLeft = 0;
+        };
+    }
 };
-}
-};
+
 x2_ScaleFix.init();
 
 function setMobileBrowserFalse() {

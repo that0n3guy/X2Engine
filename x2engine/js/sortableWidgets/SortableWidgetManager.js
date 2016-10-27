@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Manages behavior of sortable widgets as a set. Behavior of individual widgets is managed
@@ -49,10 +50,15 @@ function SortableWidgetManager (argsDict) {
         showWidgetContentsUrl: '', // the url used to call the get widget contents action
         cssSelectorPrefix: '', // used to prefix id and class attributes of html elements
         widgetType: '', // (profileWidgetLayout)
-        DEBUG: x2.DEBUG && false
+        DEBUG: true,
+        settingsModelName: null,
+        settingsModelId: null,
+        translations: []
     };
 
     auxlib.applyArgs (this, defaultArgs, argsDict);
+
+    this._init ();
 }
 
 /*
@@ -67,8 +73,31 @@ Private static methods
 Public instance methods
 */
 
+SortableWidgetManager.prototype.afterDelete = function () {};
+
 SortableWidgetManager.prototype.rebindEventFns = function () {
     this._setUpSortability ();
+};
+
+SortableWidgetManager.prototype.getWidgetClass = function (widgetSelector) {
+    return $(widgetSelector).attr ('id').replace (/-widget-container-(\w+)?$/, '');
+};
+
+SortableWidgetManager.prototype.getWidgetKey = function (widgetSelector) {
+    var uid = this.getWidgetUID (widgetSelector);
+    if (uid !== '') {
+        return this.getWidgetClass (widgetSelector) + '_' + uid;
+    } else {
+        return this.getWidgetClass (widgetSelector);
+    }
+};
+
+SortableWidgetManager.prototype.getWidgetUID = function (widgetSelector) {
+    return $(widgetSelector).attr ('id').replace (/^[^-]+-widget-container-/, '');
+};
+
+SortableWidgetManager.prototype.getWidgetContainerSelector = function () {
+    return this._widgetContainerSelector;
 };
 
 /**
@@ -76,14 +105,14 @@ SortableWidgetManager.prototype.rebindEventFns = function () {
  * @param object widgetSelector a jQuery selector for the widget container
  */
 SortableWidgetManager.prototype.addWidgetToHiddenWidgetsMenu = function (widgetSelector) {
-    var widgetClass = $(widgetSelector).attr ('id').replace (/-widget-container$/, '');
+    var widgetClass = this.getWidgetClass (widgetSelector);
     var widgetLabel = $(widgetSelector).find (this._widgetTitleSelector).text ();
 
     $(this._hiddenWidgetsMenuSelector).append (
         $('<li>').append (
             $('<span>', {
-                'id': widgetClass + '-hidden-widgets-menu-item',
-                'class': 'x2-hidden-widgets-menu-item ' + this.cssSelectorPrefix + '-widget',
+                'id': this.getWidgetKey (widgetSelector),
+                'class': $.trim (this._hiddenWidgetsMenuItemSelector.replace (/\./g, ' ')),
                 text: widgetLabel
             })
         )
@@ -94,7 +123,8 @@ SortableWidgetManager.prototype.addWidgetToHiddenWidgetsMenu = function (widgetS
 };
 
 SortableWidgetManager.prototype.hiddenWidgetsMenuIsEmpty = function () {
-    return ($(this._hiddenWidgetsMenuSelector).find (this._hiddenWidgetsMenuItemSelector).length === 0);
+    return ($(this._hiddenWidgetsMenuSelector).find (
+        this._hiddenWidgetsMenuItemSelector).length === 0);
 };
 
 /*
@@ -107,10 +137,11 @@ Private instance methods
  * @return array widgetOrder An array of strings where each string corresponds to a widget class
  */
 SortableWidgetManager.prototype._getWidgetOrder = function () {
+    var that = this;
     var widgetOrder = [];
     var widgetClass;
     $(this._widgetsBoxSelector).children (this._widgetContainerSelector).each (function () {
-        widgetClass = $(this).attr ('id').replace (/-widget-container/, ''); 
+        widgetClass = that.getWidgetClass (this);
         widgetOrder.push (widgetClass);
     });
     return widgetOrder;
@@ -121,7 +152,6 @@ SortableWidgetManager.prototype._getWidgetOrder = function () {
  */
 SortableWidgetManager.prototype._setUpSortability = function () {
     var that = this;
-    that.DEBUG && console.log ('SortableWidgetManager: _setUpSortability');
     $(this._widgetsBoxSelector).sortable ({
         items: that._widgetContainerSelector,
         update: function (event, ui) {
@@ -130,7 +160,9 @@ SortableWidgetManager.prototype._setUpSortability = function () {
                 type: "POST",
                 data: {
                     widgetOrder: that._getWidgetOrder (),
-                    widgetType: that.widgetType
+                    widgetType: that.widgetType,
+                    settingsModelName: that.settingsModelName,
+                    settingsModelId: that.settingsModelId,
                 },
                 success: function (data) {
                 }
@@ -148,27 +180,52 @@ SortableWidgetManager.prototype._afterShowWidgetContents = function () {};
 SortableWidgetManager.prototype._afterCloseWidget = function () {};
 
 /**
+ * @param string widgetClass
+ * @return object GET parameters to pass with request to the show widget contents URL
+ */
+SortableWidgetManager.prototype._getShowWidgetContentsData = function (widgetClass) {
+    var that = this;
+    return {
+        widgetClass: widgetClass, 
+        widgetType: that.widgetType,
+        settingsModelName: that.settingsModelName,
+        settingsModelId: that.settingsModelId
+    };
+};
+
+SortableWidgetManager.prototype.refreshWidget = function (widgetKey, callback) {
+    this._showWidgetContents (widgetKey, callback);
+};
+
+/**
  * Request widget HTML and display it 
  * @param string widgetClass The name of the widget class
  */
-SortableWidgetManager.prototype._showWidgetContents = function (widgetClass) {
+SortableWidgetManager.prototype._showWidgetContents = function (widgetKey, callback) {
+    callback = typeof callback === 'undefined' ? function () {} : callback; 
     var that = this;
-    that.DEBUG && console.log ('SortableWidgetManager: _showWidgetContents');
     var url = this.showWidgetContentsUrl;
     if (this.showWidgetContentsUrl.match (/\?\w+$/)) {
        url += '&'; 
     } else {
-       url += '?'; 
+       // url += '?'; 
     }
     $.ajax ({
-        url: url + 'widgetClass=' + widgetClass + '&widgetType=' + 
-            that.widgetType,
+        url: url,
         type: "GET",
+        data: that._getShowWidgetContentsData (widgetKey),
+        dataType: 'json',
         success: function (data) {
             if (data !== 'failure') {
-                $('#' + widgetClass + '-widget-container').replaceWith (data);
+                var widget$ = 
+                    $('#' + widgetKey.replace (/_.*$/, '') + '-widget-container-' + data.uid);
+
+                widget$.replaceWith (data.widget);
                 hideShowHiddenWidgetSubmenuDividers ();
-                that._afterShowWidgetContents ();
+                widget$ = 
+                    $('#' + widgetKey.replace (/_.*$/, '') + '-widget-container-' + data.uid);
+                callback ();
+                that._afterShowWidgetContents (widget$);
             }
         }
     });
@@ -179,7 +236,6 @@ SortableWidgetManager.prototype._showWidgetContents = function (widgetClass) {
  */
 SortableWidgetManager.prototype._setUpHiddenWidgetsMenuBehavior = function () {
     var that = this;
-    that.DEBUG && console.log ('SortableWidgetManager: _setUpHiddenWidgetsMenuBehavior');
 
     // show widgets when hidden widget menu item gets clicked
     $(this._hiddenWidgetsMenuSelector).find ('li').unbind (
@@ -187,10 +243,10 @@ SortableWidgetManager.prototype._setUpHiddenWidgetsMenuBehavior = function () {
     $(this._hiddenWidgetsMenuSelector).find ('li').bind (
         'click.showSortableWidget', function () {
 
-        var widgetClass = $(this).find (that._hiddenWidgetsMenuItemSelector).
-            attr ('id').replace (/-hidden-widgets-menu-item/, '');
+        var widgetKey = $(this).find (that._hiddenWidgetsMenuItemSelector).
+            attr ('id');
         $(this).remove ();
-        that._showWidgetContents (widgetClass);
+        that._showWidgetContents (widgetKey);
     });
 };
 
@@ -201,23 +257,26 @@ SortableWidgetManager.prototype._init = function () {
     var that = this;
 
     // the jQuery selector for the element that contains all the widgets
-    this._widgetsBoxSelector = '#' + this.cssSelectorPrefix + '-widgets-container-inner';
+    if (typeof this._widgetsBoxSelector === 'undefined')
+        this._widgetsBoxSelector = '#' + this.cssSelectorPrefix + 'widgets-container-inner';
 
     // the jQuery selector for elements that contain widgets
     this._widgetContainerSelector = '.sortable-widget-container';
 
     // the jQuery selector for the element that contains the widget title bar
-    this._widgetHandleSelector = '.widget-title-bar';
+    this._widgetHandleSelector = '.widget-title-bar, .sortable-widget-handle';
 
     // the jQuery selector for the element that contains the widget label 
     this._widgetTitleSelector = '.widget-title';
 
     // the jQuery selector for the element that contains the widget label 
-    this._hiddenWidgetsMenuSelector = '#x2-hidden-' + this.cssSelectorPrefix + '-widgets-menu';
+    if (typeof this._hiddenWidgetsMenuSelector === 'undefined')
+        this._hiddenWidgetsMenuSelector = '#x2-hidden-' + this.cssSelectorPrefix + 'widgets-menu';
 
     // the jQuery selector for the hidden widget menu item associated with this type of widget
-    this._hiddenWidgetsMenuItemSelector = 
-        '.x2-hidden-widgets-menu-item.' + this.cssSelectorPrefix + '-widget';
+    if (typeof this._hiddenWidgetsMenuItemSelector === 'undefined')
+        this._hiddenWidgetsMenuItemSelector = 
+            '.x2-hidden-widgets-menu-item.' + this.cssSelectorPrefix + 'widget';
 
     this._setUpSortability ();
     this._setUpHiddenWidgetsMenuBehavior ();

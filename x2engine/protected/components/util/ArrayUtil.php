@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Standalone class with miscellaneous array functions
@@ -57,7 +58,8 @@ class ArrayUtil {
 		$expKeys = array_keys($expectedFields);
 		// Current keys: in the array to compare against
 		$curKeys = array_keys($currentFields);
-		// Keys to save: both already present in the current fields and defined in the expected fields
+		// Keys to save: both already present in the current fields and defined in the expected 
+        // fields
 		$savKeys = array_intersect($expKeys, $curKeys);
 		// New keys: that are not present in the current fields but defined in the expected fields
 		$newKeys = array_diff($expKeys, $curKeys);
@@ -75,7 +77,8 @@ class ArrayUtil {
 	}
 
     /**
-     * A recursive version of normalizeToArray () which maintains order of current fields. 
+     * A recursive version of normalizeToArray () which optionally maintains order of current 
+     * fields. 
      *
 	 * @param array $expectedFields The array with key => default value pairs
 	 * @param array $currentFields The array to copy values from
@@ -147,19 +150,24 @@ class ArrayUtil {
 
 
     /**
-     * Improved version of array_search that allows for regex searching
+     * Similar to array_search but recursive, doesn't return needle of there's only one match, and
+     * allows for regex searching.
      *
-     * @param string $find Regex to search on
-     * @param array $in_array An array to search in
-     * @param array $keys_found An array of keys which meet the regex
-     * @return type Returns the an array of keys if $in_array is valid, or false if not.
+     * @param string $find regex to search on
+     * @param array $in_array an array to search in
+     * @param array $keys_found keys whose corresponding values match the regex
+     * @return type an array of keys if $in_array is valid, or false if not.
      */
-    public static function arraySearchPreg($find, $in_array, $keys_found = Array()) {
+    public static function arraySearchPreg($find, $in_array, $keys_found = array()) {
+        // Escape slashes so that the pcre regex doesn't contain an invalid modifier
+        // in the event of invalid data
+        $find = preg_replace ('/\//', '\/', $find);
+
         if (is_array($in_array)) {
             foreach ($in_array as $key => $val) {
-                if (is_array($val))
-                    self::arraySearchPreg($find, $val, $keys_found);
-                else {
+                if (is_array($val)) {
+                    $keys_found = self::arraySearchPreg($find, $val, $keys_found);
+                } else {
                     if (preg_match('/' . $find . '/', $val))
                         $keys_found[] = $key;
                 }
@@ -178,6 +186,82 @@ class ArrayUtil {
         return array ($keys[0] => array_shift ($array));
     }
 
+    /**
+     * @param array $array the array to sort
+     * @return the sorted array
+     */
+    public static function sort (array $array) {
+        sort ($array);
+        return $array;
+    }
+
+    /**
+     * Case-insensitive, no side-effects version of asort
+     * @param array $array the array to sort
+     * @return the sorted array
+     */
+    public static function asorti(array $array) {
+        uasort ($array, function ($a, $b) {
+            return strcasecmp ($a, $b);
+        });
+        return $array;
+    }
+
+    /**
+     * Side effect free version of array_pop
+     */
+    public static function pop (array $array) {
+        $newArray = $array;
+        return array_pop ($newArray);
+    }
+
+    public static function transpose ($array) {
+        $newArray = array ();
+        $arraySize = count ($array);
+        for ($i = 0; $i < $arraySize; $i++) {
+            $val = $array[$i];
+            if (is_array ($val)) {
+                $valSize = count ($val);
+                $j = 0; 
+                foreach ($val as $key => $cellVal) {
+                    $newArray[$j][] = $cellVal;
+                    $j++;
+                }
+            } else {
+                $newArray[0][] = $val;
+            }
+        }
+        return $newArray;
+    }
+
+    /**
+     * Like array_search but returns numeric index instead of key 
+     */
+    public static function numericIndexOf ($needle, $haystack, $strict=false) {
+        $i = 0;
+        foreach ($haystack as $elem) {
+            if (!$strict && $elem == $needle || $strict && $elem === $needle) return $i;
+            $i++;
+        }
+        return false;
+    }
+
+    public static function setAndTrue ($array, $val) {
+        return isset ($array[$val]) && $array[$val];
+    }
+
+    public static function setEquals ($array1, $array2) {
+        $array1 = self::sort ($array1);
+        $array2 = self::sort ($array2);
+        return $array1 === $array2;
+    }
+
+    public static function coerceToArray ($arr) {
+        if (!is_array ($arr)) {
+            $arr = array ($arr);
+        } 
+        return $arr;
+    }
 
 }
 

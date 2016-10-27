@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,19 +33,20 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 <div class="page-title rounded-top"><h2><?php echo Yii::t('admin','Edit Dropdown'); ?></h2></div>
 <div class="form">
 <?php
-$list=Dropdowns::model()->findAll();
+$list = Dropdowns::model()->findAll();
 $names=array();
 foreach($list as $dropdown){
-    $names[$dropdown->name]=$dropdown->name;
+    $names[$dropdown->id]=$dropdown->name;
 }
+$names = ArrayUtil::asorti ($names);
 ?>
 <?php $form=$this->beginWidget('CActiveForm', array(
-	'id'=>'criteria-form',
+	'id'=>'edit-dropdown-form',
 	'enableAjaxValidation'=>false,
         'action'=>'editDropdown',
 )); ?>
@@ -52,31 +54,38 @@ foreach($list as $dropdown){
 	<em><?php echo Yii::t('app','Fields with <span class="required">*</span> are required.'); ?></em><br />
 
         <div class="row">
-            <?php echo $form->labelEx($model,'name'); ?>
-            <?php echo $form->dropDownList($model,'name',$names,array(
+            <?php 
+            echo $form->labelEx($model,'name'); 
+            echo $form->dropDownList($model,'id',$names,array(
                 'empty'=>Yii::t('admin','Select a dropdown'),
+                'id' => 'edit-dropdown-dropdown-selector',
                 'ajax' => array(
-                'type'=>'POST', //request type
-                'url'=>CController::createUrl('/admin/getDropdown'), //url to call.
-                //Style: CController::createUrl('currentController/methodToCall')
-                'update'=>'#options', //selector to update
-                //'data'=>'js:"modelType="+$("'.CHtml::activeId($model,'modelType').'").val()'
-                //leave out the data key to pass all form values through
-                ))); ?>
-            <?php echo $form->error($model,'name'); ?>
+                    'type'=>'POST', 
+                    'url'=>CController::createUrl('/admin/getDropdown'), 
+                    'update'=>'#options', 
+                ))); 
+            echo $form->error($model,'name'); 
+            ?>
         </div>
 
-        <div id="workflow-stages">
-            <label><?php echo Yii::t('admin','Dropdown Options');?></label>
-            <ol id="options">
+        <div class='dropdown-config' style='display: none;'>
+            <div id="dropdown-options">
+                <label><?php echo Yii::t('admin','Dropdown Options');?></label>
+                <ol id="options">
 
-            </ol>
+                </ol>
+            </div>
+            <a href="javascript:void(0)" onclick="x2.dropdownManager.addOption();" 
+         class="add-dropdown-option">[<?php echo Yii::t('admin','Add Option'); ?>]</a>
         </div>
-        <a href="javascript:void(0)" onclick="addStage();" class="add-workflow-stage">[<?php echo Yii::t('admin','Add Option'); ?>]</a>
 
 	<div class="row buttons">
         <br />
-		<?php echo CHtml::submitButton($model->isNewRecord ? Yii::t('app','Save'):Yii::t('app','Save'),array('class'=>'x2-button')); ?>
+		<?php 
+        echo CHtml::submitButton(
+            $model->isNewRecord ? Yii::t('app','Save'):Yii::t('app','Save'),
+            array('class'=>'x2-button')); 
+        ?>
 	</div>
 <?php $this->endWidget(); ?>
 </div>

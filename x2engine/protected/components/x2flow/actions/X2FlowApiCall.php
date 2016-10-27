@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * X2FlowAction that calls a remote API
@@ -41,8 +42,24 @@
  */
 class X2FlowApiCall extends X2FlowAction {
 
+    /**
+     * This will only ever by false during unit tests 
+     */
+    private static $_makeRequest;
+
+    /**
+     * Allows request behavior of this class to be toggled during unit tests
+     */
+    public function getMakeRequest () {
+        if (!isset (self::$_makeRequest)) {
+            self::$_makeRequest = true;
+        }
+        return self::$_makeRequest;
+    }
+    
     public $title = 'Remote API Call';
-    public $info = 'Call a remote API by requesting the specified URL. You can specify the request type and any variables to be passed with the request. To improve performance, the request will be put into a job queue unless you need it to execute immediately.';
+    //public $info = 'Call a remote API by requesting the specified URL. You can specify the request type and any variables to be passed with the request. To improve performance, the request will be put into a job queue unless you need it to execute immediately.';
+    public $info = 'Call a remote API by requesting the specified URL. You can specify the request type, HTTP headers, and any variables to be passed with the request.';
 
     public function paramRules(){
         $httpVerbs = array(
@@ -52,16 +69,114 @@ class X2FlowApiCall extends X2FlowAction {
             'DELETE' => Yii::t('studio', 'DELETE')
         );
 
-        return array(
+        return array_merge (parent::paramRules (), array (
             'title' => Yii::t('studio', $this->title),
             'info' => Yii::t('studio', $this->info),
             'modelClass' => 'API_params',
             'options' => array(
-                array('name' => 'url', 'label' => Yii::t('studio', 'URL')),
-                array('name' => 'method', 'label' => Yii::t('studio', 'Method'), 'type' => 'dropdown', 'options' => $httpVerbs),
-                array('name' => 'attributes', 'optional' => 1),
+                array(
+                    'name' => 'url', 'label' => Yii::t('studio', 'URL')
+                ),
+                array(
+                    'name' => 'method', 
+                    'label' => Yii::t('studio', 'Method'), 
+                    'type' => 'dropdown',
+                    'options' => $httpVerbs
+                ),
+                array(
+                    'name' => 'jsonPayload', 
+                    'label' => Yii::t('studio', 'Use JSON payload?'), 
+                    'type' => 'boolean',
+                    'defaulVal' => 0 
+                ),
+                array(
+                    'name' => 'jsonBlob', 
+                    'label' => Yii::t('studio', 'JSON'), 
+                    'type' => 'text',
+                    'optional' => 1,
+                    'htmlOptions' => array (
+                        'style' => 'display: none;'
+                    )
+                ),
+                array(
+                    'name' => 'attributes', 'optional' => 1
+                ),
+                array(
+                    'name' => 'headers', 
+                    'type' => 'attributes', 
+                    'optional' => 1
+                ),
             // array('name'=>'immediate','label'=>'Call immediately?','type'=>'boolean','defaultVal'=>true),
-                ));
+            )));
+    }
+
+    /**
+     * @param array $headerRows 
+     * @return array
+     */
+    public function getHeaders ($headerRows, $params) {
+        $headers = array();
+        foreach ($headerRows as $row) {
+            $name = X2Flow::parseValue ($row['name'], '', $params, false);
+            $value = X2Flow::parseValue ($row['value'], '', $params, false);
+            $headers[$name] = $value;
+        }
+        return $headers;
+    }
+
+    /**
+     * @param array $headers 
+     * @return string
+     */
+    public function formatHeaders ($headers) {
+        $formattedHeaders = array ();
+        foreach ($headers as $name => $value) {
+            $formattedHeaders[] = $name.': '.$value;
+        }
+        return $formattedHeaders;
+    }
+
+    /**
+     * Override parent method to add url validation. Present warning to user on flow save if
+     * specified url points to same server as the one X2Engine is hosted on.
+     */
+    public function validateOptions(&$paramRules,$params=null,$staticValidation=false) {
+        list ($success, $message) = parent::validateOptions ($paramRules, $params, $staticValidation);
+        if (!$success) return array ($success, $message);
+        $url = $this->config['options']['url']['value'];
+
+        $hostInfo = preg_replace ('/^https?:\/\//', '', Yii::app()->getAbsoluteBaseUrl ());
+        $url = preg_replace ('/^https?:\/\//', '', $url);
+        if ($staticValidation && 
+            gethostbyname ($url) === gethostbyname ($hostInfo)) {
+
+            return array (
+                self::VALIDATION_WARNING, 
+                Yii::t(
+                    'studio',
+                    'Warning: The url specified in your Remote API Call flow action points to the '.
+                    'same server that X2Engine is hosted on. This could mean that this flow makes '.
+                    'a request to X2Engine\'s API. Calling X2Engine\'s API from X2Flow is not '.
+                    'advised since it could potentially trigger this flow, resulting in an '.
+                    'infinite loop.'));
+        } else {
+            return array (true, $message);
+        }
+    }
+
+    /**
+     * Try to prevent api requests to X2Engine's api. This is a looser check than
+     * validateOptions (). ValidateOptions () is more likely to produce false positives which we 
+     * wouldn't want to have effect flow execution.
+     */
+    private function validateUrl ($url) {
+        $absoluteBaseUrl = Yii::app()->getAbsoluteBaseUrl ();
+        $absoluteBaseUrl = preg_replace ('/^https?:\/\//', '', $absoluteBaseUrl);
+        $url = preg_replace ('/^https?:\/\//', '', $url);
+        if (preg_match ("/^".preg_quote ($absoluteBaseUrl, '/').".*\/api2?\/.*/", $url)) {
+            return false;
+        }
+        return true;
     }
 
     public function execute(&$params){
@@ -72,37 +187,96 @@ class X2FlowApiCall extends X2FlowAction {
         $method = $this->parseOption('method', $params);
 
         if($this->parseOption('immediate', $params) || true){
-            $headers = array();
-            if(isset($this->config['attributes']) && !empty($this->config['attributes'])){
-                $httpOptions = array(
-                    'timeout' => 5, // 5 second timeout
-                    'method' => $method,
-                    'header' => implode("\r\n", $headers),
-                );
-                $data=array();
+            $headers = array ();
+            $httpOptions = array(
+                'timeout' => 5, // 5 second timeout
+                'method' => $method,
+            );
+            if (isset ($this->config['headerRows'])) {
+                $headers = $this->getHeaders ($this->config['headerRows'], $params);
+            } 
+
+            if ($method !== 'GET' && $this->parseOption ('jsonPayload', $params)) {
+                $data = $this->parseOption ('jsonBlob', $params);
+            } elseif(isset($this->config['attributes']) && !empty($this->config['attributes'])){
+                $data = array();
                 foreach($this->config['attributes'] as $param){
                     if(isset($param['name'],$param['value'])){
                         $data[$param['name']]=X2Flow::parseValue(
                             $param['value'],'',$params, false);
                     }
                 }
-                $data = http_build_query($data);
+            }
+
+            if (isset ($data)) {
                 if($method === 'GET'){
-                    $url .= strpos($url, '?') === false ? '?' : '&'; // make sure the URL is ready for GET params
+                    $data = http_build_query($data);
+                    // make sure the URL is ready for GET params
+                    $url .= strpos($url, '?') === false ? '?' : '&'; 
                     $url .= $data;
                 }else{
-                    $headers[] = 'Content-type: application/x-www-form-urlencoded'; // set up headers for POST style data
-                    $headers[] = 'Content-Length: '.strlen($data);
-                    $httpOptions['content'] = $data;
-                    $httpOptions['header'] = implode("\r\n", $headers);
+                    if ($this->parseOption ('jsonPayload', $params)) {
+                        // nested JSON option
+                        if (!isset ($headers['Content-Type']))
+                            $headers['Content-Type'] = 'application/json'; 
+                        $httpOptions['content'] = $data;
+                    } else {
+                        // set up default header for POST style data
+                        if (!isset ($headers['Content-Type']))
+                            $headers['Content-Type'] = 'application/x-www-form-urlencoded'; 
+
+                        if (preg_match ("/application\/json/", $headers['Content-Type'])) {
+                            // legacy flat JSON object support
+                            $data = CJSON::encode ($data);
+                            $httpOptions['content'] = $data;
+                        } else {
+                            $data = http_build_query($data);
+                            $httpOptions['content'] = $data;
+                        }
+                    }
+
+                    // set up default header for POST style data
+                    if (!isset ($headers['Content-Length']))
+                        $headers['Content-Length'] = strlen($data);
                 }
+            }
+            if (count ($headers)) {
+                $formattedHeaders = $this->formatHeaders ($headers);
+                $httpOptions['header'] = implode("\r\n", $formattedHeaders);
             }
 
             $context = stream_context_create(array('http' => $httpOptions));
-            if(@file_get_contents($url, false, $context)!==false){
-                return array(true, "Remote API call succeeded");
-            }else{
-                return array(false, "Remote API call failed!");
+            if (!$this->validateUrl ($url)) {
+                if (YII_UNIT_TESTING) {
+                    return array(
+                        false, 
+                        array ('url' => $url)
+                    );
+                } else {
+                    return array(
+                        false, 
+                        Yii::t('studio', 'Requests cannot be made to X2Engine\'s API from X2Flow.')
+                    );
+                }
+            }
+            if (!$this->getMakeRequest ()) {
+                return array (true, array_merge (array ('url' => $url), $httpOptions));
+            } else {
+                $response = @file_get_contents($url, false, $context);
+                $params['returnValue'] = $response;
+                if ($response !== false) {
+                    if (YII_UNIT_TESTING) {
+                        return array(true, $response);
+                    } else {
+                        return array(true, Yii::t('studio', "Remote API call succeeded"));
+                    }
+                }else{
+                    if (YII_UNIT_TESTING) {
+                        return array(false, print_r ($http_response_header, true));
+                    } else {
+                        return array(false, Yii::t('studio', "Remote API call failed!"));
+                    }
+                }
             }
         }
     }

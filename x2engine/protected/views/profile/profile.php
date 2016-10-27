@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,102 +33,71 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /*
 Public/private profile page. If the requested profile belongs to the current user, profile widgets
 get displayed in addition to the activity feed/profile information sections. 
 */
 
+if (!$isMyProfile && Yii::app()->user->id == $model->id) {
+    $this->insertActionMenu();
+}
+
+$this->noBackdrop = true;
+Yii::import('application.components.leftWidget.ProfileInfo');
+
+
 Yii::app()->clientScript->registerScriptFile(
-	Yii::app()->getBaseUrl().'/js/profile.js', CClientScript::POS_END);
+    Yii::app()->baseUrl.'/js/profile.js', CClientScript::POS_END);
 Yii::app()->clientScript->registerCssFiles ('profileCombinedCss', array (
     'profile.css', 'activityFeed.css', '../../../js/multiselect/css/ui.multiselect.css'
 ));
-Yii::app()->clientScript->registerResponsiveCssFile (Yii::app()->getTheme()->getBaseUrl().'/css/responsiveActivityFeed.css');
+Yii::app()->clientScript->registerResponsiveCssFile (Yii::app()->theme->baseUrl.'/css/responsiveActivityFeed.css');
 
 AuxLib::registerPassVarsToClientScriptScript (
     'x2.profile', array ('isMyProfile' => ($isMyProfile ? 'true' : 'false')), 'profileScript');
 
-?>
-<div id='profile-content-container' <?php echo ($isMyProfile ? 'class="full-profile"' : ''); ?>>
-<div id='profile-info-container-outer'>
-<?php
-$this->renderPartial('_profileInfo', array('model'=>$model, 'isMyProfile'=>$isMyProfile)); 
-echo X2Html::getFlashes();
-?>
-</div>
-<?php
 
+$fullProfile = $isMyProfile ? 'full-profile' : '';
+$width = '';
 if ($isMyProfile) {
-    $layout = $model->profileWidgetLayout;
-    Yii::app()->clientScript->registerScriptFile(
-        Yii::app()->getBaseUrl().'/js/sortableWidgets/SortableWidget.js', CClientScript::POS_END);
-    Yii::app()->clientScript->registerScriptFile(
-        Yii::app()->getBaseUrl().'/js/sortableWidgets/SortableWidgetManager.js', 
-        CClientScript::POS_END);
-    Yii::app()->clientScript->registerScriptFile(
-        Yii::app()->getBaseUrl().'/js/sortableWidgets/ProfileWidgetManager.js', 
-        CClientScript::POS_END);
-    Yii::app()->clientScript->registerScript ('profilePageWidgetInitScript', "
-        x2.profileWidgetManager = new ProfileWidgetManager ({
-            setSortOrderUrl: '".Yii::app()->controller->createUrl ('/profile/setWidgetOrder')."',
-            showWidgetContentsUrl: '".Yii::app()->controller->createUrl (
-                '/profile/view', array ('id' => 1))."',
-            connectedContainerSelector: '.connected-sortable-profile-container'
-        });
-    ", CClientScript::POS_READY);
-     
-    /**
-     * @param int $containerNumber The container for which widgets should get instantiated 
-     * @param array $layout profile widget layout
-     * @param object $controller profile controller
-     * @param object $model profile model
-     */
-    function displayWidgets ($containerNumber, $layout, $controller, $model) {
-        // display profile widgets in order
-        foreach ($layout as $widgetClass => $settings) {
-            if ($settings['containerNumber'] == $containerNumber) {
-                $controller->widget('application.components.sortableWidget.'.$widgetClass, array (
-                    'profile' => $model,
-                    'widgetType' => 'profile',
-                ));
-            }
-        }
-    }
-?>
+    $this->leftWidgets = array (
+        'ProfileInfo' => array(
+            'model' => $model
+        )
+    );
 
-<div id='profile-widgets-container'>
-<div id='profile-widgets-container-inner' class='connected-sortable-profile-container'>
+    $dashboard = $this->widget('ProfileDashboardManager', array(
+        'model' => $model
+        ));
 
-<?php
-displayWidgets (1, $layout, $this, $model);
-?>
-</div>
-</div>
+    list($width) = $dashboard->getColumnWidths();
 
-<div id='profile-widgets-container-2' class='connected-sortable-profile-container'>
-<?php
-displayWidgets (2, $layout, $this, $model);
-?>
-</div>
-
-<?php
+    Tours::loadTips ('profile.index');
 }
+
 ?>
-<div id='activity-feed-container-outer'>
-<?php
-$this->renderPartial('_activityFeed', array(
-    'dataProvider' => $dataProvider,
-    'profileId' => $model->id,
-    'users' => $users,
-    'lastEventId' => $lastEventId,
-    'firstEventId' => $firstEventId,
-    'lastTimestamp' => $lastTimestamp,
-    'stickyDataProvider' => $stickyDataProvider,
-    'usersDataProvider' => $usersDataProvider,
-    'isMyProfile' => $isMyProfile
-));
-?>
-</div>
+<div id='profile-content-container' class='<?php echo $fullProfile ?>'>
+
+    <div id='profile-info-container-outer'>
+        <?php 
+        if (!$isMyProfile) {
+            $this->renderPartial('_profileInfo', array(
+                'model' => $model, 
+            )); 
+        }
+        echo X2Html::getFlashes(); 
+        ?>
+    </div>
+
+        <?php 
+        if ($isMyProfile) $dashboard->renderContainer(1); 
+        if ($isMyProfile) $dashboard->renderContainer(2); 
+        ?>
+
+        <div id='activity-feed-container-outer' style="width: <?php echo $width ?>">
+            <?php $this->renderPartial('_activityFeed', $activityFeedParams); ?>
+        </div>  
+
 </div>

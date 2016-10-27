@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('system.test.CDbFixtureManager');
 
@@ -40,6 +41,26 @@ Yii::import('system.test.CDbFixtureManager');
  * @package application.components
  */
 class X2FixtureManager extends CDbFixtureManager {
+
+    /**
+     * @var bool $loadFixture
+     */
+    public $loadFixtures; 
+    public $loadFixturesForClassOnly; 
+
+    private $_referenceFixtures;
+    public function setReferenceFixtures ($referenceFixtures) {
+        $this->_referenceFixtures = $referenceFixtures;
+    }
+
+    public function __construct () {
+        $this->loadFixtures = X2_LOAD_FIXTURES && !X2_LOAD_FIXTURES_FOR_CLASS_ONLY;
+        $this->loadFixturesForClassOnly = X2_LOAD_FIXTURES_FOR_CLASS_ONLY;
+    }
+
+    public function prepare () {
+        if ($this->loadFixtures) parent::prepare ();
+    }
 
 	/**
 	 * Override of {@link CDbFixtureManager}'s resetTable 
@@ -50,6 +71,9 @@ class X2FixtureManager extends CDbFixtureManager {
      * http://www.yiiframework.com/license/
 	 */
 	public function resetTable($tableName) {
+        /* x2modstart */ 
+        if (!$this->loadFixtures && !$this->loadFixturesForClassOnly) return;
+        /* x2modend */ 
 		$initFile = $this->basePath . DIRECTORY_SEPARATOR . $tableName . $this->initScriptSuffix;
 		if (is_file($initFile)) {
 			$tbl_data = require($initFile);
@@ -87,24 +111,30 @@ class X2FixtureManager extends CDbFixtureManager {
 
             foreach(require($fileName) as $alias=>$row)
             {
-                    $builder->createInsertCommand($table,$row)->execute();
-                    $primaryKey=$table->primaryKey;
-                    if($table->sequenceName!==null)
-                    {
-                            if(is_string($primaryKey) && !isset($row[$primaryKey]))
-                                    $row[$primaryKey]=$builder->getLastInsertID($table);
-                            elseif(is_array($primaryKey))
-                            {
-                                    foreach($primaryKey as $pk)
-                                    {
-                                            if(!isset($row[$pk]))
-                                            {
-                                                    $row[$pk]=$builder->getLastInsertID($table);
-                                                    break;
-                                            }
-                                    }
-                            }
+                    /* x2modstart */ 
+                    if ($this->loadFixtures || $this->loadFixturesForClassOnly) {
+                    /* x2modend */ 
+                        $builder->createInsertCommand($table,$row)->execute();
+                        $primaryKey=$table->primaryKey;
+                        if($table->sequenceName!==null)
+                        {
+                                if(is_string($primaryKey) && !isset($row[$primaryKey]))
+                                        $row[$primaryKey]=$builder->getLastInsertID($table);
+                                elseif(is_array($primaryKey))
+                                {
+                                        foreach($primaryKey as $pk)
+                                        {
+                                                if(!isset($row[$pk]))
+                                                {
+                                                        $row[$pk]=$builder->getLastInsertID($table);
+                                                        break;
+                                                }
+                                        }
+                                }
+                        }
+                    /* x2modstart */ 
                     }
+                    /* x2modend */ 
                     $rows[$alias]=$row;
             }
             return $rows;
@@ -165,6 +195,52 @@ class X2FixtureManager extends CDbFixtureManager {
 
             $schema->checkIntegrity(true);
     }
+
+	/**
+	 * Returns the specified ActiveRecord instance in the fixture data.
+	 * @param string $name the fixture name
+	 * @param string $alias the alias for the fixture data row
+	 * @return CActiveRecord the ActiveRecord instance. False is returned if there is no such fixture row.
+     * This method is Copyright (c) 2008-2014 by Yii Software LLC
+     * http://www.yiiframework.com/license/
+	 */
+	public function getRecord($name,$alias)
+	{
+		if(isset($this->_records[$name][$alias]))
+		{
+			if(is_string($this->_records[$name][$alias]))
+			{
+				$row=$this->_rows[$name][$alias];
+
+                /* x2modstart */ 
+                if ($this->loadFixtures) {
+                /* x2modend */ 
+                    $model=CActiveRecord::model($this->_records[$name][$alias]);
+                    $key=$model->getTableSchema()->primaryKey;
+                    if(is_string($key))
+                        $pk=$row[$key];
+                    else
+                    {
+                        foreach($key as $k)
+                            $pk[$k]=$row[$k];
+                    }
+                    $this->_records[$name][$alias]=$model->findByPk($pk);
+                /* x2modstart */ 
+                } else {
+                    $model = CActiveRecord::model ($this->_records[$name][$alias]);
+                    if (isset ($row['id'])) {
+                        $this->_records[$name][$alias]=$model->findByPk($row['id']);
+                    } else {
+                        $this->_records[$name][$alias]=$model->findByAttributes($row);
+                    }
+                }
+                /* x2modend */ 
+			}
+			return $this->_records[$name][$alias];
+		}
+		else
+			return false;
+	}
 
 }
 

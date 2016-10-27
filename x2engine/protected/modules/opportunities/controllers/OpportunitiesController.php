@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * @package application.modules.opportunities.controllers
@@ -64,6 +65,14 @@ class OpportunitiesController extends x2base {
 
     public function behaviors(){
         return array_merge(parent::behaviors(), array(
+            'MobileControllerBehavior' => array(
+                'class' => 
+                    'application.modules.mobile.components.behaviors.MobileControllerBehavior'
+            ),
+            'MobileActionHistoryBehavior' => array(
+                'class' => 
+                    'application.modules.mobile.components.behaviors.MobileActionHistoryBehavior'
+            ),
             'QuickCreateRelationshipBehavior' => array(
                 'class' => 'QuickCreateRelationshipBehavior',
                 'attributesOfNewRecordToUpdate' => array (
@@ -80,14 +89,8 @@ class OpportunitiesController extends x2base {
         ));
     }
 
-    public function actionGetItems(){
-        $sql = 'SELECT id, name as value FROM x2_opportunities WHERE name LIKE :qterm ORDER BY name ASC';
-        $command = Yii::app()->db->createCommand($sql);
-        $qterm = $_GET['term'].'%';
-        $command->bindParam(":qterm", $qterm, PDO::PARAM_STR);
-        $result = $command->queryAll();
-        echo CJSON::encode($result);
-        Yii::app()->end();
+    public function actionGetItems($term){
+        LinkableBehavior::getItems ($term);
     }
 
     /**
@@ -159,23 +162,6 @@ class OpportunitiesController extends x2base {
         ));
     }
 
-    /* public function create($model,$oldAttributes,$api=0) {
-
-        // process currency into an INT
-//        $model->quoteAmount = Formatter::parseCurrency($model->quoteAmount,false);
-
-        if(isset($model->associatedContacts))
-            $model->associatedContacts = Opportunity::parseContacts($model->associatedContacts);
-        $model->createDate = time();
-        $model->lastUpdated = time();
-        // $model->expectedCloseDate = Formatter::parseDate($model->expectedCloseDate);
-        if($api == 1) {
-            return parent::create($model,$oldAttributes,$api);
-        } else {
-            parent::create($model,$oldAttributes,'0');
-        }
-    } */
-
     /**
      * Creates a new model.
      * If creation is successful, the browser will be redirected to the 'view' page.
@@ -206,7 +192,7 @@ class OpportunitiesController extends x2base {
         }
 
         if(isset($_POST['x2ajax'])){
-            $this->renderInlineCreateForm ($model, isset ($ajaxErrors) ? $ajaxErrors : false);
+            $this->renderInlineForm ($model);
         } else {
             $this->render('create',array(
                 'model'=>$model,
@@ -214,32 +200,6 @@ class OpportunitiesController extends x2base {
             ));
         }
     }
-
-    /* public function update($model,$oldAttributes,$api=0){
-
-        // process currency into an INT
-        // $model->quoteAmount = Formatter::parseCurrency($model->quoteAmount,false);
-
-        $arr=$model->associatedContacts;
-        if(isset($model->associatedContacts)) {
-            foreach($model->associatedContacts as $contact) {
-                $rel=new Relationships;
-                $rel->firstType='Contacts';
-                $rel->firstId=$contact;
-                $rel->secondType='Opportunity';
-                $rel->secondId=$model->id;
-                if($rel->firstId!="" && $rel->secondId!="")
-                    $rel->save();
-            }
-                $model->associatedContacts=Opportunity::parseContacts($arr);
-        }
-        $model->lastUpdated = time();
-        // if($model->expectedCloseDate!=""){
-            // $model->expectedCloseDate=strtotime($model->expectedCloseDate);
-        // }
-
-        parent::update($model,$oldAttributes,'0');
-    } */
 
     /**
      * Updates a particular model.
@@ -270,31 +230,7 @@ class OpportunitiesController extends x2base {
             'model'=>$model,
         ));
     }
-    /*
-    public function actionSaveChanges($id) {
-        $opportunity=$this->loadModel($id);
-        if(isset($_POST['Opportunity'])) {
-            $temp=$opportunity->attributes;
-            foreach($opportunity->attributes as $field=>$value){
-                            if(isset($_POST['Opportunity'][$field])){
-                                $opportunity->$field=$_POST['Opportunity'][$field];
-                            }
-                        }
-
-            // process currency into an INT
-            $opportunity->quoteAmount = Formatter::parseCurrency($opportunity->quoteAmount,false);
-
-
-            if($opportunity->expectedCloseDate!=""){
-                $opportunity->expectedCloseDate=strtotime($opportunity->expectedCloseDate);
-            }
-            $changes=$this->calculateChanges($temp,$opportunity->attributes, $opportunity);
-            $opportunity=$this->updateChangelog($opportunity,$changes);
-            $opportunity->save();
-            $this->redirect(array('view','id'=>$opportunity->id));
-        }
-    }
-        */
+  
     public function actionAddUser($id) {
         $users=User::getNames();
         unset($users['admin']);
@@ -424,4 +360,112 @@ class OpportunitiesController extends x2base {
         $this->renderPartial('qtip', array('model' => $model));
     }
 
+    /**
+     * Create a menu for Opportunities
+     * @param array Menu options to remove
+     * @param X2Model Model object passed to the view
+     * @param array Additional menu parameters
+     */
+    public function insertMenu($selectOptions = array(), $model = null, $menuParams = null) {
+        $Opportunities = Modules::displayName();
+        $Opportunity = Modules::displayName(false);
+        $modelId = isset($model) ? $model->id : 0;
+
+        /**
+         * To show all options:
+         * $menuOptions = array(
+         *     'index', 'create', 'view', 'edit', 'share', 'delete', 'attach', 'import', 'export', 'quick',
+         * );
+         */
+
+        $menuItems = array(
+            array(
+                'name'=>'index',
+                'label'=>Yii::t('opportunities','{opportunities} List', array(
+                    '{opportunities}'=>$Opportunities,
+                )),
+                'url'=>array('index')
+            ),
+            array(
+                'name'=>'create',
+                'label'=>Yii::t('opportunities','Create {opportunity}', array(
+                    '{opportunity}'=>$Opportunity,
+                )),
+                'url'=>array('create')
+            ),
+            RecordViewLayoutManager::getViewActionMenuListItem ($modelId),
+            array(
+                'name'=>'edit',
+                'label'=>Yii::t('opportunities','Edit {opportunity}', array(
+                    '{opportunity}'=>$Opportunity,
+                )),
+                'url'=>array('update', 'id'=>$modelId)
+            ),
+            array(
+                'name'=>'share',
+                'label'=>Yii::t('accounts','Share {opportunity}', array(
+                    '{opportunity}'=>$Opportunity,
+                )),
+                'url'=>array('shareOpportunity','id'=>$modelId)
+            ),
+            array(
+                'name'=>'delete',
+                'label'=>Yii::t('opportunities','Delete'),
+                'url'=>'#',
+                'linkOptions'=>array(
+                    'submit'=>array('delete','id'=>$modelId),
+                    'confirm'=>'Are you sure you want to delete this item?')
+            ),
+            ModelFileUploader::menuLink(),
+            array(
+                'name'=>'quotes',
+                'label' => Yii::t('quotes', 'Quotes/Invoices'), 'url' => 'javascript:void(0)',
+                'linkOptions' => array('onclick' => 'x2.inlineQuotes.toggle(); return false;')),
+            array(
+                'name'=>'import',
+                'label'=>Yii::t('opportunities', 'Import {opportunities}', array(
+                    '{opportunities}'=>$Opportunities,
+                )),
+                'url'=>array('admin/importModels', 'model'=>'Opportunity'),
+            ),
+            array(
+                'name'=>'export',
+                'label'=>Yii::t('opportunities', 'Export {opportunities}', array(
+                    '{opportunities}'=>$Opportunities,
+                )),
+                'url'=>array('admin/exportModels', 'model'=>'Opportunity'),
+            ),
+            array(
+                'name'=>'quick',
+                'label'=>Yii::t('app', 'Quick Create'),
+                'url'=>array('/site/createRecords', 'ret'=>'opportunities'),
+                'linkOptions'=>array(
+                    'id'=>'x2-create-multiple-records-button',
+                    'class'=>'x2-hint',
+                    'title'=>Yii::t('app', 'Create a {contact}, {account}, and {opportunity}.', array(
+                        '{opportunity}'=>$Opportunity,
+                        '{contact}'=>Modules::displayName(false, "Contacts"),
+                        '{account}'=>Modules::displayName(false, "Accounts"),
+                    )))
+            ),
+            array(
+                'name' => 'print',
+                'label' => Yii::t('app', 'Print Record'),
+                'url' => '#',
+                'linkOptions' => array (
+                    'onClick'=>"window.open('".
+                        Yii::app()->createUrl('/site/printRecord', array (
+                            'modelClass' => 'Opportunity',
+                            'id' => $modelId,
+                            'pageTitle' => Yii::t('app', 'Opportunity').': '.(isset($model) ? 
+                                $model->name : "")
+                        ))."');"
+                )
+            ),
+            RecordViewLayoutManager::getEditLayoutActionMenuListItem (),
+        );
+
+        $this->prepareMenu($menuItems, $selectOptions);
+        $this->actionMenu = $this->formatMenu($menuItems, $menuParams);
+    }
 }

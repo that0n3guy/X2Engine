@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Standalone file manipulation class.
@@ -187,10 +188,50 @@ class FileUtil {
                         return @ftp_put(self::$_ftpStream, self::ftpStripChroot($target), $source, FTP_BINARY);
                     case 'php':
                     default:
-                        return @copy($source, $target) !== false;
+                        $retVal = @copy($source, $target) !== false;
+                        self::caseInsensitiveCopyFix ($source, $target);
+                        return $retVal;
                 }
             }
         }
+    }
+
+    /**
+     * To be called after copying a file. If it's the case that source and target basenames differ 
+     * by case, target will be renamed so that its basename matches the source's. Allows case
+     * of source filename to be preserved in case insensitive file systems.
+     * @return bool false if rename wasn't called, true otherwise (value used for testing purposes)
+     */
+    private static function caseInsensitiveCopyFix ($source, $target) {
+        $sourceBasename = basename ($source);
+        $targetBasename = basename ($target);
+        // if basename of source and target params aren't the same, it means that case was changed
+        // explicitly
+        if ($sourceBasename !== $targetBasename) return false;
+
+        // get path to file corresponding to target, so that we can get the basename of the actual
+        // file
+        $target = realpath ($target); 
+        if (!$target) return false;
+
+        $targetBasename = basename ($target);
+
+        // source and target have the same case so renaming won't be necessary
+        if ($targetBasename === $sourceBasename ||
+            // or source and target base name differ by something other than case
+            strtolower ($targetBasename) !== strtolower ($sourceBasename)) {
+
+            return false;
+        }
+
+        // replace target basename with source basename
+        $newTargetName = preg_replace (
+            '/'.preg_quote ($targetBasename).'$/', $sourceBasename, $target); 
+        if ($newTargetName !== $target) {
+            @rename ($target, $newTargetName);
+            return true;
+        }
+        return false;
     }
 
     /**

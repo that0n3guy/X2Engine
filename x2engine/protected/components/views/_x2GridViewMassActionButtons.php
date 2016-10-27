@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,12 +33,11 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /*
 Parameters:
     massActions - array of strings - list of available mass actions to select from
-        ('delete' | 'newList' | 'addToList' | 'tag' | 'updateField')
     gridId - the id property of the X2GridView instance
     modelName - the modelName property of the X2GridView instance
     selectedAction - string - if set, used to select option from mass actions dropdown
@@ -47,165 +47,8 @@ Parameters:
 Yii::app()->clientScript->registerScriptFile (
     Yii::app()->getBaseUrl().'/js/X2GridView/X2GridViewMassActionsManager.js', CClientScript::POS_END);
 
-
-
-$massActionLabels = array (
-    'completeAction' => Yii::t ('app', 'Complete selected actions'),
-    'uncompleteAction' => Yii::t ('app', 'Uncomplete selected actions'),
-    'newList' => Yii::t ('app', 'New list from selection'),
-    'addToList' => Yii::t ('app', 'Add selected to list'),
-    'removeFromList' => Yii::t ('app', 'Remove selected from list'),
-
-);
-
-AuxLib::registerTranslationsScript ('massActions', array (
-    'addedItems' => 'Added items to list',
-    'addToList' => 'Add selected to list',
-    'removeFromList' => 'Remove selected from list',
-    'newList' => 'Create new list from selected',
-    'add' => 'Add to list',
-    'remove' => 'Remove from list',
-    'noticeFlashList' => 'Mass action exectuted with',
-    'errorFlashList' => 'Mass action exectuted with',
-    'noticeItemName' => 'warnings',
-    'errorItemName' => 'errors',
-    'successItemName' => 'Close',
-    'blankListNameError' => 'Cannot be left blank',
-    'close' => 'Close',
-    'cancel' => 'Cancel',
-    'create' => 'Create',
-    'tag' => 'Tag',
-    'update' => 'Update',
-    'tagSelected' => 'Tag selected',
-    'deleteSelected' => 'Delete selected',
-    'delete' => 'Delete',
-    'updateField' => 'Update fields of selected',
-    'emptyTagError' => 'At least one tag must be included',
-));
-
-Yii::app()->clientScript->registerCss ('massActionsCss', "
-
-.x2-gridview-mass-action-outer {
-    position: relative;
-}
-
-/*
-Flashes container
-*/
-
-#x2-gridview-flashes-container.fixed-flashes-container {
-    position: fixed;
-    opacity: 0.9;
-    bottom: 5px;
-}
-
-#x2-gridview-flashes-container {
-    margin-top: 5px;
-    margin-right: 5px;
-}
-
-#x2-gridview-flashes-container > div {
-    margin-top: 5px;
-}
-
-#x2-gridview-flashes-container .flash-list-header {
-    margin-bottom: 4px;
-}
-
-#x2-gridview-flashes-container .x2-gridview-flashes-list {
-    clear: both;
-    margin-bottom: 5px;
-}
-
-#x2-gridview-flashes-container .flash-list-left-arrow,
-#x2-gridview-flashes-container .flash-list-down-arrow {
-    margin-left: 6px;
-    margin-top: 3px;
-}
-
-
-
-/*
-buttons 
-*/
-
-.mass-action-more-button-container .x2-down-arrow {
-    margin-left: 30px;
-    margin-top: 11px;
-}
-
-.mass-action-more-button-container .more-button-arrow {
-    height: 5px;
-}
-
-.mass-action-more-button-container .more-button-label {
-    display: inline !important;
-    float: left;
-    margin-right:5px;
-}
-
-.mass-action-more-button-container {
-    margin: 0 5px 0 0;
-    display: inline-block;
-}
-
-.mass-action-more-button-container button {
-    display: inline;
-    height: 26px;
-}
-
-
-
-
-/*
-more drop down list
-*/
-
-.x2-gridview-mass-action-buttons .more-drop-down-list.stuck {
-    position: absolute !important;
-    /*top: 74px !important;*/
-}
-
-.x2-gridview-mass-action-buttons .more-drop-down-list {
-    position: absolute;
-    top: 67px;
-    z-index: 99;
-    list-style-type: none;
-    background: #fff;
-    border: 1px solid #999;
-    -moz-box-shadow: 0 0 15px 0 rgba(0,0,0,0.5);
-    -webkit-box-shadow: 0 0 15px 0 rgba(0,0,0,0.5);
-    box-shadow: 0 0 15px 0 rgba(0,0,0,0.5);
-    padding: 5px 0px 5px 0px;
-    clip: rect(0px,1000px,1000px,-10px);
-}
-
-.x2-gridview-mass-action-buttons .more-drop-down-list li {
-    line-height: 17px;
-    padding: 0 10px 0 10px;
-    cursor: default;
-}
-.x2-gridview-mass-action-buttons .more-drop-down-list li:hover {
-    background: #eee;
-}
-
-/*
-general mass actions styling
-*/
-
-#mass-action-dialog-loading-anim {
-    margin-right: 30px;
-}
-
-.x2-gridview-mass-action-buttons .dialog-help-text {
-    margin-bottom: 5px;
-}
-
-.x2-gridview-mass-action-buttons {
-    margin: 0 5px 0 0;
-    display: inline-block;
-}
-");
+Yii::app()->clientScript->registerCssFile(
+    Yii::app()->theme->baseUrl.'/css/components/views/massActions.css');
 
 Yii::app()->clientScript->registerResponsiveCss ('massActionsCssResponsive', "
 
@@ -220,18 +63,25 @@ Yii::app()->clientScript->registerResponsiveCss ('massActionsCssResponsive', "
     .show-top-buttons .x2-gridview-mass-action-buttons {
         right: -183px; 
     }
+    body > .grid-view-more-drop-down-list.fixed-header {
+        position: absolute;
+    }
 }
 
 @media (min-width: 658px) {
-    .x2-gridview-mass-action-buttons .more-drop-down-list.fixed-header {
+    body > .grid-view-more-drop-down-list.fixed-header {
         position: fixed;
     }
 }
 
 ");
 
+// destroy mass action dialogs, save checks so that can be preserved through grid update
 $beforeUpdateJSString = "
     x2.DEBUG && console.log ('beforeUpdateJSString');
+     
+    if ($.inArray ('tag', x2.".$namespacePrefix."MassActionsManager._massActions) !== -1) 
+        x2.".$namespacePrefix."MassActionsManager.tagContainer.destructor ();
     
     
     $('.mass-action-dialog').each (function () {
@@ -246,14 +96,14 @@ $beforeUpdateJSString = "
     // save to preserve checks
     x2.".$namespacePrefix."MassActionsManager.saveSelectedRecords ();
 
+    // show loading overlay to prevent grid view user interaction
     $('#".$gridId." .x2-gridview-updating-anim').show ();
-    $('#".$gridId."-mass-action-buttons').find ('.mass-action-button').unbind ('click');
 ";
 
 $gridObj->addToBeforeAjaxUpdate ($beforeUpdateJSString);
 
+// reapply event handlers and checks
 $afterUpdateJSString = "
-    x2.DEBUG && console.log ('afterUpdateJSSTring');
     if (typeof x2.".$namespacePrefix."MassActionsManager !== 'undefined') 
         x2.".$namespacePrefix."MassActionsManager.reinit (); 
     $('#".$gridId." .x2-gridview-updating-anim').hide ();
@@ -261,58 +111,141 @@ $afterUpdateJSString = "
 
 $gridObj->addToAfterAjaxUpdate ($afterUpdateJSString);
 
+foreach ($massActionObjs as $obj) {
+    $obj->registerPackages ();
+}
+
 Yii::app()->clientScript->registerScript($namespacePrefix.'massActionsInitScript',"
     if (typeof x2.".$namespacePrefix."MassActionsManager === 'undefined') {
-        x2.DEBUG && console.log ('new X2GridViewMassActionsManager');
-        x2.".$namespacePrefix."MassActionsManager = new X2GridViewMassActionsManager ({
+        x2.".$namespacePrefix."MassActionsManager = new x2.GridViewMassActionsManager ({
             massActions: ".CJSON::encode ($massActions).",
             gridId: '".$gridId."',
             namespacePrefix: '".$namespacePrefix."',
             gridSelector: '#".$gridId."',
             fixedHeader: ".($fixedHeader ? 'true' : 'false').",
-            executeUrls: {
-                completeAction: '".Yii::app()->request->getScriptUrl () . '/' . 
-                    lcfirst ($gridObj->moduleName) .  '/x2GridViewMassAction'."',
-                uncompleteAction: '".Yii::app()->request->getScriptUrl () . '/' . 
-                    lcfirst ($gridObj->moduleName) .  '/x2GridViewMassAction'."',
-                 
-                removeFromList: '".Yii::app()->request->getScriptUrl () . 
-                    '/' . lcfirst ($gridObj->moduleName) .  '/x2GridViewMassAction'."',
-                addToList: '".Yii::app()->request->getScriptUrl () . '/' . 
-                    lcfirst ($gridObj->moduleName) .  '/x2GridViewMassAction'."',
-                createNewList: '".Yii::app()->request->getScriptUrl () . '/' . 
-                    lcfirst ($gridObj->moduleName) .  '/x2GridViewMassAction'."',
-            },
+            massActionUrl: '".Yii::app()->request->getScriptUrl () . '/' . 
+                lcfirst ($gridObj->moduleName) .  '/x2GridViewMassAction'."',
+             
+            updateFieldInputUrl: '".Yii::app()->request->getScriptUrl () . '/' . 
+                lcfirst ($gridObj->moduleName) .  '/getX2ModelInput'."',
              
             modelName: '".$modelName."',
-            translations: x2.massActions.translations,
+            paramsByClass: ".CJSON::encode (array_combine (
+                array_map (function ($obj) { return get_class ($obj); }, $massActionObjs),
+                array_map (function ($obj) { return $obj->getJSClassParams (); }, $massActionObjs)
+            )).",
+            translations: ".CJSON::encode (array (
+                'deleteprogressBarDialogTitle' => Yii::t('app', 'Mass Deletion in Progress'),
+                'updateFieldprogressBarDialogTitle' => Yii::t('app', 'Mass Update in Progress'),
+                'progressBarDialogTitle' => Yii::t('app', 'Mass Action in Progress'),
+                'deleted' => Yii::t('app', 'deleted'),
+                'tagged' => Yii::t('app', 'tagged'),
+                'added' => Yii::t('app', 'added'),
+                'updated' => Yii::t('app', 'updated'),
+                'removed' => Yii::t('app', 'removed'),
+                'executed' => Yii::t('app', 'executed'),
+                'doubleConfirmDialogTitle' => Yii::t('app', 'Confirm Deletion'),
+                'addedItems' => Yii::t('app', 'Added items to list'),
+                'addToList' => Yii::t('app', 'Add selected to list'),
+                'removeFromList' => Yii::t('app', 'Remove selected from list'),
+                'newList' => Yii::t('app', 'Create new list from selected'),
+                'moveToFolder' => Yii::t('app', 'Move selected messages'),
+                'moveOneToFolder' => Yii::t('app', 'Move message'),
+                'moveFileSysObjToFolder' => Yii::t('app', 'Move selected'),
+                'moveFileSysObjOneToFolder' => Yii::t('app', 'Move selected'),
+                'renameFileSysObj' => Yii::t('app', 'Rename'),
+                'move' => Yii::t('app', 'Move'),
+                'add' => Yii::t('app', 'Add to list'),
+                'remove' => Yii::t('app', 'Remove from list'),
+                'rename' => Yii::t('app', 'Rename'),
+                'noticeFlashList' => Yii::t('app', 'Mass action exectuted with'),
+                'errorFlashList' => Yii::t('app', 'Mass action exectuted with'),
+                'noticeItemName' => Yii::t('app', 'warnings'),
+                'errorItemName' => Yii::t('app', 'errors'),
+                'successItemName' => Yii::t('app', 'Close'),
+                'blankListNameError' => Yii::t('app', 'Cannot be left blank'),
+                'passwordError' => Yii::t('app', 'Password cannot be left blank'),
+                'close' => Yii::t('app', 'Close'),
+                'cancel' => Yii::t('app', 'Cancel'),
+                'create' => Yii::t('app', 'Create'),
+                'pause' => Yii::t('app', 'Pause'),
+                'stop' => Yii::t('app', 'Stop'),
+                'resume' => Yii::t('app', 'Resume'),
+                'complete' => Yii::t('app', 'Complete'),
+                'tag' => Yii::t('app', 'Tag'),
+                'untag' => Yii::t('app', 'Remove tag'),
+                'update' => Yii::t('app', 'Update'),
+                'execute' => Yii::t('app', 'Execute'),
+                'tagSelected' => Yii::t('app', 'Tag selected'),
+                'untagSelected' => Yii::t('app', 'Remove tags from selected'),
+                'deleteSelected' => Yii::t('app', 'Delete selected'),
+                'macroExecute' => Yii::t('app','Execute macro'),
+                'delete' => Yii::t('app', 'Delete'),
+                'updateField' => Yii::t('app', 'Update fields of selected'),
+                'emptyTagError' => Yii::t('app', 'At least one tag must be included'),
+                'emptyUntagError' => Yii::t('app', 'At least one tag must be specified'),
+                'emptyMacroError' => Yii::t('app','You must select a macro to be executed'),
+                'add' => Yii::t('app', 'Add'),
+                'MassPublishActionDialogTitle' => Yii::t('app', 'Add Action'),
+                'MassPublishActionGoButton' => Yii::t('app', 'Add'),
+                'MassPublishNoteDialogTitle' => Yii::t('app', 'Add Note'),
+                'MassPublishNoteGoButton' => Yii::t('app', 'Add'),
+                'MassPublishCallDialogTitle' => Yii::t('app', 'Log Call'),
+                'MassPublishCallGoButton' => Yii::t('app', 'Log'),
+                'MassPublishTimeDialogTitle' => Yii::t('app', 'Log Time'),
+                'MassPublishTimeGoButton' => Yii::t('app', 'Log'),
+                'MassConvertRecordDialogTitle' => Yii::t('app', 'Convert Records'),
+                'MassConvertRecordGoButton' => Yii::t('app', 'Convert'),
+                'MassConvertRecordGoButtonForce' => Yii::t('app', 'Convert Anyway'),
+                'MassAddRelationshipDialogTitle' => Yii::t('app', 'Add Relationships'),
+                'MassAddRelationshipGoButton' => Yii::t('app', 'Add Relationships'),
+            )).",
             expandWidgetSrc: '".Yii::app()->getTheme()->getBaseUrl().
                 '/images/icons/Expand_Widget.png'."',
             collapseWidgetSrc: '".Yii::app()->getTheme()->getBaseUrl().
                 '/images/icons/Collapse_Widget.png'."',
             closeWidgetSrc: '".Yii::app()->getTheme()->getBaseUrl().
-                '/images/icons/Close_Widget.png'."'
+                '/images/icons/Close_Widget.png'."',
+            progressBarDialogSelector: '#$namespacePrefix-progress-dialog',
+            enableSelectAllOnAllPages: ".
+                ($gridObj->enableSelectAllOnAllPages ? 'true' : 'false').",
+            totalItemCount: {$gridObj->dataProvider->totalItemCount},
+            idChecksum: '$idChecksum',
         });
+    } else {
+        // grid was refreshed, total item count may have changed
+        x2.{$namespacePrefix}MassActionsManager.totalItemCount = 
+            {$gridObj->dataProvider->totalItemCount};
+        x2.{$namespacePrefix}MassActionsManager.idChecksum = 
+            '$idChecksum';
     }
-", CClientScript::POS_READY);
+", CClientScript::POS_END);
 
 ?>
 
 <span class='x2-gridview-mass-action-outer'>
 
-<div id='<?php echo $gridId; ?>-mass-action-buttons' class='x2-gridview-mass-action-buttons'>
-     
+<div id='<?php echo $gridId; ?>-mass-action-buttons' class='x2-gridview-mass-action-buttons' style='display: none;'>
     <?php
-    
+    // TODO: check if buttons are present before rendering button set
+    $massActionButtons = true;
+    if ($massActionButtons) {
     ?>
+    <div class='mass-action-button-set x2-button-group'>
+        <?php
+        foreach ($massActionObjs as $obj) {
+            $obj->renderButton ();
+        }
+        ?>
+    </div>
 
     <?php
-    $moreActions = array_diff ($massActions, array ('tag', 'delete'));
-    if ($moreActions) {
-        ?>
+    }
+    if (count ($massActionObjs) > 1) {
+    ?>
         <div class='mass-action-more-button-container'>
             <button class='mass-action-more-button x2-button'  
-             title='<?php echo Yii::t('app', 'More Mass Actions'); ?>'>
+             title='<?php echo Yii::t('app', 'More mass actions'); ?>'>
                 <span class='more-button-label'>
                     <?php echo Yii::t('app', 'More'); ?>
                 </span>
@@ -321,67 +254,64 @@ Yii::app()->clientScript->registerScript($namespacePrefix.'massActionsInitScript
                     '/images/icons/Collapse_Widget.png'; ?>' />
             </button>
         </div>
-        <ul style='display: none;'
-         class="more-drop-down-list<?php echo ($fixedHeader ? ' fixed-header' : ''); ?>"> 
+        <ul 
+         id='<?php echo $gridId; ?>more-drop-down-list'
+         style='display: none;'
+         class="grid-view-more-drop-down-list<?php echo ($fixedHeader ? ' fixed-header' : ''); ?>"> 
         <?php
-        foreach ($massActions as $action) {
-        ?>
-            <li class='mass-action-button mass-action-<?php echo $action; ?>'
-             <?php echo ($action === 'tag' || $action === 'delete' ? 
-              'style="display: none;"' : ''); ?>>
-              <?php echo $massActionLabels[$action]; ?>
-            </li>
-        <?php
+        usort ($massActionObjs, array ('X2GridViewBase', 'massActionLabelComparison'));
+        foreach ($massActionObjs as $obj) {
+            $obj->renderListItem ();
         }
-        ?>
-        </ul>
-    <?php
     }
     ?>
-
-    <!--mass action dialog contents-->    
+    </ul>
     <?php
-    if (in_array ('newList', $massActions)) {
-    ?>
-    <div class='mass-action-dialog' id="<?php echo $gridId; ?>-new-list-dialog" style="display: none;">
-        <span>
-            <?php echo Yii::t('app', 'What should the list be named?'); ?>
-        </span>
-        <br/>
-        <input class='left new-list-name'></input>
-    </div>
-    <?php
+    foreach ($massActionObjs as $obj) {
+        $obj->renderDialog ($gridId, $modelName);
     }
-    if (in_array ('addToList', $massActions)) {
-    ?>
-    <div class='mass-action-dialog' id="<?php echo $gridId; ?>-add-to-list-dialog" style="display: none;">
-        <span>
-            <?php echo Yii::t('app', 'Select a list to which the selected records will be added.');
-            ?>
-        </span>
-        <?php
-        $listNames  = X2List::getAllStaticListNames ($this);
-        echo empty($listNames)
-            ? '<br><br>'.Yii::t('app','There are no static lists to which '
-                    . 'contacts can be added.').' '.
-                CHtml::link(Yii::t('contacts','Create a List'),
-                            array('/contacts/contacts/createList'))
-            : CHtml::dropDownList ('addToListTarget',null, $listNames); ?>
-    </div>
-    <?php
-    }
-    if (in_array ('removeFromList', $massActions)) {
-    ?>
-    <div class='mass-action-dialog' id="<?php echo $gridId; ?>-remove-from-list-dialog" 
-     style="display: none;">
-        <span>
-            <?php echo Yii::t('app', 'Remove all selected records from this list?'); ?> 
-        </span>
-    </div>
-    <?php
-    }
-    
     ?>
 </div>
 
 </span>
+<?php
+if (isset ($modelName)) {
+?>
+<div class='mass-action-dialog double-confirmation-dialog' style='display: none;'>
+    <span><?php 
+        echo Yii::t(
+            'app', 'You are about to delete {count} {recordType}.', 
+            array (
+                '{recordType}' => X2Model::getRecordName ($modelName, true),
+                '{count}' => '<b>'.$gridObj->dataProvider->totalItemCount.'</b>',
+            ));
+        echo Yii::t('app', 'This action cannot be undone.'); 
+        ?>
+        </br>
+        </br>
+        <?php
+        echo Yii::t('app', 'Please enter your password to confirm that you want to '.
+            'delete the selected records.'); 
+    ?></span>
+    </br>
+    </br>
+    <?php
+    echo CHtml::label (Yii::t('app', 'Password:'), 'LoginForm[password]');
+    ?>
+    <input name="password" type='password'>
+</div>
+<?php
+}
+?>
+<div id='<?php echo $namespacePrefix; ?>-progress-dialog' class='progress-dialog mass-action-dialog'
+ style='display: none;'>
+<?php
+    $this->widget ('X2ProgressBar', array (
+        'uid' => $gridObj->namespacePrefix,
+        'max' => $gridObj->dataProvider->totalItemCount,
+        'label' => '',
+    ));
+?>
+<div class='super-mass-action-feedback-box'>
+</div>
+</div>

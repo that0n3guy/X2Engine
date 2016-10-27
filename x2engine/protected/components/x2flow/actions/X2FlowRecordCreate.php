@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * X2FlowAction that creates a new record
@@ -44,7 +45,7 @@ class X2FlowRecordCreate extends X2FlowAction {
 	public $info = '';
 
 	public function paramRules() {
-		return array(
+		return array_merge (parent::paramRules (), array (
 			'title' => $this->title,
 			'modelClass' => 'modelClass',
 			'options' => array(
@@ -58,10 +59,11 @@ class X2FlowRecordCreate extends X2FlowAction {
                     'name'=>'createRelationship',
                     'label' => 
                         Yii::t('studio', 'Create Relationship'). 
-                        '<span class="x2-hint" title="'.
-                        Yii::t('app', 'Check this box if you want a new relationship to be '.
-                        'established betwen the record created by this action and the record that '.
-                        'triggered the flow.').'">&nbsp;[?]</span>', 
+                        '&nbsp;'.
+                        X2Html::hint2 (
+                            Yii::t('app', 'Check this box if you want a new relationship to be '.
+                                'established between the record created by this action and the '.
+                                'record that triggered the flow.')), 
                     'type'=>'boolean',
                     'defaultVal' => false,
                 ),
@@ -93,7 +95,7 @@ class X2FlowRecordCreate extends X2FlowAction {
                     'optional'=>1,
                 ),
 			),*/
-		);
+		));
 	}
 
 	public function execute(&$params) {
@@ -108,14 +110,14 @@ class X2FlowRecordCreate extends X2FlowAction {
             $acceptedModelTypes = X2Model::getModelTypesWhichSupportRelationships ();
 
             if (!in_array ($this->config['modelClass'], $acceptedModelTypes)) {
-                return array (false, Yii::t('x2flow', 'Relationships cannot be made with records '.
+                return array (false, Yii::t('admin', 'Relationships cannot be made with records '.
                     'of type {type}.', array ('{type}' => $this->config['modelClass'])));
             }
             if (!isset ($params['model'])) { // no model passed to trigger
                 return array (false, '');
             }
             if (!in_array (get_class ($params['model']), $acceptedModelTypes)) {
-                return array (false, Yii::t('x2flow', 'Relationships cannot be made with records '.
+                return array (false, Yii::t('admin', 'Relationships cannot be made with records '.
                     'of type {type}.', array ('{type}' => get_class ($params['model']))));
             }
         }
@@ -126,9 +128,7 @@ class X2FlowRecordCreate extends X2FlowAction {
             $model->save()) {
 
             if($this->parseOption('createRelationship', $params)) {
-                Relationships::create (
-                    get_class($params['model']), $params['model']->id, 
-                    get_class ($model), $model->id);
+                $params['model']->createRelationship($model);
             }
 
             return array (

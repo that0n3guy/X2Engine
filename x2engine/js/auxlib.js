@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,12 +32,13 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 if (typeof auxlib === 'undefined') auxlib = {};
 if (typeof x2 === 'undefined') x2 = {};
 
 auxlib.DEBUG = true;
+auxlib.translations = {};
 
 auxlib.error = function (message) {
     if (auxlib.DEBUG && x2.DEBUG) console.log ('Error: ' + message);
@@ -169,11 +171,14 @@ Parameters:
 	selector - a jquery selector for the select element
 	setting - the value of the option to be selected
 */
-auxlib.selectOptionFromSelector = function (selector, setting) {
+auxlib.selectOptionFromSelector = function (selector, setting, suppressChangeEvent) {
+    var suppressChangeEvent = typeof suppressChangeEvent === 'undefined' ? 
+        false : suppressChangeEvent; 
     if (!$(selector).children ('[value="' + setting + '"]').length) return;
 	$(selector).children (':selected').removeAttr ('selected');
 	$(selector).children ('[value="' + setting + '"]').attr ('selected', 'selected');
-    $(selector).val (setting).change ();
+    if (!suppressChangeEvent)
+        $(selector).val (setting).change ();
 }
 
 
@@ -183,7 +188,8 @@ is not defined.
 */
 auxlib.applyArgs = function (obj, defaultArgs, args) {
 	for (var i in defaultArgs) {
-		if (typeof args[i] === 'undefined') {
+        if (typeof obj[i] !== 'undefined') continue;
+        if (typeof args[i] === 'undefined') {
 			obj[i] = defaultArgs[i];
 		} else {
 			obj[i] = args[i];
@@ -193,7 +199,7 @@ auxlib.applyArgs = function (obj, defaultArgs, args) {
 
 /**
  * Calls callback when user clicks outside of elem
- * @param object elem jQuery element(s)
+ * @param object|string elem jQuery element(s) or selector
  * @param function callback 
  * @param boolean one if true, event handler will be bound until user clicks outside element
  */
@@ -202,17 +208,21 @@ auxlib.onClickOutside = (function () {
     return function (elem, callback, one, eventNamespace) {
         var eventNamespace = typeof eventNamespace === 'undefined' ? ++i : eventNamespace; 
         var one = typeof one === 'undefined' ?  false : one;          
-        var selector = elem.selector;
+        if (Object.prototype.toString.call (elem) === '[object String]')
+            var selector = elem;
+        else
+            var selector = elem.selector;
 
         var clickCallback = function (evt) {
             // clicked outside if target or target's parents do not match specified elements
+
             if ($.inArray ($(evt.target)[0], $(elem)) === -1 && 
                 $(evt.target).closest (selector).length === 0) {
 
                 callback.call (elem);
                 return true;
             } 
-            return false;
+            evt.stopPropagation ();
         };
         var evtName = 'click.onClickOutside' + eventNamespace;
         $("body").unbind (evtName);
@@ -228,6 +238,10 @@ auxlib.onClickOutside = (function () {
         return evtName; 
     };
 }) ();
+
+auxlib.rebind = function (elem$, eventName, callback) {
+    elem$.unbind (eventName).bind (eventName, callback);
+};
 
 auxlib.makeDialogClosableWithOutsideClick = function (dialogElem) {
     $("body").on ('click', function (evt) {
@@ -265,13 +279,13 @@ auxlib.keys = function (obj) {
     return keys;
 };
 
-/*
-Used to replace Object.create which is not available in ie8
-*/
+/**
+ * Used to replace Object.create which is not available in ie8
+ */
 auxlib.create = function (prototype) {
-    function dummyFn () {};
-    dummyFn.prototype = prototype;
-    return new dummyFn ();
+    function dummyConstructor () {};
+    dummyConstructor.prototype = prototype;
+    return new dummyConstructor ();
 };
 
 /*
@@ -306,7 +320,9 @@ auxlib.htmlEncode = function (text) {
 };
 
 auxlib.htmlDecode = function (html) {
-    return $('<div>', { 'html': html }).text ();
+    var textarea = $('<textarea>').get (0);
+    textarea.innerHTML = html;
+    return textarea.value;
 };
 
 /*
@@ -503,6 +519,148 @@ auxlib.getUnselected = function (elem) {
     },$.makeArray ($(elem).children ().not (':selected')));
 };
 
+auxlib.pageLoading = function () {
+    if (auxlib.throbber$)
+        auxlib.throbber$.remove ();
+    auxlib.throbber$ = $('<div>', {
+        'class': 'x2-loading-icon load8 full-page-loader x2-loader',
+    });
+    auxlib.throbber$.append ($('<div>', {
+        'class': 'loader'
+    }));
+    $('#content').append (auxlib.throbber$);
+    return auxlib.throbber$;
+};
+
+auxlib.pageLoadingStop = function () {
+    if (auxlib.throbber$)
+        auxlib.throbber$.remove ();
+};
+
+auxlib.containerLoadingStop = function (elem$) {
+    elem$.find ('.x2-loading-icon').remove ();
+    auxlib.containerOverlayRemove (elem$);
+};
+
+auxlib.containerLoading = function (elem$, attr, overlay) {
+    attr = typeof attr === 'undefined' ? {} : attr; 
+    overlay = typeof overlay === 'undefined' ? false : overlay; 
+    var throbber$ = $('<div>', {
+        'class': 'x2-loading-icon load8 x2-loader',
+    }).attr (attr);
+    throbber$.append ($('<div>', {
+        'class': 'loader'
+    }));
+    elem$.append (throbber$);
+
+    throbber$.position ({
+        my: 'center center',
+        at: 'center center',
+        of: elem$
+    });
+    if (overlay) {
+        auxlib.containerOverlay ();
+    }
+    return throbber$;
+};
+
+auxlib.containerOverlay = function (elem$) {
+    var overlay$ = $('<div>', {
+        'class': 'x2-loading-overlay',
+        'style': 'position: absolute;'
+    });
+    overlay$.height (elem$.height ());
+    overlay$.width (elem$.width ());
+    elem$.after (overlay$);
+    overlay$.position ({
+        my: 'center center', 
+        at: 'center center', 
+        of: elem$
+    })
+};
+
+auxlib.containerOverlayRemove = function (elem$) {
+    elem$.next ('.x2-loading-overlay').remove ();
+};
+
+auxlib.confirm = function (callback, translations) {
+    translations = typeof translations === 'undefined' ? {} : translations; 
+    translations = $.extend ({}, {
+        message: auxlib.translations['Are you sure you want to delete this item?'], 
+        title: auxlib.translations['Delete item?'], 
+        cancel: auxlib.translations['Cancel'], 
+        confirm: auxlib.translations['Confirm'], 
+    }, translations);
+    $('<div>').html (translations.message).dialog ({ 
+        title: translations.title,
+        height: 140,
+        width: 500,
+        resizable: false,
+        modal: true,
+        buttons: [
+            {    
+                text: translations.confirm,
+                click: function () {
+                    $(this).dialog ('close');
+                    callback ();
+                }
+            },
+            {    
+                text: translations.cancel,
+                click: function () {
+                    $(this).dialog ('close');
+                }
+            }
+        ],
+        close: function () {
+            $(this).dialog ('destroy');
+        }
+    }).css('min-height','3em');
+};
+
+auxlib.emptyNumArray = function (size, fill) {
+    if (typeof fill === 'undefined') {
+        fill = '0';
+    }
+
+    return auxlib.emptyStringArray(size, ''+fill).map(parseFloat);
+};
+
+auxlib.emptyStringArray = function (size, fill) {
+    if (typeof fill === 'undefined') {
+        fill = '';
+    }
+    return new Array(size+1).join(fill).split('');
+};
+
+auxlib.length = function(obj) {
+    return auxlib.keys(obj).length;
+}
+
+auxlib.fa = function(icon, htmlOptions) {
+    if (typeof htmlOptions === 'undefined'){
+        htmlOptions = {}
+    }
+    return $('<i class="fa"></i>', htmlOptions).addClass(icon);
+}
+
+auxlib.generateSelectors = function (object) {
+
+    for (var i in object) {
+        if (typeof object[i] === 'string' && 
+            (object[i][0] == '#' || object[i][0] == '.')) {
+            object['$' + i] = $(object[i]);
+        }
+    }
+}
+
+auxlib.msie = function () {
+    return (navigator.appVersion.indexOf("MSIE")!=-1);
+}
+
+auxlib.createUrl = function (route) {
+    return yii.scriptUrl + route;
+}
 
 $(function () {
 

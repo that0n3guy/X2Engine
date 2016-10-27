@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,21 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-
-$listItemColors = Workflow::getPipelineListItemColors ($colors, true);
-$listItemColorCss = '';
-for ($i = 1; $i <= count ($listItemColors); ++$i) {
-    $listItemColorCss .= 
-    "#workflow-stage-$i .stage-member-container {
-        background-color: ".$listItemColors[$i - 1][0].";
-    }
-    #workflow-stage-$i .stage-member-container:hover {
-        background-color: ".$listItemColors[$i - 1][1].";
-    }";
-}
-Yii::app()->clientScript->registerCss('stageMemberColorCss',$listItemColorCss);
-
+ **********************************************************************************/
 
 
 // drag and drop CSS always gets loaded, this prevents layout thrashing when the UI changes 
@@ -68,7 +55,7 @@ Yii::app()->clientScript->registerPackages (array (
         ),
         'depends' => array ('history', 'auxlib'),
     ),
-));
+), true);
 
 Yii::app()->clientScript->registerScript('getWorkflowStage',"
 
@@ -90,17 +77,15 @@ function WorkflowViewManager (argsDict) {
  */
 WorkflowViewManager._getQueryString = function (modelId, ajax) {
     var ajax = typeof ajax === 'undefined' ? true : ajax; 
-    var modelId = typeof modelId === 'undefined' ? $model->id : modelId; 
+    var modelId = typeof modelId === 'undefined' ? x2.workflowViewManager.workflowId : modelId; 
+
     return (
         (ajax ? 'workflowAjax=true&' : '') + 'id=' + modelId +
         '&start=".Formatter::formatDate($dateRange['start'])."' +
         '&end=".Formatter::formatDate($dateRange['end'])."' +
         '&range=".$dateRange['range']."' +
-        '&expectedCloseDateStart=".Formatter::formatDate($expectedCloseDateDateRange['start'])."' +
-        '&expectedCloseDateEnd=".Formatter::formatDate($expectedCloseDateDateRange['end'])."' +
-        '&expectedCloseDateRange=".$expectedCloseDateDateRange['range']."' +
         '&users=".$users."' +
-        '&modelType=".urlencode (CJSON::encode ($modelType))."');
+        '&modelType=".urlencode ($modelType)."');
 };
 
 /**
@@ -180,10 +165,15 @@ WorkflowViewManager.prototype._changeUI = function (perStageWorkflowView, workfl
  * Push browser state to preserve back button funtionality across ajax loaded pages
  */
 WorkflowViewManager.prototype._pushState =  function (workflowId, perStageWorkflowView) {
+    var newUrl = window.location.href.replace (/workflow\/\d+/, 'workflow/' + workflowId);
+    newUrl = newUrl.replace (/id=\d+/, 'id=' + workflowId);
+    perStageWorkflowViewGETParamVal = perStageWorkflowView ? 'true' : 'false';
+    newUrl = newUrl.replace (
+        /perStageWorkflowView=[^&]+/, 'perStageWorkflowView=' + perStageWorkflowViewGETParamVal);
+
     x2.history.pushState (
         { workflowId: workflowId, 
-          perStageWorkflowView: perStageWorkflowView }, '', 
-        window.location);
+          perStageWorkflowView: perStageWorkflowView }, '', newUrl);
 };
 
 WorkflowViewManager.prototype._setUpWorkflowSelection = function () {
@@ -199,7 +189,6 @@ WorkflowViewManager.prototype._setUpWorkflowSelection = function () {
             that.workflowId = workflowId;
         });
         
-    this._pushState (that.workflowId, that.perStageWorkflowView);
     x2.history.bind (function () {
         var state = window.History.getState ();
 
@@ -302,50 +291,29 @@ $(function () {
 
 ",CClientScript::POS_HEAD);
 
-$this->setPageTitle(Yii::t('workflow', 'View Process'));
+Yii::app()->clientScript->registerX2Flashes();
+$this->setPageTitle(Yii::t('workflow', 'View {process}', array(
+    '{process}' => Modules::displayName(false),
+)));
 
-$isAdmin = (Yii::app()->params->isAdmin);
-
-
-$workflowViewMenuItems = array (
-	array(
-        'label'=>Yii::t('app','Funnel View'),
-        'linkOptions' => array ('id' => 'funnel-view-menu-item'),
-    ),
-	array(
-        'label'=>Yii::t('app','Pipeline View'),
-        'linkOptions' => array ('id' => 'pipeline-view-menu-item'),
-    ),
+$menuOptions = array(
+    'index', 'create', 'edit', 'funnel', 'pipeline', 'delete',
 );
+$this->insertMenu($menuOptions, $model);
 
-if ($perStageWorkflowView) {
-    $workflowViewMenuItems[1]['url'] = '#';
-} else {
-    $workflowViewMenuItems[0]['url'] = '#'; 
-}
-
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('workflow','All Processes'), 'url'=>array('index')),
-	array('label'=>Yii::t('app','Create'), 'url'=>array('create'), 'visible'=>$isAdmin),
-	array(
-        'label'=>Yii::t('workflow','Edit Process'), 
-        'url'=>array('update', 'id'=>$model->id), 
-        'visible'=>$isAdmin),
-    $workflowViewMenuItems[0],
-    $workflowViewMenuItems[1],
-	array(
-        'label'=>Yii::t('workflow','Delete Process'), 
-        'url'=>'#', 
-        'linkOptions'=>array('submit'=>array('delete','id'=>$model->id),
-        'confirm'=>Yii::t('app','Are you sure you want to delete this item?')), 
-        'visible'=>$isAdmin
-    ),
-));
+// Handle disabling links for workflow views
+$unsetUrlIndex = ($perStageWorkflowView ? 4 : 3);
+unset($this->actionMenu[3]['url'], $this->actionMenu[4]['url']);
+$this->actionMenu[$unsetUrlIndex]['url'] = '#';
 
 ?>
 <div id='content-container-inner'>
-<div class="responsive-page-title page-title icon workflow x2-layout-island x2-layout-island-merge-bottom">
-    <h2><span class="no-bold"><?php echo Yii::t('workflow','Process:'); ?></span> 
+<div class="responsive-page-title page-title icon workflow ">
+    <h2><span class="no-bold">
+        <?php echo Yii::t('workflow','{process}:', array(
+            '{process}' => Modules::displayName(false),
+        )); ?>
+    </span> 
         <?php 
         echo CHtml::dropDownList ('workflows', $model->id, $workflows, array (
             'class' => 'x2-minimal-select x2-select',
@@ -361,16 +329,12 @@ $this->actionMenu = $this->formatMenu(array(
         <a href='#' id='per-stage-view-button' 
          title='<?php echo Yii::t('workflow', 'Funnel View'); ?>'
          class='x2-button<?php echo ($perStageWorkflowView ? ' disabled-link' : ''); ?>'>
-         <div></div>
-         <div></div>
-         <div></div>
+         <?php echo X2Html::x2icon('funnel'); ?>
         </a>
         <a href='#' id='drag-and-drop-view-button' 
          title='<?php echo Yii::t('workflow', 'Pipeline View'); ?>'
          class='x2-button<?php echo ($perStageWorkflowView ? '': ' disabled-link'); ?>'>
-         <div></div>
-         <div></div>
-         <div></div>
+         <?php echo X2Html::fa('long-arrow-right'); ?>
         </a>
     </div>
 
@@ -393,7 +357,6 @@ if ($perStageWorkflowView) {
             'modelType'=>$modelType,
             'viewStage'=>$viewStage,
             'dateRange'=>$dateRange,
-            'expectedCloseDateDateRange'=>$expectedCloseDateDateRange,
             'users'=>$users,
         )
     );
@@ -403,12 +366,12 @@ if ($perStageWorkflowView) {
             'model'=>$model,
             'modelType'=>$modelType,
             'dateRange'=>$dateRange,
-            'expectedCloseDateDateRange'=>$expectedCloseDateDateRange,
             'colors'=>$colors,
             'memberListContainerSelectors'=>$memberListContainerSelectors,
             'stagePermissions'=>$stagePermissions,
             'stagesWhichRequireComments'=>$stagesWhichRequireComments,
             'stageNames'=>$stageNames,
+            'stageCounts' => $stageCounts,
             'stageValues' => $stageValues,
             'users'=>$users,
             'listItemColors' => $listItemColors,

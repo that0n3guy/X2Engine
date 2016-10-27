@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // $translation = 'Field\'s wi\th <span class="required">*</span> are required.';
 // $test =  htmlspecialchars(stripslashes($translation));
@@ -119,7 +120,8 @@ return array (
 ';
 
 	foreach(array_keys($messages) as $langPack) {
-		$file = fopen($messagePath.'/'.$langPack.'/'.$_POST['file'],'w');	// open all files to be rewritten
+        // open all files to be rewritten
+		$file = fopen($messagePath.'/'.$langPack.'/'.$_POST['file'],'w');	
 
 		fwrite($file,$fileHeader);
 
@@ -141,7 +143,11 @@ return array (
 						fwrite($file,"'".addcslashes(decodeQuotes($line),'\'')."'=>'',\n");
 				} else{
                     if(isset($_POST['data'][$langPack][$index])){
-                        fwrite($file,"'".addcslashes(decodeQuotes($line),'\'')."'=>'". addcslashes(decodeQuotes($_POST['data'][$langPack][$index]),'\'') ."',\n");
+                        fwrite(
+                            $file,
+                            "'".addcslashes(decodeQuotes($line),'\'')."'=>'". 
+                                addcslashes(decodeQuotes($_POST['data'][$langPack][$index]),'\'') .
+                                "',\n");
                     }else{
                         fwrite($file,"'".addcslashes(decodeQuotes($line),'\'')."'=>'". '' ."',\n");
                     }
@@ -315,7 +321,7 @@ function removeLine(object) {
 			$active = ($fileName == $targetFile);
 			?>
 			<tr<?php if($active) echo ' class="active"'; ?>>
-				<td><?php echo $active? $fileName : '<a href="translationManager?file='.$fileName.'">'.$fileName.'</a>'; ?></td>
+				<td><?php echo $active ? CHtml::encode ($fileName) : '<a href="translationManager?file='.CHtml::encode ($fileName).'">'.CHtml::encode ($fileName).'</a>'; ?></td>
 				<td><?php echo $lines; ?></td>
 			</tr>
 			<?php
@@ -380,7 +386,10 @@ function removeLine(object) {
 <div class="content-container">
 <div class="content">
 <form method="POST" action="<?php echo Yii::app()->controller->createAbsoluteUrl('/admin/translationManager',array('file'=>$targetFile)); ?>" id="translationForm">
-<input type="hidden" name="file" value="<?php echo $_GET['file']; ?>">
+<?php
+echo X2Html::csrfToken ();
+?>
+<input type="hidden" name="file" value="<?php echo CHtml::encode ($_GET['file']); ?>">
 <table class="rounded" style="table-layout:fixed;">
 	<tr>
 		<th width="50%" height="15" style="height:16px;">Message</th>
@@ -457,29 +466,13 @@ function removeLine(object) {
 		<td colspan="3" id="translationPane"><div id="iframeBox"><!--<iframe id="googleTranslate" scrolling="no" name="googleTranslate" src="http://translate.google.com/"></iframe>--></div></td>
 	</tr>
 </table>
-</form>
-<div class="rounded" id="footer">
-	<div id="footer-logos">
-		<?php
-		$imghtml = CHtml::image(Yii::app()->theme->baseUrl.'/images/x2footer.png','');
-		echo CHtml::link($imghtml,array('/site/page','view'=>'about')); // Yii::app()->request->baseURL.'/index.php');
-		?>
-	</div>
-	Copyright &copy; <?php echo date('Y').' '.CHtml::link('X2Engine Inc.','http://www.x2engine.com');?>
-	<?php echo Yii::t('app','Rights reserved.'); ?>
-	<?php
-	$baseUrl = Yii::app()->getBaseUrl();
-	echo Yii::t('app','The Program is provided AS IS, without warranty.<br>Licensed under {BSD}.',
-	array(
-		'{BSD}'=>CHtml::link('BSD License',$baseUrl.'/LICENSE.txt'),
-		'{GPLv3long}'=>CHtml::link(Yii::t('app','GNU General Public License version 3'),$baseUrl.'/GPL-3.0 License.txt')
-	));?>
-	<?php echo Yii::t('app','Generated in {time} seconds',array('{time}'=>round(Yii::getLogger()->getExecutionTime(),3))); ?>
-</div>
-<?php
+<?php 
+echo X2Html::csrfToken (); 
+$this->renderPartial('//layouts/footer');
+
 }
 
-$langCodeUrl = 'http://en.wikipedia.org/wiki/List_of_ISO_639-1_codes';
+//$langCodeUrl = 'http://en.wikipedia.org/wiki/List_of_ISO_639-1_codes';
 ?>
 
 </div>

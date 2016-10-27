@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * This is the model class for table "x2_dropdowns".
@@ -52,11 +53,27 @@ class Dropdowns extends CActiveRecord {
         return parent::model($className);
     }
 
+    public static function getSocialSubtypes () {
+        $dropdown = Dropdowns::model()->findByPk(113);
+        if (!$dropdown) return array ();
+        return json_decode (
+            $dropdown->options,true);
+    }
+
     /**
      * @return string the associated database table name
      */
     public function tableName(){
         return 'x2_dropdowns';
+    }
+
+    public function scopes () {
+        return array (  
+            'children' => array (
+                'condition' => 'parent=:id',
+                'params' => array (':id' => $this->id)
+            )
+        );
     }
 
     /**
@@ -68,6 +85,7 @@ class Dropdowns extends CActiveRecord {
         return array(
             array('name', 'length', 'max' => 250),
             array('options', 'safe'),
+            array('options,name', 'required'),
             array('multi', 'boolean'),
             // The following rule is used by search().
             // Please remove those attributes that should not be searched.
@@ -120,10 +138,12 @@ class Dropdowns extends CActiveRecord {
      * Retrieves items for the dropdown of given id, and whether multiple selection is allowed.
      * @param integer $id
      * @param string $translationPack The translation module to use, if applicable
-     * @param bool $multi wheter or not to include the "multi" column for distinguishing multiple selection from single selection
+     * @param bool $multi wheter or not to include the "multi" column for distinguishing multiple 
+     *  selection from single selection
+     * @return array (<options>) or array ('options' => <options>, 'multi' => <multi>)
      */
     public static function getItems($id, $translationPack = null, $multi = false){
-        $data = Yii::app()->db->createCommand()
+        $data = Yii::app()->db->cache (1000, null)->createCommand()
                 ->select('options,multi')
                 ->from('x2_dropdowns')
                 ->where('id=:id', array(':id' => $id))
@@ -141,6 +161,9 @@ class Dropdowns extends CActiveRecord {
         return $multi ? $data : $data['options'];
     }
 
+    /**
+     * @return dropdown label or the value, if no corresponding label can be found
+     */
     public function getDropdownValue($id, $index){
         $arr = Dropdowns::getItems($id, null, true);
         if($arr['multi']){
@@ -149,8 +172,8 @@ class Dropdowns extends CActiveRecord {
             if(!is_array($index))
                 $index = array();
             return implode(', ', array_map(function($o)use($arr){
-                                        return isset($arr[$o]) ? $arr[$o] : $o;
-                                    }, $index));
+                return isset($arr[$o]) ? $arr[$o] : $o;
+            }, $index));
         }
         if(isset($arr['options'])){
             $arr = $arr['options'];

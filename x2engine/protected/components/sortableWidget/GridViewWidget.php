@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,23 +33,18 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-
- Yii::import ('application.components.sortableWidget.SortableWidget');
+ **********************************************************************************/
 
 /**
  * @package application.components
  */
 abstract class GridViewWidget extends SortableWidget {
 
-    public $viewFile = '_gridViewProfileWidget';
+    public $sortableWidgetJSClass = 'GridViewWidget';
+
+    protected $compactResultsPerPage = false; 
 
     private static $_JSONPropertiesStructure;
-
-    /**
-     * @var object the model to be associated with this grid view widget 
-     */
-    protected $_model;
 
     /**
      * @var object 
@@ -60,149 +56,59 @@ abstract class GridViewWidget extends SortableWidget {
      */
     private $_gridViewConfig;
 
-    /**
-     * @return object the model to be associated with the grid view widget 
-     */
-    abstract protected function getModel ();
+    abstract protected function getDataProvider ();
 
-    /**
-     * overrides parent method
-     */
+    public function getPackages () {
+        if (!isset ($this->_packages)) {
+            $this->_packages = array_merge (parent::getPackages (), array (
+                'GridViewWidgetJS' => array(
+                    'baseUrl' => Yii::app()->request->baseUrl,
+                    'js' => array(
+                        'js/sortableWidgets/GridViewWidget.js',
+                    ),
+                    'depends' => array ('SortableWidgetJS')
+                ),
+                'GridViewWidgetCSS' => array(
+                    'baseUrl' => Yii::app()->theme->baseUrl,
+                    'css' => array(
+                        'css/components/sortableWidget/views/gridViewWidget.css',
+                    )
+                ),
+            ));
+        }
+        return $this->_packages;
+    }
+
     public static function getJSONPropertiesStructure () {
         if (!isset (self::$_JSONPropertiesStructure)) {
             self::$_JSONPropertiesStructure = array_merge (
                 parent::getJSONPropertiesStructure (),
                 array (
                     'resultsPerPage' => 10, 
+                    'showHeader' => false, 
+                    'hideFullHeader' => false, 
                 )
             );
         }
         return self::$_JSONPropertiesStructure;
     }
 
-    /**
-     * @return object Data provider object to be used for the grid view
-     */
-    public function getDataProvider () {
-        if (!isset ($this->_dataProvider)) {
-            $resultsPerPage = self::getJSONProperty (
-                $this->profile, 'resultsPerPage', $this->widgetType);
-            $this->_dataProvider = $this->model->search ($resultsPerPage, get_called_class ());
-        }
-        return $this->_dataProvider;
-    }
-
-    /**
-     * @return array the config array passed to widget ()
-     */
-    public function getGridViewConfig () {
-        if (!isset ($this->_gridViewConfig)) {
-            $this->_gridViewConfig = array (
-                'sortableWidget' => $this,
-                'id'=>get_called_class (),
-                'enableScrollOnPageChange' => false,
-                'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize'),
-                'template'=>
-                    '<div class="page-title"><h2 class="grid-widget-title-bar-dummy-element">'.
-                    '</h2>{buttons}{filterHint}'.
-                    
-                    '{summary}{topPager}</div>{items}{pager}',
-                'fixedHeader'=>false,
-                'dataProvider'=>$this->dataProvider,
-                'filter'=>$this->model,
-                'pager'=>array('class'=>'CLinkPager','maxButtonCount'=>10),
-                'modelName'=> get_class ($this->model),
-                'viewName'=>'profile',
-                'gvSettingsName'=> get_called_class (),
-                'enableControls'=>true,
-                'fullscreen'=>false,
+    protected function getJSSortableWidgetParams () {
+        if (!isset ($this->_JSSortableWidgetParams)) {
+            $this->_JSSortableWidgetParams = array_merge (array( 
+                'showHeader' => CPropertyValue::ensureBoolean (
+                    $this->getWidgetProperty('showHeader')),
+                'compactResultsPerPage' => $this->compactResultsPerPage,
+                ), parent::getJSSortableWidgetParams ()
             );
         }
-        return $this->_gridViewConfig;
-    }
-
-    /**
-     * Magic getter. Returns this widget's css
-     * @return array key is the proposed name of the css string which should be passed as the first
-     *  argument to yii's registerCss. The value is the css string.
-     */
-    protected function getCss () {
-        if (!isset ($this->_css)) {
-            $this->_css = array_merge (
-                parent::getCss (),
-                array (
-                    'gridViewWidgetCss' => "
-                        .sortable-widget-container .x2grid-header-container {
-                            width: 100% !important;
-                        }
-
-                        .sortable-widget-container .page-title {
-                            border-radius: 0 !important;
-                        }
-
-                        .sortable-widget-container .pager {
-                            float: none;
-                            -moz-border-radius: 0px 0px 4px 4px;
-                            -o-border-radius: 0px 0px 4px 4px;
-                            -webkit-border-radius: 0px 0px 4px 4px;
-                            border-radius: 0px 0px 4px 4px;
-                        }
-
-                        .sortable-widget-container div.page-title {
-                            background:#cfcfcf !important;
-                            border-bottom: 1px solid #cfcfcf !important;
-                        }
-
-                        .sortable-widget-container div.page-title .x2-minimal-select {
-                            border:1px solid #cfcfcf !important;
-                        }
-
-                        .sortable-widget-container div.page-title .x2-minimal-select:hover,
-                        .sortable-widget-container div.page-title .x2-minimal-select:focus {
-                            border: 1px solid #A0A0A0 !important;
-                            background: rgb(221, 221, 221)!important;
-                        }
-
-                        .sortable-widget-container div.page-title .x2-minimal-select:hover + .after-x2-minimal-select-outer > .after-x2-minimal-select,
-                        .sortable-widget-container div.page-title .x2-minimal-select:focus + .after-x2-minimal-select-outer > .after-x2-minimal-select {
-
-                            background: rgb(221, 221, 221)!important;
-                            background-image: url(".Yii::app()->theme->getBaseUrl ()."/images/icons/Collapse_Widget.png) !important;
-                            background-repeat: no-repeat !important;
-                            background-position: 7px !important;
-                        }
-
-                        .grid-widget-title-bar-dummy-element {
-                            height: 33px;
-                        }
-
-                        @media (max-width: 657px) {
-                            .grid-widget-title-bar-dummy-element {
-                                display: block !important;
-                            }
-                            .sortable-widget-container .x2-gridview-mass-action-buttons {
-                                top: -41px;
-                                right: -20px;
-                            }
-                            .sortable-widget-container .show-top-buttons .x2-gridview-mass-action-buttons {
-                                    right: -24px; 
-                            }
-                            .sortable-widget-container .grid-view .page-title {
-                                height: 34px;
-                            }
-                        }
-                    "
-                )
-            );
-        }
-        return $this->_css;
+        return $this->_JSSortableWidgetParams;
     }
 
     /**
      * Send the chart type to the widget content view 
      */
     public function getViewFileParams () {
-
         if (!isset ($this->_viewFileParams)) {
             $this->_viewFileParams = array_merge (
                 parent::getViewFileParams (),
@@ -214,18 +120,73 @@ abstract class GridViewWidget extends SortableWidget {
         return $this->_viewFileParams;
     }
 
-    public function init () {
-        parent::init ();
+    public function getAjaxUpdateRouteAndParams () {
         $updateRoute = '/profile/view';
         $updateParams =  array (
             'widgetClass' => get_called_class (),        
             'widgetType' => $this->widgetType,
             'id' => $this->profile->id,
         );
-
-        $this->dataProvider->pagination->route = $updateRoute;
-        $this->dataProvider->pagination->params = $updateParams;
+        return array ($updateRoute, $updateParams);
     }
+
+    /**
+     * @return array the config array passed to widget ()
+     */
+    public function getGridViewConfig () {
+        if (!isset ($this->_gridViewConfig)) {
+            list ($updateRoute, $updateParams) = $this->getAjaxUpdateRouteAndParams ();
+            $this->_gridViewConfig = array (
+                'ajaxUrl' => Yii::app()->controller->createUrl ($updateRoute, $updateParams),
+                'showHeader' => CPropertyValue::ensureBoolean (
+                    $this->getWidgetProperty('showHeader')),
+                'hideFullHeader' => CPropertyValue::ensureBoolean (
+                    $this->getWidgetProperty('hideFullHeader')),
+            );
+        }
+        return $this->_gridViewConfig;
+    }
+
+
+    protected function getSettingsMenuContentEntries () {
+        return 
+            '<li class="hide-settings">'.
+                X2Html::fa('fa-toggle-down').
+                Yii::t('profile', 'Toggle Settings Bar').
+            '</li>'.
+            ($this->compactResultsPerPage ?
+                '<li class="results-per-page-container">
+                </li>' : '').
+            parent::getSettingsMenuContentEntries ();
+    }
+
+    /**
+     * @return array translations to pass to JS objects 
+     */
+    protected function getTranslations () {
+        if (!isset ($this->_translations )) {
+            $this->_translations = array_merge (
+                parent::getTranslations (), 
+                array (
+                    'Grid Settings' => Yii::t('profile', 'Widget Grid Settings'),
+                    'Cancel' => Yii::t('profile', 'Cancel'),
+                    'Save' => Yii::t('profile', 'Save'),
+                ));
+        }
+        return $this->_translations;
+    }
+
+    public function init ($skipGridViewInit = false) {
+        parent::init ();
+        if (!$skipGridViewInit) {
+            list ($updateRoute, $updateParams) = $this->getAjaxUpdateRouteAndParams ();
+            $this->dataProvider->pagination->route = $updateRoute;
+            $this->dataProvider->pagination->params = $updateParams;
+            $this->dataProvider->sort->route = $updateRoute;
+            $this->dataProvider->sort->params = $updateParams;
+        }
+    }
+
 
 }
 ?>

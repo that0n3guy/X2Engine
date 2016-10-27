@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 
 Yii::app()->clientScript->registerCss ('quickCreateCss', "
@@ -48,6 +49,12 @@ Yii::app()->clientScript->registerCss ('quickCreateCss', "
     }
     .quick-create-feedback {
         margin-top: 17px;
+    }
+    #quick-contact-form label {
+        color: #aaa;
+        float: left;
+        margin-top: 3px;
+        margin-right: 3px;
     }
 ");
 
@@ -82,23 +89,14 @@ $form = $this->beginWidget('CActiveForm', array(
 
 <div class="form thin">
 	<div id='quick-contact-form-contents-container' class="row inlineLabel">
-        <?php
-        $i = 0;
-        foreach ($formFields as $key=>$val) {
-            echo $form->textField($model,$key,array(
-                'class'=> (($key === 'firstName' || $key === 'lastName') ?
-                    'quick-contact-narrow' : 'quick-contact-wide'),
-                'tabindex'=>100 + $i,
-                'title'=>$model->getAttributeLabel($key),
-                'id'=>'quick_create_'.get_class($model).'_'.$key,
-            ));
-            ++$i;
-        }
-        ?>
-
+        <?php $this->renderContactFields ($model); ?>
 	</div>
 </div>
 <?php
+Yii::app()->clientScript->registerScript('blur-datepickers', '
+    $("#quick-contact-form").find("input.hasDatepicker").val("").blur();
+');
+
 echo CHtml::ajaxSubmitButton(
 	Yii::t('app','Create'),
 	array('/contacts/contacts/quickContact'),
@@ -108,6 +106,7 @@ echo CHtml::ajaxSubmitButton(
             var quickContactForm = $('#quick-contact-form');
             $(quickContactForm).find ('input').removeClass ('error');
             $(quickContactForm).find ('input').next ('.error-msg').remove ();
+            $(quickContactForm).find ('.star-rating-control').parent('span').next ('.error-msg').remove ();
 
 			if(response === '') { // success
                 auxlib.createReqFeedbackBox ({
@@ -117,12 +116,17 @@ echo CHtml::ajaxSubmitButton(
                     classes: ['quick-create-feedback']
                 });
 
+                var textFields = $(quickContactForm).find ('input[type=\"text\"]');
+                var textFieldsWithoutDatepicker = textFields.not('.hasDatepicker');
+
                 // reset form inputs
-                $(quickContactForm).find ('input[type=\"text\"]').val ('');
+                textFields.val ('');
+                $(quickContactForm).find ('.star-rating-control').rating('select');
+                $(quickContactForm).find ('input[type=\"checkbox\"]').removeAttr('checked');
 
                 // reset placeholder text
-                $(quickContactForm).find ('input[type=\"text\"]').focus ();
-                $(quickContactForm).find ('input[type=\"text\"]').blur ();
+                $(textFieldsWithoutDatepicker).focus ();
+                $(textFields).blur ();
 			} else { // failure, display errors
                 var errors = JSON.parse (response);
                 var selector;

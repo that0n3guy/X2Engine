@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/auxlib.js');
 Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/X2Tags/TagContainer.js');
@@ -40,24 +41,20 @@ Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/X2Tag
 Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/X2Tags/InlineTagsContainer.js');
 
 $authParams['X2Model'] = $model;
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('actions','Today\'s Actions'),'url'=>array('index')),
-	array('label'=>Yii::t('actions','All My Actions'),'url'=>array('viewAll')),
-	array('label'=>Yii::t('actions','Everyone\'s Actions'),'url'=>array('viewGroup')),
-	array('label'=>Yii::t('actions','Create Action'),'url'=>array('create','param'=>Yii::app()->user->getName().";none:0")),
-	array('label'=>Yii::t('actions','View')),
-	array('label'=>Yii::t('actions','Edit Action'),'url'=>array('update', 'id'=>$model->id)),
-	array('label'=>Yii::t('contacts','Share Action'),'url'=>array('shareAction','id'=>$model->id)),
-	array('label'=>Yii::t('actions','Delete Action'), 'url'=>'#', 'linkOptions'=>array('submit'=>array('delete','id'=>$model->id),'confirm'=>'Are you sure you want to delete this item?')),
-),$authParams);
+$menuOptions = array(
+    'todays', 'my', 'everyones', 'create', 'view', 'edit', 'share', 'delete',
+);
+$this->insertMenu($menuOptions, $model, $authParams);
 
 ?>
 <div class="page-title icon actions">
 	<h2><?php
-	if($model->associationName=='none')
-		echo Yii::t('actions','Action');
-	else
-		echo '<span class="no-bold">',Yii::t('actions','Action'),':</span> '.CHtml::encode($model->associationName); ?>
+    if($model->associationName=='none')
+        echo Yii::t('actions','{action}', array('{action}' => Modules::displayName()));
+    else if ($model->isMultiassociated())
+        echo '<span class="no-bold">',Yii::t('actions','{action}', array('{action}' => Modules::displayName())),':</span> '.$model->renderMultiassociations (false);
+    else
+        echo '<span class="no-bold">',Yii::t('actions','{action}', array('{action}' => Modules::displayName())),':</span> '.CHtml::encode($model->associationName); ?>
 	</h2>
 </div>
 <?php
@@ -85,14 +82,15 @@ if(isset($associationModel) && $model->associationType=='contacts') {
 );
 }
 
+$this->widget('X2WidgetList', array ('model' => $model));
+
+$completeUrl = $this->createUrl ('complete', array (
+	'id' => $model->id
+)); 
 ?>
-<div class="form">
-	<b><?php echo Yii::t('app', 'Tags'); ?></b>
-	<?php $this->widget('InlineTags',array('model'=>$model)); ?>
-</div>
 
 <div class="form" id="action-form">
-	<form id="complete-action" name="complete-action" action="complete/<?php echo $model->id; ?>" method="POST">
+	<form id="complete-action" name="complete-action" method='POST' action="<?php echo $completeUrl ?>">
 		<b><?php echo Yii::t('actions','Completion Notes'); ?></b>
 		<textarea name="note" rows="4" ></textarea>
 	<div class="row buttons">
@@ -100,7 +98,7 @@ if(isset($associationModel) && $model->associationType=='contacts') {
 		<button type="submit" name="submit" class="x2-button" value="completeNew"><?php echo Yii::t('actions','Complete + New Action'); ?></button>
 
 	</div>
-
+    <?php echo X2Html::csrfToken (); ?>   
 	</form>
 </div>
 <?php

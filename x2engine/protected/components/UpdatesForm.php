@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Configuration object for the installation contact & updates registry form.
@@ -52,7 +53,7 @@ class UpdatesForm {
 		'lastName' => 'Last Name',
 		'email' => 'Email',
 		'phone' => 'Phone Number',
-		'source' => 'How you found X2Engine',
+		'source' => 'How you found X2CRM',
 		'subscribe' => 'Subscribe to the newsletter',
 		'info' => 'Comments',
 		'requestContact' => 'Request a follow-up contact',
@@ -68,11 +69,11 @@ class UpdatesForm {
 		'updatesTitle' => 'Software Updates',
 		'registrationTitle' => 'Registration',
 		'registrationSuccess' => 'Software registration succeeded.',
-		'registrationSubtext' => 'To receive software updates from X2Engine, please register your copy of X2Engine:',
+		'registrationSubtext' => 'To receive software updates from X2Engine, please register your copy of X2CRM:',
 		'registrationPostText' => 'For support or sales inquiries, please contact us',
 		'emailIni' => 'If different from Administrator Email',
-		'infoIni' => 'Intended use of X2Engine, goals, etc.',
-		'intro' => 'Please help us improve X2Engine by providing the following information:',
+		'infoIni' => 'Intended use of X2CRM, goals, etc.',
+		'intro' => 'Please help us improve X2CRM by providing the following information:',
 		'already' => 'Software update notifications enabled.',
 		'optionalTitle' => 'Optional Information',
 		'title' => 'Software Updates',
@@ -83,7 +84,7 @@ class UpdatesForm {
 	);
 
 	/**
-	 * @var array Contents of the "how you found X2Engine" selector
+	 * @var array Contents of the "how you found X2CRM" selector
 	 */
 	public $leadSources = array(
 		Null => '-----',
@@ -145,7 +146,7 @@ class UpdatesForm {
 				$attrArr[$key] = call_user_func_array($transFunc, array_merge($transFuncArgs, array($attrArr[$key])));
 			$this->$attr = $attrArr;
 		}
-		$this->message['connectionNOsMessage'] .= ': <a href="http://www.x2engine.com/contact/">x2engine.com</a>.';
+		$this->message['connectionNOsMessage'] .= ': <a href="http://www.x2crm.com/contact/">x2crm.com</a>.';
 	}
 
 	/**

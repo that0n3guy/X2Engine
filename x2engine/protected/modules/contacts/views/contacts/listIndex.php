@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,25 +33,21 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-$heading = Yii::t('contacts','Contact Lists'); 
+$heading = Yii::t('contacts','{module} Lists', array('{module}'=>Modules::displayName(false))); 
 $this->pageTitle = $heading;
-
-$menuItems = array(
-	array('label'=>Yii::t('contacts','All Contacts'),'url'=>array('index')),
-	array('label'=>Yii::t('contacts','Lists')),
-	array('label'=>Yii::t('contacts','Create Contact'),'url'=>array('create')),
-	array('label'=>Yii::t('contacts','Create List'),'url'=>array('createList')),
-);
 
 $opportunityModule = Modules::model()->findByAttributes(array('name'=>'opportunities'));
 $accountModule = Modules::model()->findByAttributes(array('name'=>'accounts'));
 
-if($opportunityModule->visible && $accountModule->visible)
-	$menuItems[] = array('label'=>Yii::t('app', 'Quick Create'), 'url'=>array('/site/createRecords', 'ret'=>'contacts'), 'linkOptions'=>array('id'=>'x2-create-multiple-records-button', 'class'=>'x2-hint', 'title'=>Yii::t('app', 'Create a Contact, Account, and Opportunity.')));
+$menuOptions = array(
+    'all', 'lists', 'create', 'createList',
+);
+if ($opportunityModule->visible && $accountModule->visible)
+    $menuOptions[] = 'quick';
+$this->insertMenu($menuOptions);
 
-$this->actionMenu = $this->formatMenu($menuItems);
 
 Yii::app()->clientScript->registerScript('search', "
 $('.search-button').click(function(){
@@ -74,12 +71,14 @@ foreach(Yii::app()->user->getFlashes() as $key => $message) {
 <?php
 $attributeLabels = CActiveRecord::model('X2List')->attributeLabels();
 
-$this->widget('zii.widgets.grid.CGridView', array(
+$this->widget('X2GridViewGeneric', array(
 	'id'=>'lists-grid',
-	'enableSorting'=>false,
-	'baseScriptUrl'=>Yii::app()->theme->getBaseUrl().'/css/gridview',
-	'htmlOptions'=>array('class'=>'grid-view contact-lists fullscreen'),
-	'template'=> '<div class="page-title icon contacts"><h2>'.$heading.'</h2><div class="title-bar">{summary}</div></div>{items}{pager}',
+	//'enableSorting'=>tru,
+	//'baseScriptUrl'=>Yii::app()->theme->getBaseUrl().'/css/gridview',
+	//'htmlOptions'=>array('class'=>'grid-view contact-lists fullscreen'),
+	'template'=> '<div class="page-title icon contacts"><h2>'.$heading.'</h2>{buttons}{filterHint}{summary}</div>{items}{pager}',
+
+    'buttons' => array('clearFilters', 'autoResize'),
 	'summaryText' => Yii::t('app','<b>{start}&ndash;{end}</b> of <b>{count}</b>')
 		. '<div class="form no-border" style="display:inline;"> '
 		. CHtml::dropDownList('resultsPerPage', Profile::getResultsPerPage(),Profile::getPossibleResultsPerPage(),array(
@@ -92,23 +91,30 @@ $this->widget('zii.widgets.grid.CGridView', array(
 			))
 		. ' </div>',
 	'dataProvider'=>$contactLists,
+    'filter' => $filter,
+    'gvSettingsName' => 'listsGrid',
 	// 'filter'=>$model,
-	'rowCssClassExpression'=>'$data["id"]==="all"?"bold":""',
+	//'rowCssClassExpression'=>'$data["id"]==="all"?"bold":"$this->rowCssClass[$row%"',
+	'rowCssClassExpression'=>'$this->rowCssClass[$row%2].($data["id"]==="all"?" bold":"")',
+    'defaultGvSettings' => array (
+        'name' => 180,
+        'type' => 180,
+        'assignedTo' => 180,
+        'count' => 180,
+        'gvControls' => 75,
+    ),
 	'columns'=>array(
-		//'id',
 		array(
 			'name'=>'name',
 			'header'=>$attributeLabels['name'],
 			'type'=>'raw',
 			'value'=>'CHtml::link($data["name"],X2List::getRoute($data["id"]))',
-			'headerHtmlOptions'=>array('style'=>'width:40%;'),
 		),
 		array(
 			'name'=>'type',
 			'header'=>$attributeLabels['type'],
 			'type'=>'raw',
 			'value'=>'$data["type"]=="static"? Yii::t("contacts","Static") : Yii::t("contacts","Dynamic")',
-			'headerHtmlOptions'=>array('style'=>'width:15%;'),
 		),
 		array(
 			'name'=>'assignedTo',
@@ -121,11 +127,25 @@ $this->widget('zii.widgets.grid.CGridView', array(
 			'header'=>$attributeLabels['count'],
 			'headerHtmlOptions'=>array('class'=>'contact-count'),
 			'htmlOptions'=>array('class'=>'contact-count'),
-			'value'=>'Yii::app()->locale->numberFormatter->formatDecimal($data["count"])',
-			'headerHtmlOptions'=>array('style'=>'width:20%;'),
+            'filter' => '',
+			//'value'=>'Yii::app()->locale->numberFormatter->formatDecimal($data["count"])',
+			'value'=>'Yii::app()->locale->numberFormatter->formatDecimal($data->calculateCount ())',
 		),
+        array (
+            'id' => 'C_gvControls',
+            'class' => 'X2ButtonColumn',
+            'header' => Yii::t('app','Tools'),
+            'updateButtonUrl' => 
+                "Yii::app()->createUrl ('/contacts/updateList', array ('id' => \$data['id']))",
+            'cssClassExpression' =>
+                "!is_numeric (\$data['id']) ? 'hide-edit-delete-buttons' : ''",
+            'viewButtonUrl' => 
+                "X2List::getRoute (\$data['id'])",
+            'deleteButtonUrl' => 
+                "Yii::app()->createUrl ('/contacts/deleteList', array ('id' => \$data['id']))",
+        ),
 	),
 )); ?>
 <div class="form">
-<?php echo CHtml::link('<span class="add-button">'.Yii::t('app','New List').'</span>',array('/contacts/contacts/createList'),array('class'=>'x2-button')); ?>
+<?php echo CHtml::link('<span>'.Yii::t('app','New List').'</span>',array('/contacts/contacts/createList'),array('class'=>'x2-button')); ?>
 </div>

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,12 +33,12 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 require '../protected/models/APIModel.php';
 $attributes = $_POST['Contacts'];
 $contact = new APIModel(
-    'admin','21232f297a57a5a743894a0e4a801fc3','localhost/index-test.php');
+    'admin','21232f297a57a5a743894a0e4a801fc3',rtrim ('TEST_BASE_URL_ALIAS_1', '/'));
 $fieldMap = array( // This map should be of the format 'your_fieldname'=>'x2_fieldname',
     'firstName'=>'firstName',
     'lastName'=>'lastName',
@@ -58,7 +59,7 @@ if(isset($_POST['x2_key'])){
 if ((int)$contact->contactCreate()) {
 ?>
 <div id="success">success<?php echo $contact->trackingKey; ?></div>
-<div id="success">success<?php echo $_POST['x2_key']; ?></div>
+<div id="success">success<?php echo htmlentities ($_POST['x2_key']); ?></div>
 <?php
 } else {
 ?>

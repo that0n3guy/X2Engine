@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,38 +33,25 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 $this->pageTitle=Yii::app()->name . ' - Login';
-
-$hasProfile = false;
-if(isset($_COOKIE['LoginForm'])) {
-    $model->setAttributes($_COOKIE['LoginForm']);
-    if (is_array ($_COOKIE['LoginForm']) &&
-        in_array ('username', array_keys ($_COOKIE['LoginForm']))) {
-
-        $username = $_COOKIE['LoginForm']['username'];
-        $profile = Profile::model ()->findByAttributes (array (
-            'username' => $username
-        ));
-        if ($profile) {
-            $profileId = $profile->id;
-            $fullName = $profile->fullName;
-            $hasProfile = true;
-        } 
-    }
-}
+LoginThemeHelper::init();
 
 $loginBoxHeight = 210;
 
 
+if (X2_PARTNER_DISPLAY_BRANDING) {
+    $loginBoxHeight -= 23;
+} 
 
-if ($hasProfile) {
-    $loginBoxHeight -= 30;
+
+if ($profile) {
+    //$loginBoxHeight -= 30;
 }
 
 if ($model->useCaptcha) {
-    $loginBoxHeight -= 86;
+    $loginBoxHeight -= 56;
 }
 
 
@@ -75,9 +63,9 @@ Yii::app()->clientScript->registerCss('loginExtraCss', "
 
 ");
 
-Yii::app()->clientScript->registerScript('loginPageJS', "
 
-(function () {
+Yii::app()->clientScript->registerScript('loginPageJS', "
+;(function () {
 
 /*$('#login-form-inputs-container').children ('input').focus (function () {
     $(this).addClass ('login-input-focus');
@@ -89,15 +77,40 @@ Yii::app()->clientScript->registerScript('loginPageJS', "
 
 document.getElementById('LoginForm_username').focus (); // for when autofocus isn't supported
 
+var mobileLoginUrl = '".Yii::app()->getBaseUrl().'/index.php/mobile/login'."';
+$('#mobile-signin-button').click (function () {
+    $('#login-form-outer').attr ('action', mobileLoginUrl);
+});
+
 }) ();
     
 
 ", CClientScript::POS_READY);
+
+if (!isset ($_SERVER['HTTP_DNT']) || $_SERVER['HTTP_DNT'] != 1) {
+    Yii::app()->clientScript->registerScript('loginPageJS', "
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+            var pos = {
+              lat: position.coords.latitude,
+              lon: position.coords.longitude
+            };
+            $('#geoCoords').val(JSON.stringify (pos));
+          }, function() {
+            console.log('error fetching geolocation data');
+          });
+        }
+    ", CClientScript::POS_READY);
+}
+
+// Yii::app()->clientScript->registerScriptFile(Yii::app()->baseUrl.'/js/loginTheme.js', CClientScript::POS_END);
 ?>
 <div id="login-box-outer">
-<div class="container<?php echo (isset ($profileId) ? ' welcome-back-page' : ''); ?>" id="login-page">
+<div class="container<?php echo ($profile ? ' welcome-back-page' : ''); ?>" id="login-page">
 <div id="login-box">
-    <div id='login-title-container'>
+
+    <!--<div id='login-title-container'>
+<?php if(Yii::app()->settings->appName != "X2Engine"): ?>
         <h1 id='app-title'>
             <?php echo Yii::t('app', '{appName}', array (
                 '{appName}' => CHtml::encode (Yii::app()->settings->appName))); ?>
@@ -106,9 +119,10 @@ document.getElementById('LoginForm_username').focus (); // for when autofocus is
             <?php echo Yii::t('app', '{appDescription}', array (
                 '{appDescription}' => CHtml::encode (Yii::app()->settings->appDescription))); ?>
         </h2>
-    </div>
+    <?php endif ?>
+    </div>-->
     <?php $form=$this->beginWidget('CActiveForm', array(
-        // 'id' => 'login-form',
+        'id' => 'login-form-outer',
         'enableClientValidation' => false,
         'enableAjaxValidation' => false,
         'clientOptions' => array(
@@ -117,30 +131,56 @@ document.getElementById('LoginForm_username').focus (); // for when autofocus is
     ));
     ?>
     <div class="form" id="login-form">
+        <?php if( isset($_POST['themeName']) ) 
+            echo CHtml::hiddenField('themeName', $_POST['themeName']);    
+        ?>
+
         <div class="row">
             <div class="cell form-cell" id="login-form-inputs-container">
-                <?php
-                if (isset ($profileId)) {
-                ?>
-                <div class='avatar-cell'>
-                    <span class='image-alignment-helper'></span>
-                    <?php Profile::renderFullSizeAvatar ($profileId, 105); ?>
                 </div>
                 <?php
+                 
+                $loginLogo = Media::getLoginLogo ();
+                if ($loginLogo) {
+                    echo CHtml::image(
+                        $loginLogo->getPublicUrl (),
+                        Yii::app()->settings->appName,
+                        array (
+                            'id' => 'custom-login-form-logo',
+                        ));
+                } else {
+                 
+                    echo X2Html::logo ('login_'.(LoginThemeHelper::singleton ()->usingDarkTheme ?
+                        'white' : 'black'), array (
+                        'id' => 'login-form-logo',
+                    ));
+                  
                 }
+                 
+                if ($profile) {
                 ?>
-                <?php 
-                if ($hasProfile) { 
-                ?>
-                <div id='full-name'><?php echo $fullName; ?></div>
+                <!--<div class='avatar-cell'>
+                    <span class='image-alignment-helper'></span>
+                    <?php 
+                    echo Profile::renderFullSizeAvatar ($profile->id, 105); 
+                    ?>
+                </div>-->
                 <?php
                 }
-                if (AuxLib::isIE () && AuxLib::getIEVer () < 10) 
+                if ($profile) { 
+                ?>
+                <div id='full-name'><?php echo $profile->fullName; ?></div>
+                <?php
+                }
+                ?>
+                <div class='row'>
+                <?php
+                if (AuxLib::getIEVer () < 10) 
                     echo $form->label(
                         $model, 'username', array (
-                            'style' => ($hasProfile ? 'display: none;' : '')));
+                            'style' => ($profile ? 'display: none;' : '')));
     
-                if ($hasProfile) { 
+                if ($profile) { 
                     echo $form->hiddenField($model, 'username');
                 } else {
                     echo $form->textField($model, 'username',
@@ -148,8 +188,12 @@ document.getElementById('LoginForm_username').focus (); // for when autofocus is
                             'placeholder' => Yii::t('app', 'Username')
                         ));
                 }
-                
-                if (AuxLib::isIE () && AuxLib::getIEVer () < 10) 
+                setcookie('isMobileApp','false'); // save cookie
+                ?>
+                </div>
+                <div class='row'>
+                <?php
+                if (AuxLib::getIEVer () < 10) 
                     echo $form->label($model, 'password', array('style' => 'margin-top:5px;')); 
                 echo $form->passwordField(
                     $model, 'password',
@@ -157,7 +201,9 @@ document.getElementById('LoginForm_username').focus (); // for when autofocus is
                         'placeholder' => Yii::t('app', 'Password')
                     ));
                 echo $form->error($model, 'password'); 
-    
+                ?>
+                </div>
+                <?php
                 if($model->useCaptcha && CCaptcha::checkRequirements()) { 
                 ?>
                 <div class="row captcha-row">
@@ -179,52 +225,95 @@ document.getElementById('LoginForm_username').focus (); // for when autofocus is
                 <div class="row" id='signin-button-container'>
                     <button class='x2-button x2-blue' id='signin-button'>
                         <?php
-                        echo CHtml::image (
-                            Yii::app()->theme->baseUrl.'/images/loginButtonIcon.png', 'X2');
-                        echo Yii::t('app', 'Sign In');
+//                        echo CHtml::image (
+//                            Yii::app()->theme->baseUrl.'/images/loginButtonIcon.png', 'X2');
+                        echo Yii::t('app', 'Sign in');
                         ?>
                     </button>
-                </div><!-- #signin-button-container -->
-                <div class='row bottom-row'>
-                <div class="cell remember-me-cell">
-                    <?php
-                    if ($model->rememberMe) {
-                        echo $form->hiddenField($model, 'rememberMe', array('value' => 1));
-                    ?>
-                    <a href="<?php echo Yii::app()->createUrl ('/site/site/forgetMe'); ?>"
-                     class="x2-link x2-minimal-link">
-                        <?php echo Yii::t('app', 'Change User'); ?>
-                    </a>
-                    <?php
-                    } else {
-                        echo $form->checkBox(
-                            $model, 'rememberMe', array('value' => '1', 'uncheckedValue' => '0'));
-                        echo $form->label(
-                            $model, 'rememberMe', array('style' => 'font-size:10px;'));
-                        echo $form->error($model, 'rememberMe');
-                    }?>
+                    <!--<button class='x2-button x2-blue' 
+                     id='mobile-signin-button' 
+                     title='<?php echo CHtml::encode (Yii::t('app', 'X2Touch Sign In')); ?>'>
+                        <?php
+                        echo X2Html::fa ('mobile');
+                        ?>
+                    </button>-->
+                    <div class='clearfix'></div>
                 </div>
-                <div class='cell login-links right'>
+                <div class='row remember-me-row'>
+                    <div class="cell remember-me-cell">
+                        <?php
+                        if ($model->rememberMe) {
+                            echo $form->hiddenField($model, 'rememberMe', array('value' => 1));
+                        ?>
+                        <a href="<?php echo Yii::app()->createUrl ('/site/site/forgetMe'); ?>"
+                         class="x2-link x2-minimal-link text-link">
+                            <?php echo Yii::t('app', 'Change User'); ?>
+                        </a>
+                        <?php
+                        } else {
+                            $model->rememberMe = true;
+                            echo $form->checkBox(
+                                $model, 'rememberMe', 
+                                array('value' => '1', 'uncheckedValue' => '0'));
+                            echo $form->label(
+                                $model, 'rememberMe', array());
+                            echo $form->error($model, 'rememberMe');
+                        }
+                        ?>
+                    </div>
+                    <div class="cell need-help-cell">
+                        <?php
+                        echo CHtml::link(Yii::t('app','Need help?'),array('/site/anonHelp'),
+                            array( 'class'=>'x2-minimal-link help-link text-link'));
+                        ?>
+                    </div>
+                </div>
+                <div class="row login-links">
+                    <div class="cell x2touch-cell">
                     <?php
-                    echo CHtml::link('<img src="'.Yii::app()->baseUrl.'/images/google_icon.png" id="google-icon" /> '.Yii::t('app', 'Sign in with Google'),
+                    echo CHtml::link(
+                        '<img src="'.Yii::app()->theme->baseUrl.'/images/mobile.png" id="mobile-icon" /><span>'.Yii::t('app','X2Touch Mobile').'</span>',
+                        Yii::app()->getBaseUrl() . '/index.php/mobile/login',
+                        array('class'=>'x2touch-link alt-sign-in-link text-link')); 
+                    ?>
+                    </div>
+                    <?php
+                    if (Yii::app()->settings->googleIntegration) {
+                    ?>
+                    <div class="cell google-login-cell">
+                    <?php
+                    echo CHtml::link('<img src="'.Yii::app()->theme->baseUrl.'/images/google_icon.png" id="google-icon" /><span>'.Yii::t('app', 'Sign in with Google').'</span>',
                         (@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://') .
                         ((substr($_SERVER['HTTP_HOST'], 0, 4)=='www.')?substr($_SERVER['HTTP_HOST'], 4):$_SERVER['HTTP_HOST']) .
-                        $this->createUrl('/site/googleLogin'), array('class' => 'x2touch-link'));
+                        $this->createUrl('/site/googleLogin'), 
+                        array('class' => 'alt-sign-in-link google-sign-in-link text-link'));
                     ?>
-                </div>
-                </div><!-- .row.bottom-row -->
-                <div class="row login-links">
+                    </div>
                     <?php
-                    echo CHtml::link(Yii::t('app','Need help?'),array('/site/anonHelp'));
+                    }
                     ?>
                 </div>
+                <div id="login-version">
+                    <a href='#' id='dark-theme-button' class='fa fa-adjust text-link'></a>
+                    <span>X2CRM Version <?php echo Yii::app()->params->version; ?>, <a href="http://www.x2crm.com">X2Engine, Inc.</a></span>
+                </div>
+                <div style='display:none' class="row theme-selection">
+                    <span class="switch" >
+                        <a class="fa fa-moon-o"></a>
+                    </span>
+                </div>
+            <input type="hidden" name="geoCoords" id="geoCoords"></input>
         </div><!-- #login-form-inputs-container -->
         </div><!-- .row -->
     </div><!-- # login-form -->
-<?php $this->endWidget(); ?>
+<?php $this->endWidget(); 
+?>
 </div><!-- #login-box -->
-</div><!-- #login-page -->
 <?php
 $this->renderPartial ('loginCompanyInfo');
 ?>
+</div><!-- #login-page -->
+
+
 </div>
+

@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,16 +32,99 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 (function () {
 
-x2.profileSettings.debug = false && x2.DEBUG;
 
-x2.profileSettings.highlightSave = function () {
-	$('#save-changes').addClass('highlight'); 
+x2.profileSettings = (function () {
+
+function ProfileSettings (argsDict) {
+    var argsDict = typeof argsDict === 'undefined' ? {} : argsDict;
+    var defaultArgs = {
+        debug: x2.DEBUG && false
+    };
+    auxlib.applyArgs (this, defaultArgs, argsDict);
+    this.colorSelectorTemplate$ = $('#theme-color-selector-template')
+    this.themeAttributes$ = $('#theme-attributes');
+
+    this._init ();
 }
-        
+
+/**
+ * Add new theme color selector 
+ * @param string label
+ * @param string key
+ * @param string value
+ */
+ProfileSettings.prototype.addColorSelector = function (label, key, value) {
+    if ($('#module-override' + key).length) return false;
+
+    var colorSelectorCount = this.themeAttributes$.find ('.row.theme-color-selector').
+        not ('#theme-color-selector-template').length;
+    var lastColorSelector$ = this.themeAttributes$.find ('.row.theme-color-selector').last ();
+
+    if (colorSelectorCount % 3 === 0 && !lastColorSelector$.next ().is ('br')) {
+        lastColorSelector$.after ('<br>');
+    } 
+    var prevElem$ = lastColorSelector$.next ().is ('br') ? 
+        lastColorSelector$.next () : lastColorSelector$;
+    var newColorSelector$ = this.colorSelectorTemplate$.clone ()
+        .attr ('style', '')
+        .removeAttr ('id')
+        .attr ('id', 'module-override' + key);
+    newColorSelector$.find ('input').removeAttr ('disabled');
+    newColorSelector$.find ('input').attr ('name', 
+        newColorSelector$.find ('input').attr ('name').replace (/\[\]/, '[' + key + ']'));
+    newColorSelector$.find ('input').attr ('id', 
+        newColorSelector$.find ('input').attr ('id') + key);
+    newColorSelector$.find ('label').text (label);
+    newColorSelector$.find ('.sp-replacer').remove ();
+    x2.colorPicker.setUp (newColorSelector$.find ('input'), true);
+    prevElem$.after (newColorSelector$);
+};
+
+ProfileSettings.prototype.addModuleTitleBarColorSelector = function (module, label) {
+    this.addColorSelector (label, 'background_' + module + '_override', '');
+};
+
+ProfileSettings.prototype.highlightSave = function () {
+	$('#save-changes').addClass('highlight'); 
+};
+
+ProfileSettings.prototype.getCurrentTheme = function () {
+    return $('[name="preferences[themeName]"]').val ();
+};
+
+ProfileSettings.prototype._setUpModuleOverrides = function () {
+    var that = this;
+    var addModuleOverrideButton$ = $('#add-module-override-button');
+    var moduleSelector$ = addModuleOverrideButton$.prev ();
+    addModuleOverrideButton$.click (function () {
+        if (that.getCurrentTheme () === 'Default') return false;
+        that.addModuleTitleBarColorSelector (
+            moduleSelector$.val (), moduleSelector$.find ('option:selected').text ()); 
+        return false;
+    });
+    moduleSelector$.change (function () {
+        var val = moduleSelector$.val ();
+        if ($('#preferences_background_' + val + '_override').length) {
+            addModuleOverrideButton$.attr ('disabled', 'disabled');
+        } else {
+            addModuleOverrideButton$.removeAttr ('disabled');
+        }
+    }).change ();
+};
+
+ProfileSettings.prototype._init = function () {
+    this._setUpModuleOverrides ();
+};
+
+return new ProfileSettings;
+
+}) ();
+
+
 function convertTextColor(colorString){
     var redHex = colorString.slice(1,2);
     var greenHex = colorString.slice(3,4);
@@ -62,12 +146,7 @@ Set the url to the sound file and play the sound
 */
 function setSound(sound, id, filename, uploadedBy) {
     if(filename!=null){
-        if(uploadedBy){
-            $('#'+sound).attr('src',yii.baseUrl+'/uploads/media/'+uploadedBy+'/'+filename);
-        }else{
-            $('#'+sound).attr('src',yii.baseUrl+'/uploads/'+filename);
-        }
-
+        $('#'+sound).attr('src',yii.scriptUrl+'/media/getFile/'+id);
         var soundFile = $("#"+sound)[0];
         if (Modernizr.audio) soundFile.play();
     }
@@ -87,12 +166,12 @@ function deleteSound(sound, id){
 /*
 change the background image
 */
-function setBackground(filename) {
-    if(filename=='') {
-            $('body').css('background-image','none').removeClass("no-borders");
+function setBackground(fileId) {
+    if(fileId=='') {
+        $('body').css('background-image','none').removeClass("no-borders");
     } else {
-        $('body').css('background-image','url("'+yii.baseUrl+'/uploads/'+filename+'")').
-            toggleClass("no-borders",($('#backgroundTiling').val() === 'stretch'));
+        x2.css.css ($('body'),
+            'background-image: url("'+yii.scriptUrl+'/media/getFile/'+fileId+'") !important; ').toggleClass("no-borders", ($('#backgroundTiling').val() === 'stretch'));
         $(window).trigger('resize');
     }
 }
@@ -285,7 +364,7 @@ function setupPrefsEventListeners () {
             'background', '#F5F4DE', $(this), $('div.grid-view table.items tr.even'));
 	});
 
-    $('.color-picker-input').blur (function () {
+    $(document).on ('blur', '.color-picker-input', function () {
         var text = $(this).val ();
 
         // make color picker color match input field without triggering change events
@@ -303,28 +382,28 @@ function setupPrefsEventListeners () {
 			case 'repeat-x':
 			case 'repeat-y':
 			case 'repeat':
-				$("body").css({
+                x2.css.css ($("body"), {
                     "background-attachment":"",
                     "background-size":"",
                     "background-position":"",
-                    "background-repeat":val
-                });
+                    "background-repeat":val + ' !important'
+                }, true);
 				break;
 			case 'center':
-				$("body").css({
+				x2.css.css ($("body"), {
                     "background-attachment":"",
                     "background-size":"",
-                    "background-repeat":"no-repeat",
-                    "background-position":"center center"
-                });
+                    "background-repeat":"no-repeat !important",
+                    "background-position":"center center !important"
+                }, true);
 				break;
 			case 'stretch':
-				$("body").css({
-                    "background-attachment":"fixed",
-                    "background-size":"cover",
+				x2.css.css ($('body'), {
+                    "background-attachment":"fixed !important",
+                    "background-size":"cover !important",
                     "background-position":"",
                     "background-repeat":""
-                });
+                }, true);
 				noBorders = true;
 				break;
 		}
@@ -458,19 +537,34 @@ function setupThemeSaving () {
     function saveTheme () {
         if ($('prefs-save-theme-button').attr ('disabled')) return;
         var themeAttributes = {};
-        $.each ($("#theme-attributes").find ('.theme-attr'), function () {
+        // kludge to get hidden checkbox input into theme data
+        $('#theme-attributes [type="checkbox"]').each (function () {
+            if ($(this).prev (':hidden')) $(this).prev ().addClass ('theme-attr');
+        });
+        $.each ($("#theme-attributes").find ('.theme-attr').not (':disabled'), function () {
             x2.profileSettings.debug && console.log ($(this));
-            var themeAttrName = $(this).attr ('name').match (/\[(\w+)\]/)[1];
+            var themeAttrName = $(this).attr ('name').match (/\[([^\]]+)\]/)[1];
+            if ($(this).attr ('type') !== 'checkbox' || $(this).is (':checked')) 
             themeAttributes[themeAttrName] = $(this).val ();
         });
+
         themeAttributes['owner'] = yii.profile.username;
         //themeAttributes['private'] = $('.prefs-theme-privacy-setting').val ();
+        // remove bgId GET param which is used to set the background on page load
         x2.profileSettings.debug && console.log (themeAttributes);
+        var params = $.deparam.querystring (window.location.href);
+        if (params.bgId) {
+            delete params.bgId;
+        }
+        var replaceParamsMode = 2;
+        $('#settings-form').attr (
+            'action', $.param.querystring (window.location.href, params, replaceParamsMode));
         $.ajax ({
-            url: "saveTheme",
+            url: yii.scriptUrl+"/profile/saveTheme",
             data: {
                 'themeAttributes': JSON.stringify (themeAttributes)
             },
+            type: 'POST',
             success: function (data) {
                 x2.profileSettings.debug && console.log (data);
                 auxlib.createReqFeedbackBox ({
@@ -485,7 +579,14 @@ function setupThemeSaving () {
     
     $('#prefs-save-theme-button').click (function () {
         saveTheme ();
+        $('#settings-form').submit();
     });
+
+    $('#save-changes').click (function () {
+        saveTheme();
+        $('#settings-form').submit();
+    });
+
 
 }
 
@@ -507,6 +608,7 @@ function setupThemeCreation () {
         } else {
             $(this).attr ('disabled', 'disabled');
             createTheme (themeName); 
+            $('#settings-form').submit();
         }
     });
 
@@ -519,9 +621,9 @@ function setupThemeCreation () {
 
         // build theme attribute dictionary to send to server
         var themeAttributes = {};
-        $.each ($("#theme-attributes").find ('.theme-attr'), function () {
+        $.each ($("#theme-attributes").find ('.theme-attr').not (':disabled'), function () {
             x2.profileSettings.debug && console.log ($(this).attr ('name'));
-            var themeAttrName = $(this).attr ('name').match (/\[(\w+)\]/)[1];
+            var themeAttrName = $(this).attr ('name').match (/\[([^\]]+)\]/)[1];
             themeAttributes[themeAttrName] = $(this).val ();
         });
         themeAttributes['themeName'] = themeName;
@@ -650,16 +752,22 @@ function showHideThemeSaveButton () {
     x2.profileSettings.debug && console.log (x2.profileSettings.uploadedByAttrs[currentPredefTheme]);
     x2.profileSettings.debug && console.log (yii.profile.username);
     if (currentPredefTheme === 'Custom') {
-        $('#prefs-save-theme-button').hide (); 
+        // $('#prefs-save-theme-button').hide (); 
+         
+        // $('#prefs-export-theme-button').hide (); 
          
     } else if (checkPredefThemeEditPermissions ()) {
         $('#prefs-save-theme-button').show (); 
         $('#prefs-save-theme-hint').show (); 
          
+        $('#prefs-export-theme-button').show (); 
+         
     } else {
          
-        $('#prefs-save-theme-button').hide (); 
-        $('#prefs-save-theme-hint').hide (); 
+        // $('#prefs-export-theme-button').hide (); 
+         
+        // $('#prefs-save-theme-button').hide (); 
+        // $('#prefs-save-theme-hint').hide (); 
     }
 }
 
@@ -708,6 +816,8 @@ function setupThemeSelection () {
         if ($(this).find (':selected').attr ('id') === 'custom-theme-option') {
             $('#prefs-save-theme-button').hide (); 
              
+            $('#prefs-export-theme-button').hide (); 
+             
             $('#prefs-save-theme-hint').hide (); 
             return;
         }
@@ -719,6 +829,78 @@ function setupThemeSelection () {
 }
 
 
+function setupThemeExport () {
+    $('#prefs-export-theme-button').click (function () {
+        $.ajax ({
+            url: 'ajaxExportTheme', 
+            data: {
+                'themeId': $('#themeName').val ()
+            },
+            dataType: 'json',
+            success: function (data) {
+                if (typeof data['downloadUrl'] !== 'undefined') {
+                    var url = data['downloadUrl'];
+                    window.location.href = url;
+                }
+            }
+        });
+    });
+}
+
+function setupThemeImport () {
+    $('#prefs-import-theme-button').click (function () {
+        if ($('#theme-import-form').closest ('.ui-dialog').length) {
+            $('#theme-import-form').dialog ('open');
+        }
+        $('#theme-import-form').dialog ({
+            title: x2.profileSettings.translations['themeImportDialogTitle'],
+            autoOpen: true,
+            width: 500,
+            buttons: [
+                {
+                    text: x2.profileSettings.translations['close'],
+                    click: function () { $(this).dialog ('close'); }
+                }
+            ]
+        });
+    });
+}
+
+
+function setupDeleteThemeButton(){
+    $('#prefs-delete-theme-button').click(function() { 
+
+        var activeTheme = $('.scheme-container.active');
+
+        $.ajax( {
+            url: yii.scriptUrl+'/profile/deleteTheme',
+            data: {
+                themeName: activeTheme.attr('name')
+            },
+            success: function(data) {
+                if(data == 'error') {
+                    return;
+                }
+
+                activeTheme.remove();
+            }
+        });
+
+    });
+}
+
+
+function setupResetTipsButton(){
+    $('#reset-tips-button').click(function() { 
+        $.ajax( {
+            url: yii.scriptUrl + '/profile/resetTours',
+            success: function(data) {
+                x2.topFlashes.displayFlash('Tips Reset', 'success');
+            }
+        });
+    });
+}
+
 
 // main function
 $(document).ready(function profileSettingsMain () {
@@ -726,9 +908,14 @@ $(document).ready(function profileSettingsMain () {
     setupThemeSelection ();
     setupThemeCreation ();
     setupThemeSaving ();
+    setupDeleteThemeButton();
+     
+    setupThemeExport ();
+    setupThemeImport ();
      
 
     showHideThemeSaveButton ();
+    setupResetTipsButton ();
 
     $('#prefs-save-theme-hint').qtip({
        position:{'my':'top right','at':'bottom left'},

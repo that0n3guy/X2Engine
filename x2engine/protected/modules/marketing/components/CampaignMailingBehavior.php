@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,10 +34,11 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.modules.marketing.models.*');
 Yii::import('application.modules.docs.models.*');
+Yii::import('application.components.util.StringUtil', true);
 
 /**
  * Behavior class for email delivery in email marketing campaigns.
@@ -183,17 +185,24 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
      * @param Campaign $campaign Campaign of the current email being sent
      * @param Contacts $contact Contact to whom the email is being sent
      * @param type $email
+     * @param bool $replaceBreaks used for unit testing
+     * @param bool $replaceUnsubToken used for unit testing
      * @return type
      * @throws Exception
      */
-    public static function prepareEmail(Campaign $campaign, Contacts $contact){
+    public static function prepareEmail (
+        Campaign $campaign, Contacts $contact, $replaceBreaks=true, $replaceUnsubToken=true) {
+
         $email = $contact->email;
         $now = time();
-        $uniqueId = md5(uniqid(mt_rand(), true));
+        $uniqueId = md5 (uniqid (mt_rand (), true));
+
         // Add some newlines to prevent hitting 998 line length limit in
         // phpmailer and rfc2821
-        $emailBody = preg_replace('/<br>/', "<br>\n", $campaign->content);
-
+        if ($replaceBreaks)
+            $emailBody = StringUtil::pregReplace('/<br>/', "<br>\n", $campaign->content);
+        else
+            $emailBody = $campaign->content;
 
         // Add links to attachments
         try{
@@ -208,7 +217,8 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
                     if($file = $media->getPath()){
                         if(file_exists($file)){ // check file exists
                             if($url = $media->getFullUrl()){
-                                $emailBody .= CHtml::link($media->fileName, $media->fullUrl)."<br>\n";
+                                $emailBody .= CHtml::link($media->fileName, $media->fullUrl).
+                                    "<br>\n";
                             }
                         }
                     }
@@ -218,12 +228,31 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
             throw $e;
         }
 
+        // Replacement in body
+        $emailBody = Docs::replaceVariables($emailBody, $contact, array (
+            '{trackingKey}' => $uniqueId, // Use the campaign key, not the general contact key
+        ));
+
+        // transform links after attribute replacement but before signature and unsubscribe link 
+        // insertion
+        if ($campaign->enableRedirectLinks) {
+
+            // Replace links with tracking links
+            $url = Yii::app()->controller->createAbsoluteUrl (
+                'click', array ('uid' => $uniqueId, 'type' => 'click'));
+            $emailBody = StringUtil::pregReplaceCallback (
+                '/(<a[^>]*href=")([^"]*)("[^>]*>)/', 
+                function (array $matches) use ($url) {
+                    return $matches[1].$url.'&url='.urlencode ($matches[2]).''.
+                        $matches[3];
+                }, $emailBody);
+        }
 
         // Insert unsubscribe link placeholder in the email body if there is
         // none already:
         if(!preg_match('/\{_unsub\}/', $campaign->content)){
-            $unsubText = "<br/>\n-----------------------<br/>\n"
-                    .Yii::t('marketing', 'To stop receiving these messages, click here').": {_unsub}";
+            $unsubText = "<br/>\n-----------------------<br/>\n".
+                Yii::t('marketing', 'To stop receiving these messages, click here').": {_unsub}";
             // Insert
             if(strpos($emailBody,'</body>')!==false) {
                 $emailBody = str_replace('</body>',$unsubText.'</body>',$emailBody);
@@ -232,46 +261,33 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
             }
         }
 
-        // Replace links with tracking links.
-        //
-        // Left commented here for reference/historical purposes.
-        //
-        // The rationale for disabling this (magic redirect tracking links) is
-        // that it caused email to get caught in spam filters.
-        //
-        /*
-        $url = $this->createAbsoluteUrl('click', array('uid'=>$uniqueId, 'type'=>'click'));
-        $emailBody = preg_replace(
-        '/(<a[^>]*href=")([^"]*)("[^>]*>)/e', "(\"\\1" . $url . "&url=\" . urlencode(\"\\2\") . \"\\3\")", $emailBody);
-        */
-
         // Insert unsubscribe link(s):
         $unsubUrl = Yii::app()->createExternalUrl('/marketing/marketing/click', array(
             'uid' => $uniqueId,
             'type' => 'unsub',
             'email' => $email
-                ));
-        $emailBody = preg_replace(
-                '/\{_unsub\}/', '<a href="'.$unsubUrl.'">'.Yii::t('marketing', 'unsubscribe').'</a>', $emailBody);
+        ));
+        $unsubLinkText = Yii::app()->settings->getDoNotEmailLinkText();
+        if ($replaceUnsubToken) {
+            $emailBody = StringUtil::pregReplace (
+                '/\{_unsub\}/', 
+                '<a href="'.$unsubUrl.'">'.Yii::t('marketing', $unsubLinkText).'</a>',
+                $emailBody);
+        }
 
-        // Replace attribute variables:
-        $replacementParams = array(
-            '{trackingKey}' => $uniqueId, // Use the campaign key, not the general contact key
-        );
         // Get the assignee of the campaign, for signature replacement.
         $user = User::model()->findByAttributes(array('username' => $campaign->assignedTo));
-        if($user instanceof User) {
-            $replacementParams['{signature}'] = $user->profile->signature;
-        } else {
-            $replacementParams['{signature}'] = '';
-        }
-        // Replacement in body
-        $emailBody = Docs::replaceVariables($emailBody, $contact, $replacementParams);
+        $emailBody = Docs::replaceVariables($emailBody, null, array (
+            '{signature}' => ($user instanceof User) ? 
+                Docs::replaceVariables ($user->profile->signature, $contact) : '',
+        ));
+
         // Replacement in subject
         $subject = Docs::replaceVariables($campaign->subject, $contact);
 
         // Add the transparent tracking image:
-        $trackingImage = '<img src="'.Yii::app()->createExternalUrl('/marketing/marketing/click', array('uid' => $uniqueId, 'type' => 'open')).'"/>';
+        $trackingImage = '<img src="'.Yii::app()->createExternalUrl(
+            '/marketing/marketing/click', array('uid' => $uniqueId, 'type' => 'open')).'"/>';
         if(strpos($emailBody,'</body>')!==false) {
             $emailBody = str_replace('</body>',$trackingImage.'</body>',$emailBody);
         } else {
@@ -404,7 +420,9 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
      */
     public function getListItem() {
         if(!isset($this->_listItem)) {
-            $this->_listItem = X2ListItem::model()->findByPk($this->itemId);
+            $this->_listItem = X2ListItem::model()->findByAttributes(array (
+                'id' => $this->itemId,
+            ));
         }
         return $this->_listItem;
     }
@@ -472,6 +490,7 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
             $this->stateChangeType = self::STATE_RACECOND;
             return false;
         }
+
         // Additional checks
         //
         // Email hasn't been set blank:
@@ -481,6 +500,7 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
             $this->stateChangeType = self::STATE_NULLADDRESS;
             return false;
         }
+
         // Contact unsubscribed suddenly
         if($this->stateChange = $this->stateChange || $this->listItem->unsubscribed!=0 || $this->recipient->doNotEmail!=0) {
             $this->status['message'] = Yii::t('marketing','Skipping {email}; the contact has unsubscribed.',array('{email}'=>$this->recipient->email));
@@ -539,8 +559,30 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
             return;
         }
         $addresses = array(array('',$this->recipient->email));
-        list($subject,$message,$uniqueId) = self::prepareEmail($this->campaign,$this->recipient);
-        $this->deliverEmail($addresses, $subject, $message);
+        $deliver = true;
+        try {
+            list($subject,$message,$uniqueId) = self::prepareEmail(
+                $this->campaign,$this->recipient);
+        } catch (StringUtilException $e) {
+            $this->fullStop = true;
+            $this->status['code'] = 500;
+            $this->status['exception'] = $e;
+            if ($e->getCode () === StringUtilException::PREG_REPLACE_CALLBACK_ERROR) {
+                $this->status['message'] = Yii::t('app', 'Email redirect link insertion failed');
+            } else {
+                $this->status['message'] = Yii::t('app', 'Failed to prepare email contents');
+            }
+            $deliver = false;
+        }
+
+        if ($deliver) {
+            $unsubUrl = Yii::app()->createExternalUrl('/marketing/marketing/click', array(
+                'uid' => $uniqueId,
+                'type' => 'unsub',
+                'email' => $this->recipient->email
+            ));
+            $this->deliverEmail($addresses, $subject, $message, array(), $unsubUrl);
+        }
         if($this->status['code'] == 200) {
             // Successfully sent email. Mark as sent.
             $this->markEmailSent($uniqueId);
@@ -553,12 +595,12 @@ class CampaignMailingBehavior extends EmailDeliveryBehavior {
                 '{address}'=>$this->recipient->email,
                 '{message}'=>$this->status['exception']->getMessage()
             ));
+
             if($this->status['exception']->getCode() != PHPMailer::STOP_CRITICAL){
                 $this->undeliverable = true;
-                $this->markEmailSent(null);
+                $this->markEmailSent(null, false);
             }else{
                 $this->fullStop = true;
-                $this->markEmailSent(null,false);
             }
         } else if($this->status['exception'] instanceof phpmailerException && $this->status['exception']->getCode() == PHPMailer::STOP_CRITICAL) {
         } else {

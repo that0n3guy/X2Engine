@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,23 +32,13 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-//                     **** tags.js **** //
-//
-// This file includes functions to drag tags from the tag cloud to the inline tag widget,
-// create new tags inside the inline tag widget, and remove tags.
-//
-// note: whatever file includes tags.js (probably inlineTags.php) needs to define the following
-//         $('#x2-inline-tags').data('appendTagUrl');
-//         $('#x2-inline-tags').data('removeTagUrl');
-//         $('#x2-inline-tags').data('searchUrl');
-//         $('#x2-inline-tags').data('type'); // model type
-//         $('#x2-inline-tags').data('id'); // model id
-//
+/*
+Used primarily to manage the right and left widgets. It's also used to manage the record view 
+widgets section in the hidden widgets menu.
+*/
 
-
-// init inline tags widget javascript
 $(function() {
     $('#content-widgets').droppable({ // allow widgets to be dropped into content widgets list
         accept: '.x2-widget-menu-item',
@@ -95,10 +86,6 @@ $(function() {
         iframeFix:true
     });
     
-    $('.x2-hidden-widgets-menu-item.widget-center').click(function() {
-        return handleWidgetMenuItemClick($(this));
-    });
-    
     $('.x2-hidden-widgets-menu-item.widget-right').click(function() {
         return handleWidgetRightMenuItemClick($(this));
     });
@@ -109,7 +96,7 @@ $(function() {
  */
 function hideShowHiddenWidgetSubmenuDividers () {
     var hiddenCenter = 
-        $('#x2-hidden-center-widgets-menu').find ('.x2-hidden-widgets-menu-item').length;
+        $('#x2-hidden-recordView-widgets-menu').find ('.x2-hidden-widgets-menu-item').length;
     var hiddenRight = 
         $('#x2-hidden-right-widgets-menu').find ('.x2-hidden-widgets-menu-item').length;
     var hiddenProfile =
@@ -126,7 +113,6 @@ function hideShowHiddenWidgetSubmenuDividers () {
         $('#x2-hidden-profile-widgets-menu').find ('.x2-hidden-widgets-menu-divider').hide ();
     }
 }
-
 
 function handleWidgetMenuItemClick(menuItem) {
     $.post(yii.scriptUrl+'/site/showWidget', {
@@ -157,31 +143,6 @@ function removeChartWidget () {
     }*/
 };
 
-$.fn.hideWidget = function() {
-    $(this).each(function() {
-        var widget = $(this);
-
-        // slice of the "x2widget_" from the id to get widget name
-        var widgetName = $(this).attr('id').slice(9); 
-
-        // console.log ('widgetName = ' + widgetName);
-        $.post(yii.scriptUrl+'/site/hideWidget', {name: widgetName}, function(response) {
-            widget.slideUp(function() {
-                widget.remove();
-                if (widgetName === 'RecordViewChart') removeChartWidget ();
-                $('#x2-hidden-widgets-menu').replaceWith(response);
-        //        $('.x2-widget-menu-item').draggable({revert: 'invalid', helper:'clone', revertDuration:200, appendTo:'#x2-hidden-widgets-menu',iframeFix:true});
-                $('.x2-hidden-widgets-menu-item').click(function() {
-                    return handleWidgetMenuItemClick($(this));
-                });
-                $('.x2-hidden-widgets-menu-item.widget-right').click(function() {
-                    return handleWidgetRightMenuItemClick($(this));
-                });
-            });
-        });
-    });
-};
-
 // adds a widget to the right side widget bar
 function handleWidgetRightMenuItemClick(menuItem) {
     $.post(yii.scriptUrl+'/site/showWidget', {
@@ -207,7 +168,10 @@ $.fn.hideWidgetRight = function() {
         var widgetName = $(this).attr('id').slice(7); 
         $.post(
             yii.scriptUrl+'/site/hideWidget', 
-            {name: widgetName}, 
+            {
+                name: widgetName,
+                position: 'right'
+            }, 
             function(response) {
 
                 widget.slideUp(function() {
@@ -259,4 +223,41 @@ $.fn.minimizeWidget = function() {
             }
         });
     });
+};
+
+/**
+* Adds a config method to a right widget
+* @param jqueryObject target A jquery object that will be added to 
+*/
+$.fn.addConfigMenu = function(options, callback) {
+    var dropdown = $(this).find('#widget-dropdown');
+
+    var target = $('<span class="gear-img-container fa fa-cog fa-lg"></span>')
+    .height(18).width(18);
+    target.appendTo(dropdown);
+    var ul = $('<ul class="closed widget-gear-menu"></ul>').appendTo(dropdown);
+
+    for (var key in options){
+        $('<div class="widget-gear-option" value="'+key+'">'+options[key]+'</div>').
+        appendTo(ul).
+        click( function(element) {
+            return callback(element);
+        });
+    }
+
+
+    // Handle opening and closing of the menu
+    target.on('click', function(){
+        if( ul.hasClass('open') ){
+            ul.addClass('closed');
+            ul.removeClass('open');
+        } else {
+            ul.removeClass('closed');
+            ul.addClass('open');
+        }
+        
+    });
+
+    return dropdown;
+
 };

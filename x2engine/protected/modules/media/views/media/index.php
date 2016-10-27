@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,14 +33,12 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-?>
+ **********************************************************************************/
 
-<?php
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('media', 'All Media')),
-	array('label'=>Yii::t('media', 'Upload'), 'url'=>array('upload')),
-));
+$menuOptions = array(
+    'index', 'upload',
+);
+$this->insertMenu($menuOptions);
 
 // init qtip for media filenames
 Yii::app()->clientScript->registerScript('media-qtip', '
@@ -72,14 +71,14 @@ $(function() {
 $this->widget('X2GridView', array(
 	'id' => 'media-grid',
 	'title'=>Yii::t('media','Media & File Library'),
-	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize'),
+	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize','showHidden'),
 	'template'=> 
         '<div id="x2-gridview-top-bar-outer" class="x2-gridview-fixed-top-bar-outer">'.
         '<div id="x2-gridview-top-bar-inner" class="x2-gridview-fixed-top-bar-inner">'.
         '<div id="x2-gridview-page-title" '.
          'class="page-title icon media x2-gridview-fixed-title">'.
         '{title}{buttons}{filterHint}'.
-        
+        '{massActionButtons}'.
         '{summary}{topPager}{items}{pager}',
 	'dataProvider' => $model->search(),
 	'baseScriptUrl'=>Yii::app()->request->baseUrl.'/themes/'.Yii::app()->theme->name.'/css/gridview',
@@ -87,6 +86,7 @@ $this->widget('X2GridView', array(
 	'filter'=>$model,
     'gvSettingsName' => 'media-index',
 	'defaultGvSettings'=>array(
+		'gvCheckbox' => 30,
 		'fileName' => 285,
 		'name' => 114,
 		'associationType' => 85,

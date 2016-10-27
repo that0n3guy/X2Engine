@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 
 Yii::import('application.models.*');
@@ -61,22 +62,28 @@ class UserTest extends X2DbTestCase {
         'events' => array ('Events', '.UserTest'),
         'social' => array ('Social', '.UserTest'),
         'profile' => array ('Profile', '.UserTest'),
+        'calendar' => 'X2Calendar',
+        'calendarPermissions' => 'X2CalendarPermissions',
     );
 
     public function testAfterDelete () {
         $user = User::model ()->findByPk ('2');
-        if(VERBOSE_MODE){
+        if(X2_TEST_DEBUG_LEVEL > 1){
             /**/print ('id of user to delete: ');
             /**/print ($user->id);
         }
-        
+
+        // test calendar permissions deletion
+        $this->assertNotEquals (0,
+            sizeof (X2CalendarPermissions::model()->findAllByAttributes (
+                array ('userId' => $user->id))));
         // assert that group to user records exist for this user
         $this->assertTrue (
             sizeof (
                 GroupToUser::model ()->findAllByAttributes (array ('userId' => $user->id))) > 0);
         $this->assertTrue ($user->delete ());
 
-        VERBOSE_MODE && print ('looking for groupToUser records with userId = '.$user->id);
+        X2_TEST_DEBUG_LEVEL > 1 && print ('looking for groupToUser records with userId = '.$user->id);
         GroupToUser::model ()->refresh ();
 
         // assert that group to user records were deleted
@@ -103,6 +110,11 @@ class UserTest extends X2DbTestCase {
             sizeof (Events::model()->findAll (
                 "user=:username OR (type='feed' AND associationId=".$user->id.")", 
                 array (':username' => $user->username))) === 0);
+
+        // test calendar permissions deletion
+        $this->assertEquals (0,
+            sizeof (X2CalendarPermissions::model()->findAllByAttributes (
+                array ('userId' => $user->id))));
     }
 
     public function testBeforeDelete () {
@@ -169,7 +181,7 @@ class UserTest extends X2DbTestCase {
         $newUser->validate (array ('userAlias'));
         $this->assertFalse($newUser->hasErrors('username'));
         if ($newUser->hasErrors ()) {
-            VERBOSE_MODE && print_r ($newUser->getErrors ());
+            X2_TEST_DEBUG_LEVEL > 1 && print_r ($newUser->getErrors ());
         }
     }
 

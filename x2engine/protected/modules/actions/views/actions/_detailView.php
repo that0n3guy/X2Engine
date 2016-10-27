@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 $attributeLabels = $model->attributeLabels();
 
@@ -65,7 +66,7 @@ if($model->type=='note' || $model->type=='attachment') {
 		<td colspan="3" class="text-field"><div class="spacer"></div>
 			<?php
 			if($model->type=='attachment')
-				echo Media::attachmentActionText($model->actionDescription,true,true);
+				echo Media::attachmentActionText($model,true,true);
 			else
 				echo $this->convertUrls(CHtml::encode($model->actionDescription));
 			?>
@@ -119,7 +120,9 @@ if ($model->associationType!="none") {
 		<td colspan="3">
 			<?php
                             if ($model->associationType=="calendar")
-                                echo CHtml::link(Yii::t('calendar', "Calendar"), array('/'.$model->associationType.'/'));
+                                echo CHtml::link(Yii::t('calendar', "{calendar}", array('{calendar}' => Modules::displayName(false, "Calendar"))), array('/'.$model->associationType.'/'));
+                            else if ($model->isMultiassociated())
+                                echo $model->renderMultiassociations ();
                             else
                                 echo CHtml::link(CHtml::encode($model->associationName),array('/'.$model->associationType.'/'.$model->associationId));
                         ?>

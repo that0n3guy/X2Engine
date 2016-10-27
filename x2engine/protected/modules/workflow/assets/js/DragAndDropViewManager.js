@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 if (typeof x2 === 'undefined') x2 = {};
 
@@ -44,7 +45,6 @@ x2.DragAndDropViewManager = (function () {
 function DragAndDropViewManager (argsDict) {
     argsDict = typeof argsDict === 'undefined' ? {} : argsDict;
 
-    x2.WorkflowManagerBase.call (this, argsDict);
     var defaultArgs = {
         DEBUG: false && x2.DEBUG,
         workflowId: null,
@@ -67,6 +67,7 @@ function DragAndDropViewManager (argsDict) {
         stageListItemColors: []
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
+    x2.WorkflowManagerBase.call (this, argsDict);
 
     this.stagesWhichRequireComments = auxlib.map (function (a) {
         return parseInt (a, 10);
@@ -230,6 +231,24 @@ DragAndDropViewManager.prototype._disableQTips = function (disable) {
     $('.stage-member-name a').qtip ('disable', disable);
 };
 
+DragAndDropViewManager.prototype._emptyColumnFix = function () {
+    var that = this;
+    // show empty column placeholder in all columns with no visible elements.
+    // accounts for bug in jQuery UI which causes sortable "over" event to trigger
+    // inconsistently
+    var emptyStages$;
+    if ((emptyStages$ = $(that.connectWithClass).filter (function () {
+        return !$(this).find ('.empty').is (':visible') &&
+            !$(this).find (that.memberContainerSelector).not ('.ui-sortable-helper').length;
+    })) && emptyStages$.length) {
+        emptyStages$.each (function () {
+            var stageNumber = that._getWorkflowStageNumber ($(this));
+            that._hideShowNoResultsDummyItem (stageNumber); 
+        });
+    } else {
+    }
+};
+
 /**
  * Sets up drag and drop feature. Allows records to be dragged from one stage to the next.
  */
@@ -242,6 +261,7 @@ DragAndDropViewManager.prototype._setUpDragAndDrop = function () {
         items: this.memberContainerSelector,
         connectWith: this.connectWithClass,
         tolerance: 'pointer',
+        dropOnEmpty: true,
         change: function (event, ui) {
             //console.log ('change');
             var stageMember = $(ui.item);
@@ -257,7 +277,8 @@ DragAndDropViewManager.prototype._setUpDragAndDrop = function () {
             if (that._listItemIsLocked ($(ui.item))) {
                 return false;
             }
-            //console.log ('sort');
+
+            that._emptyColumnFix ();
             //return false;
         },
         out: function (event, ui) {
@@ -309,10 +330,13 @@ DragAndDropViewManager.prototype._setUpDragAndDrop = function () {
             $(ui.item).removeClass ('stage-highlight'); 
 
             // lock record so that it can't be dragged until server response
-            that._lockStageListItem ($(ui.item));
-            $(ui.item).find ('.stage-member-button').hide (); 
             var stageMember = $(ui.item);
             var memberInfo = that._getStageMemberInfo (stageMember);
+
+            if (startStage === memberInfo['stageNumber']) return;
+
+            that._lockStageListItem ($(ui.item));
+            $(ui.item).find ('.stage-member-button').hide (); 
             return that._moveFromStageAToStageB (
                 startStage,
                 memberInfo['stageNumber'], 
@@ -655,7 +679,8 @@ DragAndDropViewManager.prototype._completeStage = function (stage, modelId, type
                 that._updateStageLists (data['workflowStatus'], modelId, type);
                 that.DEBUG && console.log ('_completeStage' + stage);
                 that._updateListHeader ($(element), stage);
-                that._successFailureAnimation ($(element));
+                if (stage !== that.stageNames.length)
+                    that._successFailureAnimation ($(element));
             } else {
                 that._removeStagingClone ($(that._lastTouchedListItem));
                 that._successFailureAnimation ($(element), false);
@@ -1397,7 +1422,9 @@ DragAndDropViewManager.prototype._setUpAddADealButtonBehavior = function () {
                             that._getStageMemberListItemSelector (newDealId, newDealType);
                         that._startStage (
                             1, newDealId, newDealType, recordName, newDealSelector);
-                        x2.forms.clearForm ($form);
+                        // kludge to prevent clearForm from deselecting record type
+                        $('#new-deal-type').attr ('data-default', $('#new-deal-type').val ());
+                        x2.forms.clearForm ($form, true);
                         $(this).dialog ('close');
                     }
                 }
@@ -1435,7 +1462,7 @@ DragAndDropViewManager.prototype._setUpAddADealButtonBehavior = function () {
             }
         });
         
-    });
+    }).change ();
 };
 
 /**
@@ -1485,7 +1512,7 @@ DragAndDropViewManager.prototype._setUpQtips = function () {
 
     var that = this;
     $.each (['opportunities', 'contacts', 'accounts'], function (i, type) {
-        that._qtipManagers[type] = new X2QtipManager ({
+        that._qtipManagers[type] = new x2.X2GridViewQtipManager ({
             loadingText: that.translations['Loading...'],
             qtipSelector: '.stage-member-type-' + type + ' .stage-member-name a',
             modelType: type,

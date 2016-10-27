@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,41 +33,39 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 include("protected/modules/bugReports/bugReportsConfig.php");
 
 $this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('module','{X} List',array('{X}'=>$moduleConfig['recordName'])), 'url'=>array('index')),
-	array('label'=>Yii::t('module','Create {X}',array('{X}'=>$moduleConfig['recordName'])), 'url'=>array('create')),
-	array('label'=>Yii::t('module','View {X}',array('{X}'=>$moduleConfig['recordName']))),
-	array('label'=>Yii::t('module','Update {X}',array('{X}'=>$moduleConfig['recordName'])), 'url'=>array('update', 'id'=>$model->id)),
-	array('label'=>Yii::t('module','Delete {X}',array('{X}'=>$moduleConfig['recordName'])), 'url'=>'#', 'linkOptions'=>array('submit'=>array('delete','id'=>$model->id),'confirm'=>Yii::t('app','Are you sure you want to delete this item?'))),
-    array('label'=>Yii::t('app','Attach A File/Photo'),'url'=>'#','linkOptions'=>array('onclick'=>'toggleAttachmentForm(); return false;')),
+	array('label'=>Yii::t('module','{X} List',array('{X}'=>Modules::itemDisplayName())), 'url'=>array('index')),
+	array('label'=>Yii::t('module','Create {X}',array('{X}'=>Modules::itemDisplayName())), 'url'=>array('create')),
+	array('label'=>Yii::t('module','View {X}',array('{X}'=>Modules::itemDisplayName()))),
+	array('label'=>Yii::t('module','Update {X}',array('{X}'=>Modules::itemDisplayName())), 'url'=>array('update', 'id'=>$model->id)),
+	array('label'=>Yii::t('module','Delete {X}',array('{X}'=>Modules::itemDisplayName())), 'url'=>'#', 'linkOptions'=>array('submit'=>array('delete','id'=>$model->id),'confirm'=>Yii::t('app','Are you sure you want to delete this item?'))),
+    ModelFileUploader::menuLink()
 
 ));
 ?>
 <div class="page-title">
     <h2>
     <?php 
-         echo Yii::t('module','View {X}',array('{X}'=>$moduleConfig['recordName'])); ?>: <?php 
+         echo Yii::t('module','View {X}',array('{X}'=>Modules::itemDisplayName())); ?>: <?php 
          echo $model->name; 
     ?>
     </h2>
     <?php
-    echo CHtml::link(
-        '<img src="'.Yii::app()->request->baseUrl.'/themes/x2engine/images/icons/email_button.png'.
-            '"></img>', '#',
-        array(
-            'class' => 'x2-button icon right email',
-            'title' => Yii::t('app', 'Open email form'),
-            'onclick' => 'toggleEmailForm(); return false;'
-        )
-    );
+    echo X2Html::emailFormButton();
+    echo X2Html::inlineEditButtons();
     ?>
 </div>
 <div id="main-column" class="half-width">
-<?php $this->renderPartial('application.components.views._detailView',array('model'=>$model, 'modelName'=>'BugReports')); 
+<?php 
+$this->widget('DetailView', array(
+	'model' => $model,
+	'modelName' =>'BugReports'
+));
+// $this->renderPartial('application.components.views.@DETAILVIEW',array('model'=>$model, 'modelName'=>'BugReports')); 
 
 $this->widget('InlineEmailForm',
 	array(
@@ -83,7 +82,12 @@ $this->widget('InlineEmailForm',
 	)
 );
 
-$this->widget('Attachments',array('associationType'=>'bugReports','associationId'=>$model->id,'startHidden'=>true)); ?>
+$this->widget ('ModelFileUploader', array(
+    'associationType' => 'bugReports',
+    'associationId' => $model->id,
+));
+?>
+
 
 <?php
 $this->widget('X2WidgetList', array('block'=>'center', 'model'=>$model, 'modelType'=>'BugReports'));

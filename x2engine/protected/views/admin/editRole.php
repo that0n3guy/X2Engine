@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,19 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+Yii::app()->clientScript->registerCss('editRoleCSS',"
+#editRole .x2-loading-icon {
+    height: 0;
+}
+#editRole .loader {
+    margin: 0;
+}
+#editRole > .form {
+    margin: 0;
+}
+");
 
 ?>
 <div class="page-title rounded-top"><h2><?php echo Yii::t('admin','Edit Role'); ?></h2></div>
@@ -54,22 +67,35 @@ foreach($list as $role){
 	<em><?php echo Yii::t('app','Fields with <span class="required">*</span> are required.'); ?></em><br />
 
         <div class="row">
-            <?php echo $form->labelEx($model,'name'); ?>
-            <?php echo $form->dropDownList($model,'name',$names,array(
-                'empty'=>'Select a role',
+            <?php 
+            echo $form->labelEx($model,'name'); 
+            echo $form->dropDownList($model,'name',$names,array(
+                'empty'=>Yii::t('admin','Select a role'),
                 'id'=>'editDropdown',
                 'ajax' => array(
                 'type'=>'POST', //request type
-                'url'=>CController::createUrl('/admin/getRole', array('mode'=>'edit')), //url to call.
+                'url'=>CController::createUrl('/admin/getRole', array('mode'=>'edit')), 
                 //Style: CController::createUrl('currentController/methodToCall')
                 'update'=>'#roleForm', //selector to update
-                'complete'=>"function(){
+                'beforeSend' => "function () {
+                    auxlib.containerLoading ($('#editRole'));
+                }",
+                'complete'=>"function(data){
+                    var data = data.responseText;
                     $('.multiselect').multiselect();
-                }"
+                    if (data === '') {
+                        $('#roleEdit-form').find ('[type=\"submit\"]').
+                            attr ('disabled', 'disabled'); 
+                    } else {
+                        $('#roleEdit-form').find ('[type=\"submit\"]').removeAttr ('disabled'); 
+                    }
+                    auxlib.containerLoadingStop ($('#editRole'));
+                }",
                 //'data'=>'js:"modelType="+$("'.CHtml::activeId($model,'modelType').'").val()'
                 //leave out the data key to pass all form values through
-                ))); ?>
-            <?php echo $form->error($model,'name'); ?>
+                ))); 
+            echo $form->error($model,'name'); 
+            ?>
         </div>
 
         <div id="roleForm">
@@ -77,7 +103,14 @@ foreach($list as $role){
         </div>
         <br />
 	<div class="row buttons">
-		<?php echo CHtml::submitButton($model->isNewRecord ? Yii::t('app','Save'):Yii::t('app','Save'),array('class'=>'x2-button')); ?>
+		<?php 
+        echo CHtml::submitButton(
+            $model->isNewRecord ?  Yii::t('app','Save'):Yii::t('app','Save'),
+            array(
+                'class'=>'x2-button',
+                'disabled'=>'disabled',
+            )); 
+        ?>
 	</div>
 <?php $this->endWidget(); ?>
 </div>

@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.components.ResponseBehavior');
 Yii::import('application.models.Admin');
@@ -689,6 +690,32 @@ class UpdaterBehavior extends ResponseBehavior {
     }
 
     
+    /**
+     * Branding validity check.
+     */
+    public function checkPartner($content=false) {
+        $partnerFiles = array(
+            'about' => array('about'),
+            'footer' => array('footer'),
+            'login' => array('login'),
+        );
+        $fileStatus = array_fill_keys(array_keys($partnerFiles),false);
+        foreach($partnerFiles as $name=>$sections) {
+            $path = implode(DIRECTORY_SEPARATOR,array(Yii::app()->basePath,'partner',''));
+            if(!file_exists($file = $path."$name.php"))
+                $file = $path.$name.'_example.php';
+            if(!file_exists($file))
+                continue;
+            $delimPatterns = array();
+            foreach($sections as $secName) {
+                $delimPatterns[] = sprintf('/\* @start:%s \*/.*?/\* @end:%s \*/',$secName,$secName);
+            }
+            $defaultContent = trim(preg_replace('%(?:'.implode('|',$delimPatterns).')%ms','',file_get_contents($file)));
+            $fileStatus[$name] = $content ? $defaultContent : md5($defaultContent);
+        }
+        return $fileStatus;
+    }
+    
 
 
     /**
@@ -746,7 +773,8 @@ class UpdaterBehavior extends ResponseBehavior {
      * Wrapper for {@link FileUtil::ccopy} for updates that can operate
      * recursively without requiring a list of files.
      *
-     * @param string $path Path relative to the web root to be copied
+     * @param string $path Path relative to the web root to be copied 
+     *  (this is the target, unless dir is null, in which case it's the source)
      * @param string $file The path to copy (assumed relative to the webroot)
      * @param string $dir The name of the backup directory; "." means top-level directory
      */
@@ -957,13 +985,18 @@ class UpdaterBehavior extends ResponseBehavior {
                 $this->resetAssets();
                 // Apply configuration changes and clear out the assets folder:
                 $this->regenerateConfig($this->manifest['targetVersion'], $this->manifest['updaterVersion'], $this->manifest['buildDate']);
+                $this->version = $this->manifest['targetVersion'];
             }else if($this->scenario == 'upgrade'){
                 // Change the edition and product key to reflect the upgrade:
                 $admin = CActiveRecord::model('Admin')->findByPk(1);
+                // refresh admin schema since it may have changed during db changes
+                Yii::app()->db->schema->refresh ();
+                $admin->refreshMetaData ();
                 $admin->edition = $this->manifest['targetEdition'];
                 if(!(empty($this->uniqueId)||$this->uniqueId=='none')) // Set new unique id
                     $admin->unique_id = $this->uniqueId;
                 $admin->save();
+                $this->edition = $admin->edition;
             }
         }catch(Exception $e){
             $lastException = $e;
@@ -979,6 +1012,9 @@ class UpdaterBehavior extends ResponseBehavior {
         $cache = Yii::app()->cache;
         if(!empty($cache))
             $cache->flush();
+        if (isset (Yii::app()->cache2)) {
+            Yii::app()->cache2->flush ();
+        }
         // Clear the auth cache
         Yii::app()->db->createCommand('DELETE FROM x2_auth_cache WHERE 1')->execute();
         if($this->scenario == 'update'){
@@ -990,6 +1026,9 @@ class UpdaterBehavior extends ResponseBehavior {
         if($lastException instanceof Exception) {
             throw new CException(Yii::t('admin','Encountered an issue after applying database changes. The error message given was {msg}.',array('{msg}'=>$lastException->getMessage())));
         }else{
+            $admin = CActiveRecord::model('Admin')->findByPk(1);
+            $admin->edition = 'opensource';
+            $admin->save();
             return false;
         }
     }
@@ -1024,29 +1063,55 @@ class UpdaterBehavior extends ResponseBehavior {
                                 continue;
                             $sqlErr = $e->getMessage();
                             try{
-                                if($backup){ // Run the recovery
-                                    $this->restoreDatabaseBackup();
-                                    $dbRestoreMessage = Yii::t('admin', 'The database has been restored to the backup copy.');
-                                }else{ // No recovery available; print messages instead
-                                    if((bool) realpath($this->dbBackupPath)) // Backup available
-                                        $dbRestoreMessage = Yii::t('admin', 'To restore the database to its previous state, use the database dump file {file} stored in {dir}', array('{file}' => self::BAKFILE, '{dir}' => 'protected/data'));
-                                    else // No backup available
-                                        $dbRestoreMessage = Yii::t('admin', 'If you made a backup of the database before running the updater, you will need to apply it manually.');
-                                }
+                                $this->handleSqlFailure ($sql, $sqlRun, $sqlErr, $backup);
                             }catch(Exception $re){ // Database recovery failed. We're SOL
                                 $dbRestoreMessage = $re->getMessage();
+                                $this->sqlError($sql, $sqlRun, "$sqlErr\n$dbRestoreMessage");
                             }
-                            $this->sqlError($sql, $sqlRun, "$sqlErr\n$dbRestoreMessage");
                         }
                     }
                 }
             }
             if(count($part['migrationScripts'])){
                 $this->output(Yii::t('admin', 'Running migration scripts for version {ver}...', array('{ver}' => $part['version'])));
-                $this->runMigrationScripts($part['migrationScripts'], $sqlRun);
+                $sqlRun = $this->runMigrationScripts($part['migrationScripts'], $sqlRun, $backup);
             }
         }
         return true;
+    }
+
+    /**
+     * Handle database backups in the event of failure
+     * @param string $error SQL Error
+     * @param bool $backup Whether to restore from backup
+     */
+    public function handleSqlFailure($sql, $sqlRun, $sqlErr, $backup, $throw = true) {
+        if ($backup) { // Run the recovery
+            $this->restoreDatabaseBackup();
+            $dbRestoreMessage = Yii::t('admin', 'The database has been restored to the backup copy.');
+        } else { // No recovery available; print messages instead
+            if((bool) realpath($this->dbBackupPath)) // Backup available
+                $dbRestoreMessage = Yii::t('admin', 'To restore the database to its previous state, use the database dump file {file} stored in {dir}', array('{file}' => self::BAKFILE, '{dir}' => 'protected/data'));
+            else // No backup available
+                $dbRestoreMessage = Yii::t('admin', 'If you made a backup of the database before running the updater, you will need to apply it manually.');
+        }
+        $this->sqlError($sql, $sqlRun, "$sqlErr\n$dbRestoreMessage", $throw);
+    }
+
+    /**
+     * Notify the server that the update has finished
+     */
+    public function finalizeUpdate($scenario, $unique_id, $version, $edition) {
+        if ($scenario !== 'update')
+            return;
+        $params = array(
+            'unique_id' => $unique_id,
+            'version' => $version,
+            'edition' => $edition,
+        );
+        return FileUtil::getContents (
+            $this->updateServer . '/installs/updates/finalizeUpdate?' . 
+                http_build_query ($params, '', '&'));
     }
 
     /**
@@ -1292,7 +1357,12 @@ class UpdaterBehavior extends ResponseBehavior {
                     else
                         $prog = 'mysqldump.exe';
                 }
-                $this->_dbBackupCommand = $prog." -h{$this->dbParams['dbhost']} -u{$this->dbParams['dbuser']} -p{$this->dbParams['dbpass']} {$this->dbParams['dbname']}";
+                $passArg = '';
+                if(!empty($this->dbParams['dbpass'])){
+                    $quotedPass = escapeshellarg($this->dbParams['dbpass']);
+                    $passArg = " -p{$quotedPass}";
+                }
+                $this->_dbBackupCommand = $prog." -h{$this->dbParams['dbhost']} -u{$this->dbParams['dbuser']}$passArg {$this->dbParams['dbname']}";
             } else{ // no other database types supported yet...
                 return null;
             }
@@ -1338,7 +1408,12 @@ class UpdaterBehavior extends ResponseBehavior {
                     else
                         $prog = 'mysql.exe';
                 }
-                $this->_dbCommand = $prog." -h{$this->dbParams['dbhost']} -u{$this->dbParams['dbuser']} -p{$this->dbParams['dbpass']} {$this->dbParams['dbname']}";
+                $passArg = '';
+                if(!empty($this->dbParams['dbpass'])){
+                    $quotedPass = escapeshellarg($this->dbParams['dbpass']);
+                    $passArg = " -p{$quotedPass}";
+                }
+                $this->_dbCommand = $prog." -h{$this->dbParams['dbhost']} -u{$this->dbParams['dbuser']}$passArg {$this->dbParams['dbname']}";
             } else{ // no other DB types supported yet..
                 return null;
             }
@@ -1746,7 +1821,7 @@ class UpdaterBehavior extends ResponseBehavior {
         if((bool) $prog){
             $backup = proc_open($this->dbBackupCommand, $descriptor, $pipes, $this->webRoot);
             $return = proc_close($backup);
-            if($return == -1)
+            if($return !== 0)
                 throw new CException(Yii::t('admin', "Database backup process did not exit cleanly. See the file {file} for error output details.", array('{file}' => "protected/data/$errFile")));
             else
                 return True;
@@ -1858,7 +1933,11 @@ class UpdaterBehavior extends ResponseBehavior {
             // Use realpath to get platform-dependent path
             $absFile = realpath("{$this->webRoot}/$file");
             if((bool) $absFile){
-                unlink($absFile);
+                // Get existing file's name to ensure that we're deleting the correct file.
+                // This check is only necessary on case-insensitive file systems
+                $basename = pathinfo ($absFile, PATHINFO_BASENAME);
+                if (basename ($file) === $basename)
+                    unlink($absFile);
             }
         }
     }
@@ -2013,27 +2092,42 @@ class UpdaterBehavior extends ResponseBehavior {
      * @param type $ran List of database changes and other scripts that have
      *  already been run
      */
-    public function runMigrationScripts($scripts, &$ran){
+    public function runMigrationScripts($scripts, $ran, $backup){
         $that = $this;
         $script = '';
-        $scriptExc = function($e) use(&$ran, &$script, $that){
-                    $that->sqlError(Yii::t('admin', 'migration script {file}', array('{file}' => $script)), $ran, $e->getMessage(),false);
+        $scriptExc = function($e) use(&$ran, &$script, $that, $backup){
+                    $that->handleSqlFailure ($script, $ran, $e->getMessage(), $backup, false);
                 };
-        $scriptErr = function($errno, $errstr, $errfile, $errline, $errcontext) use(&$ran, &$script, $that){
-                    if($errno == E_ERROR) {
-                        $that->sqlError(Yii::t('admin', 'migration script {file}', array('{file}' => $script)), $ran, "$errstr [$errno] : $errfile L$errline; $errcontext",false);
+        $scriptErr = function($errno, $errstr, $errfile, $errline, $errcontext) use(&$ran, &$script, $that, $backup) {
+            if (error_reporting () === 0) { // handle case of '@' error suppression
+                return false;
+            }
+                    $unrecoverable = array(
+                        E_ERROR, E_PARSE, E_CORE_ERROR, E_CORE_WARNING, E_COMPILE_ERROR, E_COMPILE_WARNING
+                    );
+                    if (!in_array($errno, $unrecoverable)) {
+                        $that->handleSqlFailure ($script, $ran,
+                            "$errstr [$errno] : $errfile L$errline;", $backup, false);
                     }
                 };
         set_error_handler($scriptErr);
         set_exception_handler($scriptExc);
         sort($scripts);
+        // add in case this is a version before introduction of this constant
+        defined('YII_UNIT_TESTING') or define('YII_UNIT_TESTING',false);
         foreach($scripts as $script){
             $this->output(Yii::t('admin', 'Running migration script: {script}', array('{script}' => $script)));
-            require_once($this->sourceDir.DIRECTORY_SEPARATOR.FileUtil::rpath($script));
+            if (YII_UNIT_TESTING) {
+                // To allow the same migration script to be executed twice in testing
+                require($this->sourceDir.DIRECTORY_SEPARATOR.FileUtil::rpath($script));
+            } else {
+                require_once($this->sourceDir.DIRECTORY_SEPARATOR.FileUtil::rpath($script));
+            }
             $ran[] = Yii::t('admin', 'migration script {file}', array('{file}' => $script));
         }
         restore_exception_handler();
         restore_error_handler();
+        return $ran;
     }
 
     /**
@@ -2228,8 +2322,23 @@ class UpdaterBehavior extends ResponseBehavior {
 
         // Retrieve the update package contents' files' digests:
         $md5sums_content = FileUtil::getContents($this->updateServer.'/'.$this->getUpdateDataRoute($this->configVars['updaterVersion']).'/contents.md5');
+        // If there's an error on the server end the response will be a JSON
+        $tryJson = json_decode($md5sums_content,1);
         if(!(bool) $md5sums_content) {
-            throw new CException(Yii::t('admin','Unknown update server error.'),self::ERR_UPSERVER);
+            $admin = CActiveRecord::model('Admin')->findByPk(1);
+            if ($this->scenario === 'upgrade' && isset($admin) && empty($admin->unique_key)) {
+                $updaterSettingsLink = CHtml::link(Yii::t('admin', 'Updater Settings page'), array('admin/updaterSettings'));
+                throw new CException(Yii::t('admin','You must first set a product key on the '.$updaterSettingsLink));
+            } else {
+                throw new CException(Yii::t('admin','Unknown update server error.'),self::ERR_UPSERVER);
+            }
+        } else if(is_array($tryJson)) {
+            // License key error
+            if(isset($tryJson['errors'])) {
+                throw new CException($tryJson['errors']);
+            } else {
+                throw new CException(Yii::t('admin','Unknown update server error.').' '.$md5sums_content);
+            }
         }
         preg_match_all(':^(?<md5sum>[a-f0-9]{32})\s+source/protected/(?<filename>\S.*)$:m',$md5sums_content,$md5s);
         $md5sums = array();

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,10 +33,10 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-?>
+ **********************************************************************************/
 
-<?php
+Yii::app()->clientScript->registerCssFile(Yii::app()->theme->baseUrl.'/css/viewChangelog.css');
+
 $this->widget('zii.widgets.grid.CGridView', array(
     'id' => 'changelog-grid',
     'baseScriptUrl' => Yii::app()->request->baseUrl.'/themes/'.Yii::app()->theme->name.'/css/gridview',
@@ -55,7 +56,7 @@ $this->widget('zii.widgets.grid.CGridView', array(
         array(
             'name' => 'recordName',
             'header' => Yii::t('admin', 'Record'),
-            'value' => '($data->changed !== "delete") ? CHtml::link($data->recordName,Yii::app()->controller->createUrl(lcfirst($data->type)."/".$data->itemId)) : $data->recordName',
+            'value' => '($data->changed !== "delete") ? CHtml::link(CHtml::encode($data->recordName),Yii::app()->controller->createUrl(lcfirst($data->type)."/".$data->itemId)) : CHtml::encode($data->recordName)',
             'type' => 'raw',
         ),
         'changed',
@@ -73,10 +74,35 @@ $this->widget('zii.widgets.grid.CGridView', array(
     ),
 ));
 echo "<br>";
-echo CHtml::link(Yii::t('admin','Clear Changelog'), '#', array('class' => 'x2-button', 'submit' => 'clearChangelog', 'confirm' => 'Are you sure you want to clear the changelog?'));
-?>
-<script>
+echo CHtml::link(
+    Yii::t('admin','Clear Changelog'), '#', array(
+        'class' => 'x2-button',
+        'submit' => 'clearChangelog',
+        'csrf' => true,
+        'confirm' => 'Are you sure you want to clear the changelog?',
+));
+echo CHtml::link(
+    Yii::t('admin',X2Html::fa('fa-share fa-lg').'Export Changelog'), '#', array(
+        'class' => 'x2-button export-changelog',
+        'id' => 'export-changelog',
+));
+
+Yii::app()->clientScript->registerScript ('changelog-js', '
     function refreshQtipHistory(){
-        $('.x2-hint').qtip();
+        $(".x2-hint").qtip();
     }
-</script>
+
+    $("#export-changelog").click(function(evt) {
+        evt.preventDefault();
+        $.ajax ({
+            url: "'.$this->createUrl ('exportChangelog').'",
+            success: function() {
+                window.location.href = "'.
+                    $this->createUrl('/admin/downloadData', array(
+                        'file' => 'changelog.csv',
+                    )).
+                '";
+            }
+        });
+    });
+', CClientScript::POS_END);

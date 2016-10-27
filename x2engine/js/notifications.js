@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /*
 Notifs prototype 
@@ -74,7 +75,7 @@ x2.Notifs = function (argsDict) {
 Public static properties
 */
 
-x2.Notifs.fetchNotificationUpdates = !x2.DEBUG;
+x2.Notifs.fetchNotificationUpdates = !x2.DEV_MODE;
 //x2.Notifs.fetchNotificationUpdates = true;
 
 
@@ -302,7 +303,7 @@ x2.Notifs.prototype._setUpUIBehavior = function () {
         if (!window.confirm (that.translations['clearAll'])) return;
         $.ajax({
             type: 'GET',
-            url: yii.scriptUrl + '/notifications/deleteAll',
+            url: auxlib.createUrl ('/notifications/deleteAll'),
             success: function(response) {
                 that._removeAllNotifications ();
             },
@@ -379,7 +380,7 @@ x2.Notifs.prototype._deleteNotification = function (notifId) {
 
     $.ajax({
         type: 'GET',
-        url: yii.scriptUrl + '/notifications/delete',
+        url: auxlib.createUrl ('/notifications/delete'),
         data: {
             id: notifId,
             getNext: getNextNotif,
@@ -421,7 +422,7 @@ x2.Notifs.prototype._getUpdates = function (firstCall) {
 
     $.ajax({
         type: 'GET',
-        url: yii.scriptUrl + '/notifications/get',
+        url: auxlib.createUrl ('/notifications/get'),
         data: {
             lastNotifId: that._lastNotifId,
             lastEventId: that._lastEventId,
@@ -433,7 +434,7 @@ x2.Notifs.prototype._getUpdates = function (firstCall) {
         if (that._iwcMode) {
             // call checkMasterId, which will then call getUpdates
             that._notifTimeout = setTimeout(
-                function () { that._checkMasterId () }, x2.notifUpdateInterval);    
+                function () { that._checkMasterId (); }, x2.notifUpdateInterval);    
         } else {
             // there's no IWC, so call getUpdates directly
             that._notifTimeout = setTimeout(that._getUpdates, x2.notifUpdateInterval);        
@@ -512,7 +513,7 @@ x2.Notifs.prototype._openNotifications = function () {
         if (notifIds.length) {
             $.ajax({
                 type: 'GET',
-                url: yii.scriptUrl + '/notifications/markViewed',
+                url: auxlib.createUrl ('/notifications/markViewed'),
                 data: encodeURI(notifIds.join('&'))
             });
         }

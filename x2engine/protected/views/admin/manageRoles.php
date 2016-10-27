@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,10 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+$this->noBackdrop = true;
+
 Yii::app()->clientScript->registerScriptFile(
     Yii::app()->getBaseUrl().'/js/multiselect/js/ui.multiselect.js');
 Yii::app()->clientScript->registerCssFile(
@@ -84,10 +88,9 @@ $this->widget('zii.widgets.grid.CGridView', array(
 )); 
 X2Html::getFlashes(); ?>
 <br>
-<a style='margin-left: 5px;' href="#" onclick="$('#addRole').toggle();$('#deleteRole').hide();$('#editRole').hide();$('#exception').hide();" class="x2-button">Add Role</a>
-<a href="#" onclick="$('#deleteRole').toggle();$('#addRole').hide();$('#editRole').hide();$('#exception').hide();" class="x2-button">Delete Role</a>
-<a href="#" onclick="$('#editRole').toggle();$('#addRole').hide();$('#deleteRole').hide();$('#exception').hide();" class="x2-button">Edit Role</a>
-<a href="#" onclick="$('#exception').toggle();$('#addRole').hide();$('#deleteRole').hide();$('#editRole').hide();" class="x2-button">Add Exception</a>
+<a style='margin-left: 5px;' href="#" onclick="$('#addRole').toggle();$('#deleteRole').hide();$('#editRole').hide();" class="x2-button"><?php echo Yii::t('admin','Add Role');?></a>
+<a href="#" onclick="$('#deleteRole').toggle();$('#addRole').hide();$('#editRole').hide();" class="x2-button"><?php echo Yii::t('admin','Delete Role');?></a>
+<a href="#" onclick="$('#editRole').toggle();$('#addRole').hide();$('#deleteRole').hide();" class="x2-button"><?php echo Yii::t('admin','Edit Role');?></a>
 <br>
 </div>
 <br>
@@ -106,11 +109,5 @@ X2Html::getFlashes(); ?>
 <div id="editRole" style="display:none;" class='x2-layout-island'>
 <?php $this->renderPartial('editRole',array(
     'model'=>$model,
-)); ?>
-</div>
-<div id="exception" style="display:none;" class='x2-layout-island'>
-<?php $this->renderPartial('roleException',array(
-    'model'=>$model,
-    'workflows'=>$workflows,
 )); ?>
 </div>

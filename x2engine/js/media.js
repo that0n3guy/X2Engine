@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 function mediaFileUpload(form, fileField, action_url, remove_url) {
     // Create the iframe...
@@ -47,7 +48,7 @@ function mediaFileUpload(form, fileField, action_url, remove_url) {
     form.parentNode.appendChild(iframe);
     window.frames['upload_iframe'].name = "upload_iframe";
  
-    iframeId = document.getElementById("upload_iframe");
+    var iframeId = document.getElementById("upload_iframe");
  
     // Add event...
     var eventHandler = function () {
@@ -78,10 +79,9 @@ function mediaFileUpload(form, fileField, action_url, remove_url) {
             	
             	var temp = $('<input>', {
             		'type': 'hidden',
-            		'name': 'AttachmentFiles[temp][]',
-            		'value': true
+            		'name': 'AttachmentFiles[types][]',
+            		'value': 'temp'
             	});
-            	
             	
             	var parent = fileField.parent();
             	
@@ -96,6 +96,7 @@ function mediaFileUpload(form, fileField, action_url, remove_url) {
             	
  				$('#choose-file-saving-icon').animate({opacity: 0.0});
  				parent.find('.filename').html(response['name']).animate({opacity: 1.0});
+                parent.find('.error').html("");
  				
  				
     			form.removeAttribute("target");
@@ -111,15 +112,24 @@ function mediaFileUpload(form, fileField, action_url, remove_url) {
     			form.removeAttribute("encoding");
             	form.setAttribute("action", $(form).data('oldAction'));
             } else {
-            	fileField.parent().find('.error').html(response['message']);
-            	fileField.val("");
+                var parent = fileField.parent();
+                parent.find('.error').html(response['message']);
+                // clear old values
+                parent.find('.filename').html("");
+                parent.find('.temp-file-id').val("");
+                parent.val("");
+                parent.find('input[type="button"]').css({opacity: 1.0});
+                $('#choose-file-saving-icon').css({opacity: 0.0});
+                form.setAttribute("action", $(form).data('oldAction'));
+
             }
  			
             // Del the iframe...
             setTimeout('iframeId.parentNode.removeChild(iframeId)', 250);
         }
         
-    $(form).data('oldAction', $(form).attr('action')); // save the form object, to be restored after uploading temp file
+    // save the form object, to be restored after uploading temp file
+    $(form).data('oldAction', $(form).attr('action')); 
  
     if (iframeId.addEventListener) iframeId.addEventListener("load", eventHandler, true);
     if (iframeId.attachEvent) iframeId.attachEvent("onload", eventHandler);
@@ -138,9 +148,10 @@ function mediaFileUpload(form, fileField, action_url, remove_url) {
     form.submit(); 
 }
 
-var illegal_ext = ['exe','bat','dmg','js','jar','swf','php','pl','cgi','htaccess','py'];    // array with disallowed extensions
 
 function mediaCheckName(el) {
+    // array with disallowed extensions
+    var illegal_ext = ['exe','bat','dmg','js','jar','swf','php','pl','cgi','htaccess','py'];    
     // - www.coursesweb.net
     // get the file name and split it to separe the extension
     var name = el.value;
@@ -162,6 +173,7 @@ function mediaCheckName(el) {
     	return true;
     }
     else {
+        var filenameError = "{X} is not an allowed filetype.";
         alert(filenameError.replace('{X}',ar_ext));
         return false;
     }
@@ -196,13 +208,13 @@ function showAssociationAutoComplete(associationType) {
 	}
 }
 
-function toggleUserMedia(userMedia, showhide, response) {
+function toggleUserMedia(userMedia, showhide) {
 	userMedia.toggle('blind');
-	var text;
-	if(response == true) {
-		var text = "[&ndash;]";
+	var buttonClass = $(showhide).find ('i').attr ('class');
+	if(buttonClass.match('left')) {
+        buttonClass = buttonClass.replace (/left/, 'down');
 	} else {
-		var text = "[+]";
+        buttonClass = buttonClass.replace (/down/, 'left');
 	}
-	showhide.html(text);
+	showhide.find ('i').attr ('class', buttonClass);
 }

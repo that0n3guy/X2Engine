@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerCss('workflowFormCss',"
 
@@ -40,6 +41,32 @@ Yii::app()->clientScript->registerCss('workflowFormCss',"
     margin: 9px 0;
 }
 
+");
+
+$financialFieldsUrl = $this->createUrl('workflow/getFinancialFields');
+Yii::app()->clientScript->registerScript('workflowFinancial',"
+    $('#Workflow_financial').on('change',function(){
+        if($('#Workflow_financial').is(':checked')){
+            $('#financialModel').show();
+            $('#financialField').show();
+        } else {
+            $('#financialModel').hide();
+            $('#financialField').hide();
+        }
+    });
+    $('#Workflow_financialModel').on('change',function(){
+        $.ajax({
+            url: '$financialFieldsUrl',
+            data: {modelType: $(this).val()},
+            success: function(data){
+                $('#Workflow_financialField').empty();
+                $.each(JSON.parse(data), function(key, val){
+                    $('#Workflow_financialField').append($('<option></option>')
+                    .attr('value', key).text(val));
+                });
+            }
+        });
+    });
 ");
 
 if(empty($model->stages))
@@ -123,6 +150,7 @@ function updateStageNumbers() {
 		$(this).find('select.workflow_requirePrevious').attr('name','WorkflowStages['+(i+1)+'][requirePrevious]');
 		$(this).find('select.workflow_roles').attr('name','WorkflowStages['+(i+1)+'][roles][]');
 		$(this).find('select.workflow_requireComment').attr('name','WorkflowStages['+(i+1)+'][requireComment]');
+                $(this).find('input.workflow_stageId').attr('name','WorkflowStages['+(i+1)+'][stageId]');
 	});
 }
 
@@ -150,15 +178,60 @@ $(function() {
 	<?php echo $form->errorSummary($model); ?>
 
 	<div class="row">
-		<div class="cell">
-			<?php echo $form->labelEx($model,'name'); ?>
-			<?php echo $form->textField($model,'name',array('maxlength'=>250, 'class'=>'x2-wide-input')); ?>
-			<?php echo $form->error($model,'name'); ?>
-		</div>
-		<div class="cell">
-			<?php echo $form->labelEx($model,'isDefault'); ?>
-			<?php echo $form->checkbox($model,'isDefault'); ?>
-		</div>
+            <div class="cell">
+                <?php
+                echo $form->labelEx($model, 'name');
+                echo $form->textField($model, 'name',
+                        array('maxlength' => 250, 'class' => 'x2-wide-input'));
+                echo $form->error($model, 'name');
+                ?>
+            </div>
+            <div class="cell">
+                <?php
+                $moduleOptions = array(
+                            Workflow::DEFAULT_ALL_MODULES => Yii::t('workflow',
+                                    'All Modules')
+                        ) + Modules::getDropdownOptions('id',
+                                function ($record) {
+                            $modelName = X2Model::getModelName($record['name']);
+                            return $modelName && ($modelName::model() instanceof X2Model)
+                                    &&
+                                    $modelName::model()->supportsWorkflow;
+                        });
+                echo $form->labelEx($model, 'isDefaultFor');
+                echo $form->dropDownList(
+                        $model, 'isDefaultFor', $moduleOptions,
+                        array(
+                    'multiple' => 'multiple',
+                    'class' => 'x2-multiselect-dropdown',
+                    'style' => 'display: none',
+                    'data-selected-text' => Yii::t('workflow', 'module(s)'),
+                ));
+                ?>
+            </div>
+            <div class="cell">
+                <?php 
+                echo $form->labelEx($model, 'financial');
+                echo $form->checkBox($model, 'financial');
+                echo $form->error($model, 'financial');
+                ?>
+            </div>
+            <div class="cell" id="financialModel" style="<?php echo $model->financial?'':'display:none;'; ?>">
+                <?php 
+                echo $form->labelEx($model, 'financialModel');
+                echo $form->dropDownList($model, 'financialModel', X2Model::getModelTypesWhichSupportWorkflow(true, true), array('empty'=>Yii::t('workflow','Select a model type')));
+                echo $form->error($model, 'financialModel');
+                ?>
+            </div>
+            <div class="cell" id="financialField" style="<?php echo $model->financial?'':'display:none;'; ?>">
+                <?php 
+                echo $form->labelEx($model, 'financialField');
+                $currencyFields = !empty($model->financialModel)?Workflow::getCurrencyFields($model->financialModel):array();
+                $emptyText = empty($currencyFields)?Yii::t('workflow','Select a model'):Yii::t('workflow','Select a field');
+                echo $form->dropDownList($model, 'financialField', $currencyFields, array('empty'=>$emptyText));
+                echo $form->error($model, 'financialField');
+                ?>
+            </div>
 	</div>
 	<div id="workflow-stages" class="x2-sortlist">
 	<ol><?php
@@ -199,6 +272,11 @@ $(function() {
 				<?php echo $form->labelEx($stage,'requireComment'); ?>
 				<?php echo CHtml::dropdownList('WorkflowStages['.($i+1).'][requireComment]',$stage->requireComment,array('0'=>Yii::t('app','No'),'1'=>Yii::t('app','Yes')),array('class'=>'workflow_requireComment','style'=>'width:80px;')); ?>
 			</div>
+                        <div class="cell">
+                            <?php if (isset($stage->id)) {
+                                echo CHtml::hiddenField('WorkflowStages['.($i+1).'][stageId]', $stage->id,array('class'=>'workflow_stageId'));
+                            } ?>
+                        </div>
 			<a href="javascript:void(0)" onclick="deleteStage(this);" title="<?php echo Yii::t('workflow','Del'); ?>" class="del"></a>
 		</div>
 		</li>
@@ -209,13 +287,17 @@ $(function() {
 	</div>
 	<a href="javascript:void(0)" onclick="addStage()" class="x2-sortlist-add">[<?php echo Yii::t('workflow','Add'); ?>]</a>
 
+    <?php
+    $firstColor = isset($model->colors['first']) ? $model->colors['first'] : '';
+    $lastColor = isset($model->colors['last']) ? $model->colors['last'] : '';
+    ?>
     <div class='row color-picker-row'>
         <label for='colors[first]'><?php echo Yii::t('workflow', 'First Stage Color:'); ?></label>
         <input name='colors[first]' class='x2-color-picker' 
-         value='<?php echo $model->colors['first']; ?>'> 
+         value='<?php echo $firstColor; ?>'>
         <label for='colors[last]'><?php echo Yii::t('workflow', 'Last Stage Color:'); ?></label>
         <input name='colors[last]' class='x2-color-picker' 
-         value='<?php echo $model->colors['last']; ?>'> 
+         value='<?php echo $lastColor; ?>'>
     </div>
 
 	<div class="row buttons">

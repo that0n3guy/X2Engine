@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 
 /**
@@ -46,6 +47,8 @@
  * 
  * @package application.views.admin 
  */
+
+$protocol = (!empty ($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 
 ?>
 <?php echo "\n<!-- \begin{UpdatesForm} -->"; ?>
@@ -62,7 +65,7 @@
 		if (in_array($form->config['unique_id'],array(Null,'none'))) {
 			echo '<span class="registration-sub-text">'.$form->message['registrationSubtext'] . '</span>';
 			$form->textFields($mandatoryFields);
-			echo '<br>'.$form->message['registrationPostText'].': <a href="http://www.x2engine.com/contact/">x2engine.com</a><br><br>';
+			echo '<br>'.$form->message['registrationPostText'].': <a href="http://www.x2crm.com/contact-us/">x2crm.com</a><br><br>';
 		} else {
 			echo $form->message['registrationSuccess'] . '<br><br>';
 			$form->hiddenFields($mandatoryFields);
@@ -238,7 +241,7 @@
                     
                 // Now it is time to connect to the updates server
 				if(!isos || ((postData.unique_id == 'none' || empty(postData.unique_id)) && elts.receiveUpdates.is(":checked"))) {
-                    var submitToUrl = 'http://x2planet.com/installs/registry/<?php echo $form->os ? 'new' : 'register'; ?>';
+                    var submitToUrl = '<?php echo $protocol; ?>://x2planet.com/installs/registry/<?php echo $form->os ? 'new' : 'register'; ?>';
 					form.find('.error').removeClass('error');
 					status.fadeIn(300).html(loadingImg);
                     if($.browser.msie || typeof window.XDomainRequest != 'undefined') {

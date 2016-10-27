@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,180 +33,25 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
+Yii::app()->clientScript->registerPackage ('X2CSS');
 Yii::app()->clientScript->registerScriptFile(
         Yii::app()->getBaseUrl().'/js/profileSettings.js', CClientScript::POS_END);
 
-Yii::app()->clientScript->registerCss("profileSettings", "
+Yii::app()->clientScript->registerCssFile(Yii::app()->theme->baseUrl.'/css/profileSettings.css');
 
-    
-#theme-attributes select, #theme-attributes button,
-#prefs-create-theme-hint {
-    display: inline-block;
-}
-
-/*
-prevents FF checkbox border cutoff
-*/
-#profile-settings input[type='checkbox'] {
-    margin-left: 2px !important;
-}
-
-.preferences-section {
-    border-bottom: 1px solid #C2C2C2 !important;
-}
-
-.tag{
-    -moz-border-radius:4px;
-    -o-border-radius:4px;
-    -webkit-border-radius:4px;
-    border-radius:4px;
-    border-style:solid;
-    border-width:1px;
-    border-color:gray;
-    margin:2px 2px;
-    display:block;
-    float:left;
-    padding:2px;
-    background-color:#f0f0f0;
-}
-.tag a {
-    text-decoration:none;
-    color:black;
-}
-
-#settings-form .prefs-hint {
-    height: 28px;
-    color:#06c;
-    margin-right: 4px;
-}
-
-/* override spectrum color picker css */
-.sp-replacer {
-    padding: 0px !important;
-}
-.sp-dd {
-    height: 13px !important;
-}
-.sp-preview
-{
-    width:20px !important;
-    height: 17px !important;
-    margin-right: 5px !important;
-}
-
-/* modify standard form style, remove rounded borders */
-#settings-form .form {
-    margin: 0 0 0 0;
-    border-radius: 0;
-    -webkit-border-radius: 0;
-}
-
-#settings-form .color-picker-input {
-    margin-right: 6px;
-}
-
-#settings-form #theme-attributes-body .row {
-    margin-top: 5px;
-    margin-bottom: 5px;
-}
-
-/* temporary change to allow small buttons, this should exist across the app */
-#settings-form .x2-small-button  {
-    padding: 0 4px 0 4px !important;
-    margin: 2px 4px 0 0;
-}
-
-/* prevents side-by-side borders between touching forms */
-#profile-settings {
-    border-top: 0;
-}
-
-/* prevents side-by-side borders between touching forms */
-#profile-settings,
-#theme-attributes,
-#prefs-tags {
-    border-bottom: 0;
-}
-
-#theme-attributes,
-.upload-box {
-    border-top: 1px solid #C2C2C2 !important;
-}
-
-/* sub-menu maximize/minimize arrows */
-#theme-attributes .minimize-arrows,
-#prefs-tags .minimize-arrows {
-    margin-top: 15px;
-    width: 20px;
-    height: 20px;
-    text-align: center;
-}
-
-/* spacing in the create a theme sub menu */
-.theme-name-input-container {
-    margin-top: 9px;
-    margin-bottom: 0px;
-}
-
-/* validation in the create a theme sub menu */
-#create-theme-box input.error
-{
-    background: #FEE;
-    border-color: #C00 !important;
-}
-
-/* spacing in the create a theme sub menu */
-#create-theme-box input {
-    margin-top: 0px;
-}
-
-/* spacing in the create a theme sub menu */
-#new-theme-name {
-    width: 170px;
-    margin-left: 4px;
-    margin-bottom: 4px;
-}
-
-select#themeName,
-select#backgroundImg,
-select#loginSounds,
-select#themeName,
-select#notificationSounds {
-    /*margin-right: 4px;*/
-}
-
-#save-changes {
-    margin-bottom: 5px;
-}
-
-#prefs-save-theme-button,
-#prefs-create-theme-button,
-#upload-theme-button,
-#export-theme-button,
-#upload-background-img-button,
-#upload-login-sound-button,
-#upload-notification-sound-button {
-    margin-top: 2px;
-}
-
-.no-theme-editor {
-    display: none;
-}
-
-.no-theme-editor + #prefs-tags {
-    border-top: 1px solid #C2C2C2;
-}
-
-
-");
+Tours::tips (array(
+    array(
+        'content' => Yii::t('app','You can disable tips like this by unchecking this box.'),
+        'target' =>  '#Profile_showTours'
+    )
+));
 
 $preferences = $model->theme;
 $miscLayoutSettings = $model->miscLayoutSettings;
 
 $passVariablesToClientScript = "
-    x2.profileSettings = {};
     x2.profileSettings.checkerImagePath = '".
         Yii::app()->theme->getBaseUrl()."/images/checkers.gif';
     x2.profileSettings.createThemeHint = '".
@@ -218,7 +64,8 @@ $passVariablesToClientScript = "
         themeImportDialogTitle: '".Yii::t('profile', 'Import a Theme')."',
         close: '".Yii::t('app', 'close')."',
     };
-    x2.profileSettings.uploadedByAttrs = {};";
+    x2.profileSettings.uploadedByAttrs = {};
+";
 
 // pass array of predefined theme uploadedBy attributes to client
 foreach($myThemes->data as $theme){
@@ -227,7 +74,7 @@ foreach($myThemes->data as $theme){
 }
 
 Yii::app()->clientScript->registerScript(
-        'passVariablesToClientScript', $passVariablesToClientScript, CClientScript::POS_BEGIN);
+    'passVariablesToClientScript', $passVariablesToClientScript, CClientScript::POS_END);
 
 // If the user was redirected from /site/upload and the "useId" parameter is 
 // available, set the background to that so they get instant feedback
@@ -235,10 +82,10 @@ if(isset($_GET['bgId'])) {
     $media = Media::model()->findByPk($_GET['bgId']);
     if($media instanceof Media) {
         Yii::app()->clientScript->registerScript(
-                'setBackgroundToUploaded',
-                '$("select#backgroundImg").val('
-                    .json_encode('media/'.Yii::app()->user->name.'/'.$media->fileName).').trigger("change");'
-                ,CClientScript::POS_READY);
+            'setBackgroundToUploaded',
+            '$("select#backgroundImg").val('
+                .$media->id.').trigger("change");'
+            ,CClientScript::POS_READY);
     }
 }
 
@@ -265,22 +112,9 @@ $form = $this->beginWidget('X2ActiveForm', array(
             <?php
             echo $form->labelEx(
                     $model, 'disablePhoneLinks', array('style' => 'display:inline;'));
+            echo X2Html::hint2 (
+                Yii::t('app', 'Prevent phone number fields from being formatted as links.'));
             ?>
-            <span class='x2-hint' title='<?php 
-             echo Yii::t('app', 'Prevent phone number fields from being formatted as links.'); ?>'>[?]</span>
-        </div>
-    </div>
-    <div class="row">
-        <div class="cell">
-            <?php
-            echo $form->checkBox(
-                    $model, 'disableAutomaticRecordTagging', 
-                    array('onchange' => 'js:x2.profileSettings.highlightSave();'));
-            echo '&nbsp;'.$form->labelEx(
-                    $model, 'disableAutomaticRecordTagging', array('style' => 'display:inline;'));
-            ?>
-            <span class='x2-hint' title='<?php 
-             echo Yii::t('app', 'Prevent tags from being automatically generated when hashtags are detected in record fields.'); ?>'>[?]</span>
         </div>
     </div>
     <?php if(Yii::app()->contEd('pro')) { ?>
@@ -351,9 +185,89 @@ $form = $this->beginWidget('X2ActiveForm', array(
             ?>
         </div>
     </div>
+    <div class="row">
+        <div class="cell">
+        <label for="loginSounds">
+            <?php echo Yii::t('profile', 'Login Sound'); ?>
+        </label>
+        <select id="loginSounds" name="preferences[loginSound]" class='x2-select'>
+            <option value=""> <?php echo Yii::t('app', 'None'); ?> </option>
+            <?php foreach($myLoginSounds->data as $loginSound){ ?>
+                <option value="<?php
+            echo $loginSound->id.",".
+            $loginSound->fileName.",".$loginSound->uploadedBy;
+                ?>"
+                        id="sound-<?php echo $loginSound->id; ?>"
+                        <?php
+                        if ($loginSound->id == $model->loginSound) {
+                            echo "selected='selected'";
+                        }
+                        ?>>
+                            <?php echo $loginSound->fileName; ?>
+                </option>
+            <?php } ?>
+        </select>
+        <?php
+        echo X2Html::fa ('upload', array (
+            'id' => 'upload-login-sound-button',
+            'class' => 'icon-button-min',
+            'title' => Yii::t('profile', 'Upload Login Sound')
+        ));
+        ?>
+        </div>
+        <div class="cell">
+            <label for="notificationSounds">
+                <?php echo Yii::t('profile', 'Notification Sound'); ?>
+            </label>
+            <select id="notificationSounds" name="preferences[notificationSound]"
+                    class='x2-select'>
+                <option value=""> <?php echo Yii::t('app', 'None'); ?> </option>
+                <?php foreach($myNotificationSounds->data as $notificationSound){ ?>
+                    <option value="<?php
+                        echo $notificationSound->id.",".$notificationSound->fileName.",".
+                            $notificationSound->uploadedBy; ?>"
+                     id="sound-<?php echo $notificationSound->id; ?>"
+                     <?php
+                     if($notificationSound->id == $model->notificationSound){
+                         echo "selected='selected'";
+                     }
+                     ?>><?php echo $notificationSound->fileName; ?></option>
+                <?php } ?>
+            </select>
+            <?php
+            echo X2Html::fa ('upload', array (
+                'id' => 'upload-notification-sound-button',
+                'class' => 'icon-button-min',
+                'title' => Yii::t('profile', 'Upload Notification Sound')
+            ));
+            ?>
+        </div>
+    </div>
+    <div class="row">
+        <div class="cell">
+            <?php echo $form->labelEx($model, 'defaultCalendar'); ?>
+            <?php
+            echo $form->dropDownList(
+                $model, 'defaultCalendar', X2CalendarPermissions::getEditableUserCalendarNames());
+            ?>
+        </div>
+    </div>
+    <div class="row">
+        <div class="cell" style="margin: 8px 0px">
+            <label style='display:inline-block'><?php echo Yii::t('app','Show Tips');?></label>
+            <?php echo X2Html::activeCheckBox ($model, 'showTours', array(
+                'style' =>'margin: 0px; vertical-align: middle',
+                'type' =>'checkbox'
+             )); ?> 
+        </div>
+    </div>
+    <div class="row">
+        <span title='<?php echo Yii::t('app','Tips around the app will only be seen once. To see them again press this button.') ?>' id='reset-tips-button' class='x2-hint x2-button' style='color: inherit'><?php echo Yii::t('app', 'Reset Tips') ?></span>
+    </div>
 </div>
 <div id="theme-attributes" class='form preferences-section<?php 
-    echo ''; 
+    echo ($displayThemeEditor ? 
+        ' no-theme-editor': '')/* x2plaend */; 
     ?>'>
     <div id="theme-attributes-title-bar" class="row prefs-title-bar">
         <h3 class="left"><?php echo Yii::t('app', 'Theme'); ?></h3>
@@ -367,120 +281,72 @@ $form = $this->beginWidget('X2ActiveForm', array(
     <div id="theme-attributes-body" class="row prefs-body" <?php echo
         ($miscLayoutSettings['themeSectionExpanded'] == false ? 'style="display: none;"' : ''); ?>>
         <div class="row" id='theme-mgmt-buttons'>
-            <label for="themeName">
-                <?php echo Yii::t('app', 'Predefined Theme') ?>
-            </label>
-            <select id="themeName" class="theme-attr x2-select" name="preferences[themeName]">
-                <option value="" id="custom-theme-option">
-                    <?php echo Yii::t('app', 'Custom'); ?>
-                </option>
-                <?php foreach($myThemes->data as $theme){ ?>
-                    <option value="<?php echo $theme->id; ?>"
-                    <?php
-                    if($theme->fileName == $preferences['themeName']){
-                        echo "selected='selected'";
-                    }
-                    ?>>
-                                <?php echo $theme->fileName; ?>
-                    </option>
-                <?php } ?>
-            </select>
-            <button type='button' class='x2-button x2-small-button'
-                    id='prefs-create-theme-button'>
-                        <?php echo Yii::t('profile', 'Create Theme'); ?>
-            </button>
-            <span id="prefs-create-theme-hint" class='prefs-hint'>[?]</span>
-            <button type='button' class='x2-button x2-small-button'
-                    id='prefs-save-theme-button'>
-                        <?php echo Yii::t('profile', 'Save Theme'); ?>
-            </button>
-            <span id="prefs-save-theme-hint" class='hide prefs-hint'>[?]</span>
-            <!--  -->    
-            <!--<div id="create-theme-dialog" title="Create Theme">
-                <span class='left'> <?php //echo Yii::t('app', 'Theme name');    ?>: </span>
-                <input id="new-theme-name"> </input>
-                <input type="checkbox"> Private </input>
-                <br/>
-                <button class='dialog-create-button' class="x2-button">
-            <?php //echo Yii::t('app', 'Create');  ?>
+            <input type="hidden" id="themeName" class="theme-attr x2-select" 
+             name="preferences[themeName]" />
+
+            <div class='x2-button-group'>
+                <button type='button' class='x2-button x2-small-button'
+                        id='prefs-create-theme-button'>
+                            <?php echo X2Html::fa("fa-copy") ?>
+                            <?php echo Yii::t('profile', 'New'); ?>
                 </button>
-            </div>-->
-            <!--<button type='button' class='x2-button' id='export-theme-button'>
-            <?php //echo Yii::t('profile', 'Export Theme');  ?>
-            </button>
-            <button type='button' class='x2-button' id='upload-theme-button'>
-            <?php //echo Yii::t('profile', 'Upload Theme');   ?>
-            </button>-->
+                <!-- <span id="prefs-create-theme-hint" class='prefs-hint'></span> -->
+                <button type='button' class='x2-button x2-small-button'
+                        id='prefs-save-theme-button'>
+                            <?php echo X2Html::fa("fa-save") ?>
+                            <?php echo Yii::t('profile', 'Save'); ?>
+                </button>
+                <!-- <span id="prefs-save-theme-hint" class='hide prefs-hint'></span> -->
+                <button type='button' class='x2-button x2-small-button'
+                        id='prefs-delete-theme-button'>
+                            <?php echo X2Html::fa("fa-trash") ?>
+                            <?php echo Yii::t('profile', 'Delete'); ?>
+                </button>
+                <?php  ?>
+                <button type='button' class='x2-button x2-small-button'
+                        id='prefs-import-theme-button'>
+                            <?php echo X2Html::fa("fa-download") ?>
+                            <?php echo Yii::t('profile', 'Import'); ?>
+                </button>
+                <button type='button' class='x2-button x2-small-button'
+                        id='prefs-export-theme-button'>
+                            <?php echo X2Html::fa("fa-upload") ?>
+                            <?php echo Yii::t('profile', 'Export'); ?>
+                </button>
+            </div>
+            <?php  ?>
+            <div style="clear:both"></div>
+
+            <?php $this->renderPartial('_themeSettings', array(
+                'myThemes' => $myThemes,
+                'selected' => $preferences['themeName'])
+            ); ?>
+
         </div>
-        <div class="row">
-            <label for="backgroundColor">
-                <?php echo Yii::t('app', 'Background Color') ?>
-            </label>
-            <input id="backgroundColor" type="text" name="preferences[backgroundColor]"
-                   value="<?php echo $preferences['backgroundColor']; ?>"
-                   class='color-picker-input theme-attr'> </input>
-        </div>
-        <div class="row">
-            <label for="menuBgColor">
-                <?php echo Yii::t('app', 'Menu Background Color') ?>
-            </label>
-            <input id="menuBgColor" type="text" name="preferences[menuBgColor]"
-                   value="<?php echo $preferences['menuBgColor']; ?>"
-                   class='color-picker-input theme-attr'> </input>
-        </div>
-        <div class="row">
-            <label for="menuTextColor">
-                <?php echo Yii::t('app', 'Menu Text Color') ?>
-            </label>
-            <input id="menuTextColor" type="text" name="preferences[menuTextColor]"
-                   value="<?php echo $preferences['menuTextColor']; ?>"
-                   class='color-picker-input theme-attr'> </input>
-        </div>
-        <div class="row">
-            <label for="pageHeaderBgColor">
-                <?php echo Yii::t('app', 'Page Header Background Color') ?>
-            </label>
-            <input id="pageHeaderBgColor" type="text"
-                   name="preferences[pageHeaderBgColor]"
-                   value="<?php echo $preferences['pageHeaderBgColor']; ?>"
-                   class='color-picker-input theme-attr'> </input>
-        </div>
-        <div class="row">
-            <label for="pageHeaderTextColor">
-                <?php echo Yii::t('app', 'Page Header Text Color') ?>
-            </label>
-            <input id="pageHeaderTextColor" type="text"
-                   name="preferences[pageHeaderTextColor]"
-                   value="<?php echo $preferences['pageHeaderTextColor']; ?>"
-                   class='color-picker-input theme-attr'> </input>
-        </div>
-        <div class="row">
-            <label for="activityFeedWidgetBgColor">
-                <?php echo Yii::t('app', 'Activity Feed Widget Background Color'); ?>
-            </label>
-            <input id="activityFeedWidgetBgColor" type="text"
-                   name="preferences[activityFeedWidgetBgColor]"
-                   value="<?php echo $preferences['activityFeedWidgetBgColor']; ?>"
-                   class='color-picker-input theme-attr'> </input>
-        </div>
-        <div class="row">
-            <label for="gridViewRowColorOdd">
-                <?php echo Yii::t('app', 'Grid View Row Color 1'); ?>
-            </label>
-            <input id="gridViewRowColorOdd" type="text"
-                   name="preferences[gridViewRowColorOdd]"
-                   value="<?php echo $preferences['gridViewRowColorOdd']; ?>"
-                   class='color-picker-input theme-attr'> </input>
-        </div>
-        <div class="row">
-            <label for="gridViewRowColorEven">
-                <?php echo Yii::t('app', 'Grid View Row Color 2'); ?>
-            </label>
-            <input id="gridViewRowColorEven" type="text"
-                   name="preferences[gridViewRowColorEven]"
-                   value="<?php echo $preferences['gridViewRowColorEven']; ?>"
-                   class='color-picker-input theme-attr'> </input>
-        </div>
+
+        <?php 
+            ThemeGenerator::renderThemeColorSelector ('', '', '', array (
+                'id' => 'theme-color-selector-template',
+                'style' => 'display: none;',
+            ), true);
+            ThemeGenerator::renderSettings();
+            ?>
+            <div id='module-theme-override' 
+             <?php echo $preferences['themeName'] === 'Default' || !$preferences['themeName'] ? 
+                'style="display: none;"' : ''; ?>>
+                <?php
+                echo Modules::dropDownList ('', '', array (
+                    'class' => 'x2-select',
+                ));
+                ?>
+                <button id='add-module-override-button' class='x2-button x2-small-button'>
+                <?php
+                    echo CHtml::encode (Yii::t('app', 'Add Module Color')) 
+                ?>
+                </button>
+            </div>
+            <?php
+        ?>
         <div class="row">
             <label for="backgroundTiling">
                 <?php echo Yii::t('app', 'Background Tiling') ?>
@@ -511,78 +377,40 @@ $form = $this->beginWidget('X2ActiveForm', array(
                 <option value=""> <?php echo Yii::t('app', 'None'); ?> </option>
                 <?php foreach ($myBackgrounds->data as $background) { ?>
                     <option value="<?php
-                        echo $background->uploadedBy == null ?
-                            $background->fileName :
-                            ('media/'.$background->uploadedBy.'/'.$background->fileName); ?>"
+                        echo $background->id; ?>"
                         <?php
-                        if($background->fileName == $preferences['backgroundImg']){
+                        if($background->id == $preferences['backgroundImg']){
                             echo "selected='selected'";
                         } ?>>
                         <?php echo $background->fileName; ?>
                     </option>
                 <?php } ?>
             </select>
-            <button type='button' class='x2-button x2-small-button'
-                    id='upload-background-img-button'>
-                        <?php echo Yii::t('profile', 'Upload Background Image'); ?>
-            </button>
-        </div>
-        <div class="row">
-            <label for="loginSounds">
-                <?php echo Yii::t('profile', 'Login Sound'); ?>
-            </label>
-            <select id="loginSounds" name="preferences[loginSound]" class='x2-select'>
-                <option value=""> <?php echo Yii::t('app', 'None'); ?> </option>
-                <?php foreach($myLoginSounds->data as $loginSound){ ?>
-                    <option value="<?php
-                echo $loginSound->id.",".
-                $loginSound->fileName.",".$loginSound->uploadedBy;
-                    ?>"
-                            id="sound-<?php echo $loginSound->id; ?>"
-                            <?php
-                            if($loginSound->fileName == $model->loginSound){
-                                echo "selected='selected'";
-                            }
-                            ?>>
-                                <?php echo $loginSound->fileName; ?>
-                    </option>
-                <?php } ?>
-            </select>
-            <button type='button' class='x2-button x2-small-button'
-                    id='upload-login-sound-button'>
-                        <?php echo Yii::t('profile', 'Upload Login Sound'); ?>
-            </button>
-        </div>
-        <div class="row">
-            <label for="notificationSounds">
-                <?php echo Yii::t('profile', 'Notification Sound'); ?>
-            </label>
-            <select id="notificationSounds" name="preferences[notificationSound]"
-                    class='x2-select'>
-                <option value=""> <?php echo Yii::t('app', 'None'); ?> </option>
-                <?php foreach($myNotificationSounds->data as $notificationSound){ ?>
-                    <option value="<?php
-                        echo $notificationSound->id.",".$notificationSound->fileName.",".
-                            $notificationSound->uploadedBy; ?>"
-                     id="sound-<?php echo $notificationSound->id; ?>"
-                     <?php
-                     if($notificationSound->fileName == $model->notificationSound){
-                         echo "selected='selected'";
-                     }
-                     ?>><?php echo $notificationSound->fileName; ?></option>
-                <?php } ?>
-            </select>
-            <button type='button' class='x2-button x2-small-button'
-                    id='upload-notification-sound-button'>
-                        <?php echo Yii::t('profile', 'Upload Notification Sound'); ?>
-            </button>
+            <?php
+            echo X2Html::fa ('upload', array (
+                'id' => 'upload-background-img-button',
+                'class' => 'icon-button-min',
+                'title' => Yii::t('profile', 'Upload Background Image')
+            ));
+            ?>
+            <br>
+            <?php
+            echo CHtml::checkBox (
+                'preferences[enableLoginBgImage]', 
+                in_array ($preferences['enableLoginBgImage'], array ("0", "1"), true) ?
+                    $preferences['enableLoginBgImage'] : true, array (
+                    'class' => 'theme-attr',
+                    'uncheckValue' => "0",
+                ));
+            echo CHtml::label (
+                Yii::t('profile', 'Apply to login screen?'), 
+                'preferences[enableLoginBgImage]', array (
+                    'class' => 'right-label'
+                ));
+            ?>
         </div>
     </div>
 
-    <?php /* <div class="row">
-      <?php echo $form->checkBox($model,'enableFullWidth'); ?>
-      <?php echo $form->labelEx($model,'enableFullWidth',array('style'=>'display:inline;')); ?>
-      </div> */ ?>
 </div>
 
 <div id="prefs-tags" class="form preferences-section">
@@ -628,11 +456,11 @@ $form = $this->beginWidget('X2ActiveForm', array(
 
 <div class="form hide upload-box preferences-section" id="create-theme-box">
     <div class="row">
-        <h3><?php echo Yii::t('profile', 'Create a Theme'); ?></h3>
+        <h3><?php echo Yii::t('profile', 'Save Theme As'); ?></h3>
         <span class='left'>
             <?php
-            echo Yii::t('app', 'Creating a theme will save your current '.
-                    'theme settings as a predefined theme');
+            echo Yii::t('app', 'Saving a theme will create a theme from your'.
+                    ' current theme settings');
             ?>.
         </span>
         <br/>
@@ -745,5 +573,7 @@ $form = $this->beginWidget('X2ActiveForm', array(
 </div>
 
 <?php
+
+$this->renderPartial ('_themeImportForm');
 
 ?>

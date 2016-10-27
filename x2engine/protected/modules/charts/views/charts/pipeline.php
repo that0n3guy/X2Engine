@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,22 +33,18 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerScriptFile($this->module->getAssetsUrl ().'/js/chartManager.js',
     CClientScript::POS_BEGIN);
 
 require_once("protected/modules/charts/chartsConfig.php");
-$this->actionMenu = $this->formatMenu(array(
-	array('label' => Yii::t('charts', 'Lead Volume'), 'url' => array('leadVolume')),
-	// array('label' => Yii::t('charts', 'Lead Activity'), 'url' => array('leadActivity')),
-	// array('label' => Yii::t('charts', 'Lead Performance'), 'url' => array('leadPerformance')),
-	// array('label' => Yii::t('charts', 'Lead Sources'), 'url' => array('leadSources')),
-	// array('label' => Yii::t('charts', 'Workflow'), 'url' => array('workflow')),
-	array('label' => Yii::t('charts', 'Marketing'), 'url' => array('marketing')),
-	array('label' => Yii::t('charts', 'Pipeline')),
-	array('label' => Yii::t('charts', 'Opportunities'), 'url' => array('sales')),
-));
+
+$menuOptions = array(
+    'leadVolume', 'marketing', 'pipeline', 'opportunities',
+);
+$this->insertMenu($menuOptions);
+
 ?>
 
 

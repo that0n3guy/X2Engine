@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,61 +33,268 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+Yii::import ('application.modules.mobile.components.ThemeGenerator.*');
 
 $isGuest = Yii::app()->user->isGuest;
 $cs = Yii::app()->clientScript;
+$cs->useAbsolutePaths = true;
 $cs->scriptMap = array();
-$baseUrl = $this->module->assetsUrl;
-$cs->registerCoreScript('jquery');
-$cs->registerPackage('jquerymobile');
-$cs->registerCssFile($this->module->getAssetsUrl() . '/css/jqueryMobileCssOverrides.css');
-$cs->registerCssFile($this->module->getAssetsUrl() . '/css/main.css');
-$cs->registerScriptFile(Yii::app()->baseUrl.'/js/webtoolkit.sha256.js');
+$baseUrl = $this->assetsUrl;
 
-$cs->registerScriptFile($baseUrl . '/js/x2mobile.js');
+if ($this->includeDefaultJsAssets ()) { 
+    $cs->registerCoreScript('jquery');
+    $cs->registerPackage('jqueryMobileJs');
+    $cs->registerPackage('x2TouchJs');
+    $cs->registerPackage('x2TouchSupplementalJs');
 
-$jsVersion = '?'.Yii::app()->params->buildDate;
-$cs->registerScriptFile(Yii::app()->getBaseUrl ().'/js/auxlib.js'.$jsVersion);
-$cs->registerScriptFile(Yii::app()->getBaseUrl ().'/js/jstorage.min.js'.$jsVersion)
-   ->registerScriptFile(Yii::app()->getBaseUrl ().'/js/notifications.js'.$jsVersion, 
-     CClientScript::POS_BEGIN);
+    if (YII_UNIT_TESTING) {
+        Yii::app()->clientScript->registerScriptFile(
+            Yii::app()->getBaseUrl ().'/js/qunit/qunit-1.20.0.js', CClientScript::POS_HEAD);
+        Yii::app()->clientScript->registerScriptFile(
+            $this->assetsUrl.'/js/tests/functional/Main.js',
+            CClientScript::POS_END);
+        Yii::app()->clientScript->registerScriptFile(
+            $this->assetsUrl.'/js/tests/functional/login.js',
+            CClientScript::POS_END);
+        $excludedFiles = array (
+            'Main.js',
+            //'activityFeed.js',
+            'login.js'
+        );
+        foreach(scandir(Yii::getPathOfAlias(
+            'application.modules.mobile.assets.js.tests.functional')) as $file) {
 
+            if(!preg_match ('/\.js$/', $file) || in_array($file,$excludedFiles) || 
+                isset ($includedFiles) && !in_array($file, $includedFiles)) {
+
+                continue;
+            }
+            Yii::app()->clientScript->registerScriptFile(
+                $this->assetsUrl.'/js/tests/functional/'.$file,
+                CClientScript::POS_END);
+        }
+    }
+}
+
+if ($this->includeDefaultCssAssets ()) { 
+    $cs->registerPackage('jqueryMobileCss');
+    $cs->registerPackage('x2TouchCss');
+    $cs->registerPackage('x2TouchSupplementalCss');
+
+    if (YII_UNIT_TESTING) {
+        Yii::app()->clientScript->registerCssFile(
+            Yii::app()->getBaseUrl ().'/js/qunit/qunit-1.20.0.css');
+        Yii::app()->clientScript->registerCssFile(
+            $this->assetsUrl.'/css/functionalTests.css'); 
+    }
+}
+
+if (!$this->isAjaxRequest () && !Yii::app()->params->isPhoneGap) {
+    $cs->registerScriptFile($baseUrl . '/js/x2mobile.js', CClientScript::POS_READY);
+}
+
+if ($this->includeDefaultJsAssets ()) {
+    Yii::app()->clientScript->registerScript('registerMain',"
+        x2.Main.onPageCreate (function () {
+            if (!x2.main) {
+                x2.main = new x2.Main (".CJSON::encode (array (
+                    'translations' => array (
+                        'confirmCancel' => Yii::t('app', 'Cancel'),
+                        'confirmOkay' => Yii::t('app', 'Okay'),
+                    ),
+                    'pageDepth' => $this->pageDepth,
+                    'platform' => MobileModule::getPlatform (),
+                )).");
+            }
+        });
+    ", CClientScript::POS_HEAD);
+}
+
+$this->onPageLoad ("
+    if (!x2.attachments) {
+        x2.attachments = new x2.Attachments ({
+            translations: ".CJSON::encode (array (
+                'filetypeError' => Yii::t('app', '"{X}" is not an allowed filetype.'),
+            ))."
+        });
+    }
+    if (x2.main) {
+        var updateParams = ".CJSON::encode (array (
+            'pageDepth' => $this->pageDepth
+        )).";
+        $.extend (x2.main, updateParams);
+    }
+");
 
 ?><!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
+<?php
+if (!$this->isAjaxRequest ()) {
+?>
 <meta charset="UTF-8" />
 <meta name="language" content="en" />
 <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1"/> 
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <link rel="icon" href="<?php echo Yii::app()->getBaseUrl(); ?>/images/favicon.ico" type="image/x-icon0" />
 <link rel="shortcut icon" href="<?php echo Yii::app()->getBaseUrl(); ?>/images/favicon.ico" type="image/x-icon" />
-<title><?php echo CHtml::encode($this->pageTitle); ?></title>
+<title><?php echo CHtml::encode($this->headerTitle); ?></title>
+<?php
+}
+?>
 </head>
-<body> 
-<div id="container"> 
-	<div id="<?php echo $this->pageId; ?>" data-role="page" data-url="<?php echo $this->dataUrl; ?>/" data-theme="a">
-		<div data-role="header" data-theme="a">
-			<div  class="figure"><a href="<?php echo $this->createUrl('/mobile/site/home');?>" rel="external"><img style="margin-left:20px;" src="<?php echo $this->module->getAssetsUrl() . '/css/images/x2touch-logo.png'; ?>" alt="x2engine" /></a></div>
-		</div>
-		<div data-role="content">
-			<?php
-			echo $content;
-			?>
-		</div>
-		<div data-role="footer" data-theme="a">
-			<p>&nbsp;&nbsp;&copy; <?php echo date('Y') . ' ' . CHtml::link('X2Engine Inc.', 'http://www.x2engine.com')." ";
-				echo Yii::t('app', 'Rights Reserved.'); ?>
-				<?php echo CHtml::link(Yii::t('mobile', 'Go to Full Site'),Yii::app()->getBaseUrl().'/index.php/site/index?mobile=false',array('rel'=>'external', 'onClick'=>'setMobileBrowserFalse()')); ?>
-			</p>
-            <div id='logo-container'>
+
+<body class='mobile-body<?php 
+?>'> 
+<?php
+
+if (YII_UNIT_TESTING) {
+    echo "<div id='qunit'></div>";
+    echo "<div id='qunit-fixture'></div>";
+}
+
+?>
+
+<div id="<?php echo $this->pageId.'-'.$this->getUniquePageIdSuffix (); ?>" data-role="page" 
+ data-page-id="<?php echo $this->pageId; ?>"
+ class='<?php 
+    echo $this->pageId.' '.$this->pageClass; 
+    if ($this->layoutHasTabs ()) {
+        echo ' tabbed-layout';
+    }
+     
+    if (Yii::app()->params->isPhoneGap) {
+        echo ' x2-phone-gap';
+        if (MobileModule::getPlatform () === 'iOS') {
+            echo ' x2touch-ios';
+        } else {
+            echo ' x2touch-android';
+        }
+    } else {
+     
+        echo ' x2touch-browser';
+     
+    }
+     
+?> x2-remote-page' 
+ data-url="<?php echo $this->dataUrl; ?>/" data-theme="a">
+
+<div class='flashes-container'>
+<?php
+X2Html::getFlashes ();
+?>
+</div>
+<form id="geoCoordsForm" action="" method="POST">
+    <input type="hidden" name="geoCoords" id="geoCoords">
+</form>
+    <div id='header' data-role='header'>
+        <a href='#<?php echo $this->pageId; ?>-panel' 
+          style='display: none;' 
+          class='ui-btn-left ui-btn show-left-menu-button'>
+            <i class='fa fa-bars'></i>
+        </a>
+        <?php
+        $currentUrl = Yii::app()->request->url;
+        if (strpos($currentUrl, '/mobile/login') == false){
+        ?>
+            <a href='<?php echo Yii::app()->createAbsoluteUrl ('profile/mobileActivity'); ?>' 
+              style='margin-left: 40px;' 
+              class='ui-btn-left ui-btn show-left-menu-button-right'>
+                <i class='fa fa-home'></i>
+            </a>
             <?php
-            echo CHtml::image(Yii::app()->params->x2Power,'',array('id'=>'powered-by-x2engine')); 
+            if (Yii::app()->params->isPhoneGap) {
             ?>
+            <a href='<?php echo Yii::app()->createAbsoluteUrl ('profile/mobileCheckInPublisher'); ?>' 
+              style='margin-left: 80px;' 
+              class='ui-btn-left ui-btn show-left-menu-button-right'>
+                <i class='fa fa-location-arrow'></i>
+            </a>
+            <?php
+            }
+            ?>
+        <?php
+        }
+        ?>
+        <?php
+        if (MobileModule::getPlatform () === 'iOS') {
+        ?>
+            <div class='header-back-button'
+              style='display: none;'>
+                <i class='fa fa-chevron-left'></i>
+                <?php
+                echo CHtml::encode (Yii::t('app', 'Back'));
+                ?>
             </div>
+        <?php
+        }
+        ?>
+        <h1 class='page-title'>
+        <?php
+        echo CHtml::encode ($this->headerTitle);
+        ?>
+        </h1>
+        <a href='#settings-menu' data-rel='popup' data-transition='pop' 
+         class='ui-btn-right ui-btn show-settings-menu'>
+            <i class='fa fa-ellipsis-v'></i>
+        </a>
+        <div class='header-content-center'>
+        </div>
+        <div class='header-content-right'>
+        </div>
+    </div>
+
+    <div data-role='panel' data-display='push' class='x2touch-panel no-scrollbar' 
+     id='<?php echo $this->pageId; ?>-panel'>
+        <?php
+        if (!Yii::app()->user->isGuest) { 
+        ?>
+        <div class='panel-contents'>
+        <?php
+        $this->widget ('application.modules.mobile.components.panel.Panel');
+        ?>
+        </div>
+        <?php
+        } 
+        ?>
+    </div>
+
+<script>
+if (typeof x2 === 'undefined') x2 = {};
+x2.isAjaxRequest = <?php echo $this->isAjaxRequest () ? 'true' : 'false'; ?>;
+ 
+x2.nlscCacheBuster = <?php echo CJSON::encode (Yii::app()->clientScript->getCacheBuster ()); ?>;
+ 
+x2.csrfToken = <?php echo CJSON::encode (Yii::app()->request->getCsrfToken ()); ?>;
+</script>
+
+<?php
+if ($this->isAjaxRequest ()) {
+    // when the page is being updated via ajax, scripts must be registered inside body so that 
+    // they're fetched by jQuery mobile
+    $cs = Yii::app()->clientScript;
+    $assets = $cs->renderX2TouchAssets ();
+    echo $assets;
+}
+?>
+		<div data-role="content" class='<?php echo MobileModule::getPlatform () === 'iOS' ? '' : 'innermost-content-container'; ?>'>
+            <?php
+            // extra div needed for ios scrolling to work properly
+            if (MobileModule::getPlatform () === 'iOS') {
+                ?>
+		        <div class='content-inner<?php echo MobileModule::getPlatform () === 'iOS' ? ' innermost-content-container' : ''; ?>'>
+                <?php
+            }
+			echo $content;
+            if (MobileModule::getPlatform () === 'iOS') {
+                ?>
+                </div>
+                <?php
+            }
+            ?>
 		</div>
-	</div>
 </div>
 </body>
 </html>

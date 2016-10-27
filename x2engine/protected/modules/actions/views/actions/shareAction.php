@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,23 +33,22 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
 $authParams['X2Model'] = $model;
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('actions','Action List'),'url'=>array('index')),
-	array('label'=>Yii::t('actions','Create Action'),'url'=>array('create')), 
-	array('label'=>Yii::t('actions','Edit Action'),'url'=>array('update', 'id'=>$model->id)),
-	array('label'=>Yii::t('contacts','Share Action')),
-	array('label'=>Yii::t('actions','Delete Action'), 'url'=>'#', 'linkOptions'=>array('submit'=>array('delete','id'=>$model->id),'confirm'=>'Are you sure you want to delete this item?')),
-),$authParams);
+$menuOptions = array(
+    'list', 'create', 'edit', 'share', 'delete',
+);
+$this->insertMenu($menuOptions, $model, $authParams);
 
-Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/ckeditor/ckeditor.js');
-Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/ckeditor/adapters/jquery.js');
-Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/emailEditor.js');
-
+Yii::app()->clientScript->registerPackage ('emailEditor');
 Yii::app()->clientScript->registerScript('editorSetup','createCKEditor("input");',CClientScript::POS_READY);
 ?>
-<div class="page-title icon actions"><h2><?php echo Yii::t('actions','Share Action');?></h2></div>
+<div class="page-title icon actions"><h2>
+    <?php echo Yii::t('actions','Share {module}', array(
+        '{module}' => Modules::displayName(false),
+    )); ?>
+</h2></div>
 <?php
 if(!empty($status)) {
 	$index = array_search('200',$status);
@@ -68,9 +68,17 @@ if(!empty($status)) {
 	<b><span<?php if(in_array('email',$errors)) echo ' class="error"'; ?>><?php echo Yii::t('contacts','E-Mail');?></span></b><br /><input type="text" name="email" size="50"<?php if(in_array('email',$errors)) echo ' class="error"'; ?> value="<?php if(!empty($email)) echo $email; ?>"><br />
 	<b><span<?php if(in_array('body',$errors)) echo ' class="error"'; ?>><?php echo Yii::t('app','Message Body');?></span></b><br /><textarea name="body" id="input" style="height:200px;width:558px;"<?php if(in_array('body',$errors)) echo ' class="error"'; ?>><?php echo $body; ?></textarea><br />
 	<input type="submit" class="x2-button" value="<?php echo Yii::t('app','Share');?>" />
+	<?php echo X2Html::csrfToken(); ?>
 </form>
 </div>
-<h2><?php echo Yii::t('actions','Action:'); ?> <b><?php echo $model->associationName; ?></b></h2>
+
+<h2>
+    <?php echo Yii::t('actions','{module}:', array(
+        '{module}' => Modules::displayName(false),
+    )); ?>
+    <b><?php echo $model->associationName; ?>
+</b></h2>
 <?php
 $this->renderPartial('_detailView',array('model'=>$model)); 
 ?>
+

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * User notifications & social feed controller
@@ -40,6 +41,7 @@
  * @package application.controllers
  */
 Yii::import('application.models.Relationships');
+Yii::import('application.components.behaviors.RelationshipsBehavior');
 Yii::import('application.models.Tags');
 
 class NotificationsController extends CController {
@@ -57,7 +59,7 @@ class NotificationsController extends CController {
     }
 
     /**
-     * Obtain all current notifications for the current web user.
+     * Obtain all current notifications/events for the current web user.
      */
     public function actionGet() {
 
@@ -75,28 +77,33 @@ class NotificationsController extends CController {
         $notifications = $this->getNotifications($_GET['lastNotifId']);
         $notifCount = 0;
         if(count($notifications))
-            $notifCount = X2Model::model('Notification')->countByAttributes(array('user'=>Yii::app()->user->name),'createDate < '.time());
+            $notifCount = X2Model::model('Notification')
+                ->countByAttributes(array('user'=>Yii::app()->user->name),'createDate < '.time());
 
         $chatMessages = array();
         $lastEventId = 0;
         $lastTimestamp=0;
-        if(isset($_GET['lastEventId']) && is_numeric($_GET['lastEventId'])){    // if the client specifies the last message ID received,
-            $lastEventId = $_GET['lastEventId'];                                // only send newer messages
+        // if the client specifies the last message ID received,
+        if(isset($_GET['lastEventId']) && is_numeric($_GET['lastEventId'])){   
+            // only send newer messages
+            $lastEventId = $_GET['lastEventId'];                                
         }
         if(isset($_GET['lastTimestamp']) && is_numeric($_GET['lastTimestamp'])){
             $lastTimestamp=$_GET['lastTimestamp'];
         }
-        Yii::import('application.models.Events');
-        Yii::import('application.components.Formatter');
-        Yii::import('application.controllers.x2base');
-        Yii::import('application.controllers.X2Controller');
         if($lastEventId==0){
-            $limit=20;
+            // get page of newest events
+            $retVal = Events::getFilteredEventsDataProvider (
+                null, true, null, isset ($_SESSSION['filters']));
+            $dataProvider = $retVal['dataProvider'];
+            $events = $dataProvider->getData ();
         }else{
+            // get new events
             $limit=null;
+            $result=Events::getEvents($lastEventId,$lastTimestamp,$limit);
+            $events=$result['events'];
         }
-        $result=Events::getEvents($lastEventId,$lastTimestamp,null,null,$limit);
-        $events=$result['events'];
+
         $i=count($events)-1;
         for($i; $i>-1; --$i) {
             if(isset($events[$i])){
@@ -125,18 +132,6 @@ class NotificationsController extends CController {
      * Looks up notifications using the specified offset and limit
      */
     public function getNotifications($lastId=0,$getNext=false) {
-
-        // import all the models
-        Yii::import('application.models.Social');
-        Yii::import('application.models.Profile');
-        Yii::import('application.models.Events');
-        Yii::import('application.models.Notification');
-        Yii::import('application.models.Fields');
-        Yii::import('application.components.X2WebUser');
-        foreach(scandir('protected/modules') as $module){
-            if(file_exists('protected/modules/'.$module.'/register.php'))
-                Yii::import('application.modules.'.$module.'.models.*');
-        }
 
         $notifications = array();
 

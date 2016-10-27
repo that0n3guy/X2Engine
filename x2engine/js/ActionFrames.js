@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 if (typeof x2 === 'undefined')
     x2 = {};
@@ -48,6 +49,7 @@ Private properties
 
 function ActionFrames (argsDict) {
     argsDict = typeof argsDict === 'undefined' ? {} : argsDict;
+    var that = this;
     var defaultArgs = {
         deleteActionUrl: '',
         /* required, the name of the variable in which this instance is saved. */
@@ -57,12 +59,13 @@ function ActionFrames (argsDict) {
                typeof $.fn.yiiListView.settings['history'] !== 'undefined') {
 
                 $.fn.yiiListView.update('history');
+                x2.TransactionalViewWidget.refreshByActionType (that.getActionType ());
             }
         }
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
 
-    this._lastClass = '';
+    this._lastClass = ''; // id of last clicked action index list item 
     this._frame;
 
     this._init ();
@@ -79,6 +82,11 @@ Private static methods
 /*
 Public instance methods
 */
+
+ActionFrames.prototype.getActionType = function () {
+    return $($(x2.actionFrames._frame).find ("iframe")[0].contentWindow.document).find ('form').
+        attr ('data-action-type');
+};
 
 ActionFrames.prototype.setLastClass = function (lastClass) {
     this._lastClass = lastClass;
@@ -167,12 +175,15 @@ Private instance methods
 /**
  * @param int id
  */
-ActionFrames.prototype.loadActionFrame = function (id){
+ActionFrames.prototype.loadActionFrame = function (id, type, textOnly){
+    textOnly = typeof textOnly === 'undefined' ? false : textOnly; 
+    type = typeof type === 'undefined' ? null : type; 
     var that = this;
 
-    var publisher=($('#publisher-form').html()!=null);
+    var publisher=($('#publisher').html()!=null);
     var frame='<iframe id="action-frame" style="width:99%;height:99%"' +
-        'src="'+yii.baseUrl+'/index.php/actions/viewAction?id='+id+'&publisher='+publisher+'" '+
+        'src="'+yii.baseUrl+'/index.php/actions/viewAction?id='+id+'&publisher='+publisher+''+
+        (textOnly ? '&textOnly=1' : '') + '" ' +
         'onload="x2.' + this.instanceName + '.createControls('+id+', true);"></iframe>';
 
     if(typeof that._frame !== 'undefined') {
@@ -189,8 +200,17 @@ ActionFrames.prototype.loadActionFrame = function (id){
 
     var isResizing = false;
     var iframeFix;
+    if (type === 'time') {
+        var title = 'View Comment';
+    } else if (type === 'call') {
+        var title = 'View Call Note';
+    } else if (type === 'note') {
+        var title = 'View Comment';
+    } else {
+        var title = 'View Action';
+    }
     that._frame.dialog({
-        title: 'View Action',
+        title: title,
         autoOpen: false,
         resizable: true,
         width: '650px',
@@ -249,8 +269,7 @@ ActionFrames.prototype._uncompleteAction = function (id, publisher){
             'id':id
         },
         success:function(data){
-            if(data){
-                data=JSON.parse(data);
+            if(data === 'success'){
                 if(!publisher){
                     if(that._lastClass==''){
                         that._lastClass='history-'+id;
@@ -258,12 +277,6 @@ ActionFrames.prototype._uncompleteAction = function (id, publisher){
                     }
                     $('#'+that._lastClass).find('.header').html('');
                     $('#'+that._lastClass).find('.description').css('text-decoration','');
-                    $('#'+that._lastClass).find('.uncomplete-box').replaceWith(
-                        '<div class="icon action-index complete-box" style="'+
-                          data[1]+'" data-action-id="'+
-                          $('#'+that._lastClass).find('.uncomplete-box').
-                            attr('data-action-id')+'">'+
-                        '</div>');
                     if(resetFlag){
                         that._lastClass='';
                     }
@@ -341,19 +354,14 @@ ActionFrames.prototype._init = function () {
 
     // set up frame dialog open behavior
     $(document).on('ready',function(){
-        var timer;
-        $(document).on('mouseenter','.action-frame-link',function(){
-            var id=$(this).attr('data-action-id');
-            timer = setTimeout(function(){
-                that.loadActionFrame (id);
-            },500);
-        });
-        $(document).on('mouseleave','.action-frame-link',function(){
-            clearTimeout(timer);
-        });
         $(document).on('click','.action-frame-link',function(evt){
+            var id=$(this).attr('data-action-id');
+            var type=$(this).attr('data-action-type') ? 
+                $(this).attr('data-action-type') : null;
+            var textOnly=$(this).attr('data-text-only') ? 
+                (!!(Number.parseInt ($(this).attr('data-text-only'), 10))) : null;
             evt.preventDefault ();
-            return false;
+            that.loadActionFrame (id, type, textOnly);
         });
     });
 
@@ -377,12 +385,6 @@ ActionFrames.prototype._init = function () {
         e.stopPropagation();
         var publisher=($('#publisher-form').html()!=null);
         that._completeAction($(this).attr('data-action-id'), publisher);
-    });
-    $(document).on('click', '.uncomplete-box', function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        var publisher=($('#publisher-form').html()!=null);
-        that._uncompleteAction($(this).attr('data-action-id'), publisher);
     });
 };
 

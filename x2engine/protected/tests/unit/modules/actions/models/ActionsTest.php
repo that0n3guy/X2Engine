@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.models.*');
 Yii::import('application.modules.actions.models.*');
@@ -41,13 +42,16 @@ Yii::import('application.modules.groups.models.*');
 Yii::import('application.modules.users.models.*');
 Yii::import('application.components.*');
 Yii::import('application.components.permissions.*');
+Yii::import('application.components.X2Settings.*');
+Yii::import('application.components.sortableWidget.profileWidgets.*');
+Yii::import('application.components.sortableWidget.recordViewWidgets.*');
 
 /**
  * Test for the Actions class
  * @package application.tests.unit.modules.actions.models
  * @author Demitri Morgan <demitri@x2engine.com>
  */
-class ActionsTest extends CDbTestCase {
+class ActionsTest extends X2DbTestCase {
 
     public $fixtures = array(
         'actions'=>array ('Actions', '.ActionsTest'),
@@ -116,13 +120,13 @@ class ActionsTest extends CDbTestCase {
         // this should return profile for username and all profiles in group, without duplicates
         $profileUsernames = array_map (function ($a) { return $a->username; }, $profiles);
 
-        VERBOSE_MODE && print ('sizeof ($profiles) = ');
-        VERBOSE_MODE && print (sizeof ($profiles)."\n");
+        X2_TEST_DEBUG_LEVEL > 1 && print ('count ($profiles) = ');
+        X2_TEST_DEBUG_LEVEL > 1 && print (count ($profiles)."\n");
 
-        VERBOSE_MODE && print ('$profileUsernames  = ');
-        VERBOSE_MODE && print ($profileUsernames);
+        X2_TEST_DEBUG_LEVEL > 1 && print ('$profileUsernames  = ');
+        X2_TEST_DEBUG_LEVEL > 1 && print_r ($profileUsernames);
 
-        $this->assertTrue (sizeof ($profiles) === 2);
+        $this->assertTrue (count ($profiles) === 2);
         $this->assertTrue (in_array ('testuser', $profileUsernames));
         $this->assertTrue (in_array ('testuser2', $profileUsernames));
 
@@ -137,13 +141,13 @@ class ActionsTest extends CDbTestCase {
         // this should return profile for username and all profiles in group, without duplicates
         $profileUsernames = array_map (function ($a) { return $a->username; }, $profiles);
 
-        VERBOSE_MODE && print ('sizeof ($profiles) = ');
-        VERBOSE_MODE && print (sizeof ($profiles)."\n");
+        X2_TEST_DEBUG_LEVEL > 1 && print ('count ($profiles) = ');
+        X2_TEST_DEBUG_LEVEL > 1 && print (count ($profiles)."\n");
 
-        VERBOSE_MODE && print ('$profileUsernames  = ');
-        VERBOSE_MODE && print ($profileUsernames);
+        X2_TEST_DEBUG_LEVEL > 1 && print ('$profileUsernames  = ');
+        X2_TEST_DEBUG_LEVEL > 1 && print_r ($profileUsernames);
 
-        $this->assertTrue (sizeof ($profiles) === 2);
+        $this->assertTrue (count ($profiles) === 2);
         $this->assertTrue (in_array ('testuser', $profileUsernames));
         $this->assertTrue (in_array ('admin', $profileUsernames));
         
@@ -154,10 +158,10 @@ class ActionsTest extends CDbTestCase {
         $action = $this->actions('action3');
         $assignees = $action->getAssignees (true);
 
-        VERBOSE_MODE && print ('sizeof ($assignees) = ');
-        VERBOSE_MODE && print (sizeof ($assignees)."\n");
+        X2_TEST_DEBUG_LEVEL > 1 && print ('count ($assignees) = ');
+        X2_TEST_DEBUG_LEVEL > 1 && print (count ($assignees)."\n");
 
-        $this->assertTrue (sizeof ($assignees) === 2);
+        $this->assertTrue (count ($assignees) === 2);
         $this->assertTrue (in_array ('testuser', $assignees));
         $this->assertTrue (in_array ('testuser2', $assignees));
 
@@ -175,10 +179,10 @@ class ActionsTest extends CDbTestCase {
         */
         $assignees = $action->getAssignees (true);
 
-        VERBOSE_MODE && print ('sizeof ($assignees) = ');
-        VERBOSE_MODE && print (sizeof ($assignees)."\n");
+        X2_TEST_DEBUG_LEVEL > 1 && print ('count ($assignees) = ');
+        X2_TEST_DEBUG_LEVEL > 1 && print (count ($assignees)."\n");
 
-        $this->assertTrue (sizeof ($assignees) === 2);
+        $this->assertTrue (count ($assignees) === 2);
         $this->assertTrue (in_array ('testuser', $assignees));
         $this->assertTrue (in_array ('admin', $assignees));
         
@@ -189,20 +193,20 @@ class ActionsTest extends CDbTestCase {
         $action = $this->actions('action6');
 
         $notifs = $action->createNotifications ('assigned');
-        VERBOSE_MODE && print (sizeof ($notifs));
-        $this->assertTrue (sizeof ($notifs) === 2);
+        X2_TEST_DEBUG_LEVEL > 1 && print (count ($notifs));
+        $this->assertTrue (count ($notifs) === 2);
         $notifAssignees = array_map (function ($a) { return $a->user; }, $notifs);
         $this->assertTrue (in_array ('admin', $notifAssignees));
         $this->assertTrue (in_array ('testuser', $notifAssignees));
 
         $notifs = $action->createNotifications ('me');
-        $this->assertTrue (sizeof ($notifs) === 1);
+        $this->assertTrue (count ($notifs) === 1);
         $notifAssignees = array_map (function ($a) { return $a->user; }, $notifs);
-        VERBOSE_MODE && print ($notifAssignees);
+        X2_TEST_DEBUG_LEVEL > 1 && print_r ($notifAssignees);
         $this->assertTrue (in_array ('Guest', $notifAssignees));
 
         $notifs = $action->createNotifications ('both');
-        $this->assertTrue (sizeof ($notifs) === 3);
+        $this->assertTrue (count ($notifs) === 3);
         $notifAssignees = array_map (function ($a) { return $a->user; }, $notifs);
         $this->assertTrue (in_array ('admin', $notifAssignees));
         $this->assertTrue (in_array ('testuser', $notifAssignees));
@@ -211,19 +215,69 @@ class ActionsTest extends CDbTestCase {
 
     public function testChangeCompleteState () {
         TestingAuxLib::suLogin ('admin');
-        VERBOSE_MODE && print (Yii::app()->user->name ."\n");
-        VERBOSE_MODE && print ((int) Yii::app()->params->isAdmin);
-        VERBOSE_MODE && print ("\n");
+        X2_TEST_DEBUG_LEVEL > 1 && print (Yii::app()->user->name ."\n");
+        X2_TEST_DEBUG_LEVEL > 1 && print ((int) Yii::app()->params->isAdmin);
+        X2_TEST_DEBUG_LEVEL > 1 && print ("\n");
         $action = $this->actions('action6');
         $completedNum = Actions::changeCompleteState ('complete', array ($action->id));
-        $this->assertTrue ($completedNum === 1);
+        $this->assertEquals (1, $completedNum);
         $action = Actions::model()->findByPk ($action->id);
-        VERBOSE_MODE && print ($action->complete."\n");
+        X2_TEST_DEBUG_LEVEL > 1 && print ($action->complete."\n");
         $this->assertTrue ($action->complete === 'Yes');
         Actions::changeCompleteState ('uncomplete', array ($action->id));
         $action = Actions::model()->findByPk ($action->id);
         $this->assertTrue ($action->complete === 'No');
+    }
 
+    public function testDeleteOldNotifications () {
+        TestingAuxLib::suLogin ('admin');
+        // assigned to testuser
+        $action = $this->actions('action1');
+        $reminders = $action->getReminders (true);
+        foreach ($reminders as $reminder) $this->assertTrue ($reminder->delete ());
+        $deleteOldNotifications = TestingAuxLib::setPublic ($action, 'deleteOldNotifications');
+        $this->assertEquals (0, count ($action->getReminders (true)));
+        $action->createNotifications ('assigned', 1234, 'action_reminder');
+        $this->assertGreaterThan (0, count ($action->getReminders (true)));
+        $deleteOldNotifications ('me');
+        $this->assertGreaterThan (0, count ($action->getReminders (true)));
+        $deleteOldNotifications ('assigned');
+        $this->assertEquals (0, count ($action->getReminders (true)));
+    }
+
+    public function testUpdateWithNotifications () {
+        TestingAuxLib::loadX2NonWebUser ();
+        TestingAuxLib::suLogin ('admin');
+        // assigned to testuser
+        $action = $this->actions('action1');
+        $reminders = $action->getReminders (true);
+        foreach ($reminders as $reminder) $this->assertTrue ($reminder->delete ());
+        $this->assertEquals (0, count ($action->getReminders (true)));
+
+        // ensure that we can create a reminder
+        $action->reminder = true;
+        $action->notificationUsers = 'assigned';
+        $action->notificationTime = 1234;
+        $this->assertSaves ($action);
+        $this->assertEquals (1, count ($action->getReminders (true)));
+        $reminders = $action->getReminders (true);
+        $assignees = array_map (function ($reminder) {
+            return $reminder->user;
+        }, $reminders);
+        $this->assertEquals (array ('testuser'), $assignees);
+
+        // now ensure that we can create another reminder and that the old reminder was deleted
+        TestingAuxLib::suLogin ('testuser');
+        $action->reminder = true;
+        $action->notificationUsers = 'assigned';
+        $action->notificationTime = 1234;
+        $this->assertSaves ($action);
+        $this->assertEquals (1, count ($action->getReminders (true)));
+        $reminders = $action->getReminders (true);
+        $assignees = array_map (function ($reminder) {
+            return $reminder->user;
+        }, $reminders);
+        $this->assertEquals (array ('testuser'), $assignees);
     }
 }
 

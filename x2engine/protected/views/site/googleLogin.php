@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,9 +33,13 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+LoginThemeHelper::init();
 
 Yii::app()->clientScript->registerCssFile(Yii::app()->theme->getBaseUrl().'/css/login.css');
+
+$credentials = Yii::app()->settings->getGoogleIntegrationCredentials ();
 
 $this->pageTitle = Yii::app()->settings->appName.' - Login';
 $admin = Admin::model()->findByPk(1);
@@ -42,6 +47,10 @@ $admin = Admin::model()->findByPk(1);
 
 $loginBoxHeight = 230;
 
+
+if (X2_PARTNER_DISPLAY_BRANDING) {
+    //$loginBoxHeight -= 36;
+} 
 
 
 Yii::app()->clientScript->registerCss('googleLogin', "
@@ -61,8 +70,8 @@ Yii::app()->clientScript->registerCss('googleLogin', "
 }
 ", 'screen', CClientScript::POS_HEAD);
 ?>
-<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js">
-</script>
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
 <script type="text/javascript">
     (function () {
       var po = document.createElement('script');
@@ -77,7 +86,9 @@ Yii::app()->clientScript->registerCss('googleLogin', "
 <div class="container<?php echo (isset ($profileId) ? ' welcome-back-page' : ''); ?>" id="login-page">
 <div id="login-box">
 <div class="form" id="login-form">
-    <?php if(isset($admin->googleIntegration) && $admin->googleIntegration == '1'){ ?>
+    <?php 
+    if (isset($admin->googleIntegration) && $admin->googleIntegration == '1' && 
+        isset ($credentials)) { ?>
         <div id="login-box">
             <div id="error-message">
                 <?php
@@ -98,7 +109,7 @@ Yii::app()->clientScript->registerCss('googleLogin', "
                       https://www.googleapis.com/auth/userinfo.profile
                       https://www.googleapis.com/auth/calendar
                       https://www.googleapis.com/auth/calendar.readonly"
-                      data-clientid="<?php echo trim(Yii::app()->settings->googleClientId) ?>"
+                      data-clientid="<?php echo trim($credentials['clientId']); ?>"
                       data-redirecturi="postmessage"
                       data-accesstype="offline"
                       data-cookiepolicy="single_host_origin"
@@ -108,7 +119,7 @@ Yii::app()->clientScript->registerCss('googleLogin', "
             <div id="result"></div>
         </div>
         <?php } ?>
-    <?php }else{ ?>
+    <?php } else { ?>
         <div id="login-box">
             <div id="error-message">
                 Google Integration is not enabled for this instance of X2Engine.  Please contact an administrator.
@@ -121,7 +132,7 @@ Yii::app()->clientScript->registerCss('googleLogin', "
 
     <div class="row" style="margin-top:10px;text-align:center;">
         <?php
-        echo CHtml::link('<img src="'.Yii::app()->baseUrl.'/images/google_icon.png" id="google-icon" /> '.Yii::t('app', 'Sign in with Google'), (@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://').
+        echo CHtml::link('<img src="'.Yii::app()->theme->baseUrl.'/images/google_icon.png" id="google-icon" /> '.Yii::t('app', 'Sign in with Google'), (@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://').
                 ((substr($_SERVER['HTTP_HOST'], 0, 4) == 'www.') ? substr($_SERVER['HTTP_HOST'], 4) : $_SERVER['HTTP_HOST']).
                 $this->createUrl('/site/googleLogin'), array('class' => 'x2touch-link'));
         ?>
@@ -135,28 +146,29 @@ $this->renderPartial ('loginCompanyInfo');
 </div>
 <script type="text/javascript">
 function signInCallback(authResult) {
-  if (authResult['code']) {
-
+  if (authResult.code) {
     // Hide the sign-in button now that the user is authorized, for example:
     $('#signinButton').attr('style', 'display: none');
     $('#result').html('<div><div class="loading-icon" style="vertical-align:middle;"></div> <span><b>Logging you in...</b></span></div>');
     // Send the code to the server
+    var csrfToken = '<?php echo Yii::app()->request->getCsrfToken (); ?>';
     $.ajax({
       type: 'POST',
       url: 'storeToken',
-      contentType: 'application/octet-stream; charset=utf-8',
       success: function(result) {
         window.location=window.location;
       },
-      processData: false,
-      data: authResult['code']
+      data: {
+        code: authResult.code,
+        YII_CSRF_TOKEN: csrfToken
+      }
     });
-  } else if (authResult['error']) {
+  } else if (authResult.error) {
     // There was an error.
     // Possible error codes:
     //   "access_denied" - User denied access to your app
     //   "immediate_failed" - Could not automatially log in the user
-    // console.log('There was an error: ' + authResult['error']);
+    // console.log('There was an error: ' + authResult.error);
   }
 }
 </script>

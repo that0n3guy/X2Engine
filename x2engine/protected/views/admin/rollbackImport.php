@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 <div class="page-title"><h2><?php echo Yii::t('admin','Import List');?></h2></div>
 <div class="form">
@@ -68,7 +69,7 @@ $this->widget('zii.widgets.grid.CGridView', array(
             'type'=>array(
                 'name' => 'type',
                 'header' => Yii::t('admin', 'Type of Record Imported'),
-                'value' => '$data["type"]',
+                'value' => 'CHtml::encode($data["type"])',
                 'type' => 'raw',
             ),
             'records'=>array(
@@ -96,7 +97,7 @@ $this->widget('zii.widgets.grid.CGridView', array(
 <div class="form" style="width:600px;">
     <?php echo Yii::t('admin','To begin the rollback, click the button below and wait for the completion message.'); ?>
     <br><br>
-    <?php echo Yii::t('admin','Import ID: '); ?><strong><?php echo $_GET['importId'];?></strong>
+    <?php echo Yii::t('admin','Import ID: '); ?><strong><?php echo CHtml::encode ($importId);?></strong>
     <br>
     <?php echo Yii::t('admin','Records to be Deleted: '); ?><strong><?php echo $count; ?></strong>
     <br><br>
@@ -109,7 +110,7 @@ $this->widget('zii.widgets.grid.CGridView', array(
 ?>
 <script>
     var models=JSON.parse('<?php echo json_encode($typeArray);?>');
-    var importId=<?php echo isset($_GET['importId'])?$_GET['importId']:0 ?>;
+    var importId=<?php echo isset($importId)? addslashes ($importId):0 ?>;
     var stages=new Array('tags','relationships','actions','records','import');
     $('#rollback-link').click(function(e){
         e.preventDefault();
@@ -134,11 +135,13 @@ $this->widget('zii.widgets.grid.CGridView', array(
                             rollbackStage(model+1,0);
                         }else{
                             $('#status-box').append("<br><br><b>Rollback Complete</b>");
+                            $('#rollback-link').hide();
                             alert("Done!");
                         }
                     }
                 }else{
                     $('#status-box').append("<br><br><b>Rollback Complete</b>");
+                    $('#rollback-link').hide();
                     alert("Done!");
                 }
             }

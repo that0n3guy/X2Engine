@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerScript('deleteActionJs',"
 function deleteAction(actionId) {
@@ -61,20 +62,6 @@ if(empty($data->type)) {
 } else
 	$type = $data->type;
 
-if($type == 'workflow') {
-
-	$workflowRecord = X2Model::model('Workflow')->findByPk($data->workflowId);
-	$stageRecords = X2Model::model('WorkflowStage')->findAllByAttributes(
-		array('workflowId'=>$data->workflowId),
-		new CDbCriteria(array('order'=>'id ASC'))
-	);
-
-	// see if this stage even exists; if not, delete this junk
-	if($workflowRecord === null || $data->stageNumber < 1 || $data->stageNumber > count($stageRecords)) {
-		$data->delete();
-		return;
-	}
-}
 
 // if($type == 'call') {
 	// $type = 'note';
@@ -98,6 +85,7 @@ if($type == 'workflow') {
 		echo X2DateUtil::actionDate($data->completeDate,$data->priority,'Yes');
     }
 ?>
+<div class="history-content-container">
 	<div class="header">
 		<?php
 		if(empty($data->type) || $data->type=='weblead') {
@@ -127,7 +115,7 @@ if($type == 'workflow') {
 				//echo Actions::parseStatus($data->dueDate);
 		} elseif ($data->type == 'workflow') {
 			// $actionData = explode(':',$data->actionDescription);
-			echo Yii::t('workflow','Process:').'<b> '.$workflowRecord->name .'/'.$stageRecords[$data->stageNumber-1]->name.'</b> ';
+			echo Yii::t('workflow','Process:').'<b> '.$data->workflow->name .'/'.$data->workflowStage->name.'</b> ';
 		} elseif(in_array($data->type,array('email','emailFrom'))) {
 			echo Yii::t('actions','Email Message:').' '.Formatter::formatCompleteDate($data->completeDate);
 		} elseif($data->type == 'quotes') {
@@ -170,15 +158,13 @@ if($type == 'workflow') {
 	<div class="description" style="overflow:hidden;height:15px;text-overflow: ellipsis;white-space:nowrap;">
 		<?php
 		if($type=='attachment' && $data->completedBy!='Email')
-			echo Media::attachmentActionText(Yii::app()->controller->convertUrls($data->actionDescription),true,true);
+			echo Media::attachmentActionText($data,true,true);
 		else if($type=='workflow') {
-
-			if(!empty($data->stageNumber) && !empty($data->workflowId) && $data->stageNumber <= count($stageRecords)) {
-				if($data->complete == 'Yes')
-					echo ' <b>'.Yii::t('workflow','Completed').'</b> '.date('Y-m-d H:i:s',$data->completeDate);
-				else
-					echo ' <b>'.Yii::t('workflow','Started').'</b> '.date('Y-m-d H:i:s',$data->createDate);
-			}
+                        if($data->complete == 'Yes'){
+                            echo ' <b>'.Yii::t('workflow','Completed').'</b> '.date('Y-m-d H:i:s',$data->completeDate);
+                        }else{
+                            echo ' <b>'.Yii::t('workflow','Started').'</b> '.date('Y-m-d H:i:s',$data->createDate);
+                        }
 			if(isset($data->actionDescription))
 				echo '<br>'.$data->actionDescription;
 
@@ -225,6 +211,7 @@ if($type == 'workflow') {
 	}
 	?>
 	</div>
+</div>
 
 </div>
 

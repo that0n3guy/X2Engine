@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.modules.users.models.*');
 
@@ -61,6 +62,9 @@ class ApiController extends x2base {
 
 	public function behaviors() {
 		return array_merge(parent::behaviors(),array(
+            'LeadRoutingBehavior' => array(
+                'class' => 'LeadRoutingBehavior'
+            ),
 			'responds' => array(
 				'class' => 'application.components.ResponseBehavior',
 				'isConsole' => false,
@@ -68,7 +72,7 @@ class ApiController extends x2base {
 				'longErrorTrace' => false,
 			),
             'CommonControllerBehavior' => array(
-                'class' => 'application.components.CommonControllerBehavior',
+                'class' => 'application.components.behaviors.CommonControllerBehavior',
                 'redirectOnNullModel' => false,
                 'throwOnNullModel' => false
             ),
@@ -164,9 +168,14 @@ class ApiController extends x2base {
         $model = $this->getModel(true);
         $model->setX2Fields($_POST);
 
-        if($this->modelClass === 'Contacts' && isset($_POST['trackingKey'])){
-            // key is read-only, won't be set by setX2Fields
-            $model->trackingKey = $_POST['trackingKey']; 
+        if($this->modelClass === 'Contacts') {
+            if (isset($_POST['trackingKey'])){
+                // key is read-only, won't be set by setX2Fields
+                $model->trackingKey = $_POST['trackingKey']; 
+            }
+            if (isset($_POST['_leadRouting']) && $_POST['_leadRouting']) {
+                $model->assignedTo = $this->getNextAssignee ();
+            }
         }
 
         $setUserFields = false;
@@ -188,18 +197,8 @@ class ApiController extends x2base {
             $this->modelSetUsernameFields($model);
         // Attempt to save the model, and perform special post-save (or error)
         // operations based on the model type:
-        $valid = $model->validate();
-        if($valid){
-            // First (a hack) to ensure that empty numeric fields get set
-            // properly to avoid SQL "invalid value" errors in strict mode
-            foreach($model->fields as $fieldModel)
-                if(in_array($fieldModel->type, array('currency', 'float', 'int')) && !isset($_POST[$fieldModel->fieldName]))
-                    $model->{$fieldModel->fieldName} = $fieldModel->parseValue($model->{$fieldModel->fieldName});
-            $valid = $valid && $model->save();
-        }
-        $this->response['model'] = $model->attributes;
-
-        if($valid){ // New record successfully created
+        if($model->save()){ // New record successfully created
+            $this->response['model'] = $model->attributes;
             $message = "A {$this->modelClass} type record was created"; //sprintf(' <b>%s</b> was created',$this->modelClass);
             switch($this->modelClass){
                 // Special extra actions to take for each model type:
@@ -210,7 +209,6 @@ class ApiController extends x2base {
                         $model->actionDescription = $_POST['actionDescription'];
                     }
                     $message .= " with description {$model->actionDescription}";
-                    $model->syncGoogleCalendar('create');
                     break;
                 case 'Contacts':
                     $message .= " with name {$model->name}";
@@ -289,8 +287,6 @@ class ApiController extends x2base {
 	 */
 	public function actionDelete() {
 		$model = $this->model;
-		if ($this->modelClass === 'Actions')
-				$model->syncGoogleCalendar('delete');
 		// Delete the model
 		$num = $model->delete();
 		if ($num > 0) {
@@ -361,16 +357,10 @@ class ApiController extends x2base {
 		$attrs = $_POST;
 		unset($attrs['user']);
 		unset($attrs['userKey']);
-        // Use the "search" scenario to avoid default values
         $tempModel = new $this->modelClass('search');
 
-        $tempModel->setX2Fields($attrs);
-        // Some users might want to include ID in the lookup, and since it's
-        // read-only, it needs to be set manually.
-        if(isset($attrs['id']))
-            $tempModel->id = $attrs['id'];
-        // Only use non-null attributes
-        $attrs = array_filter($tempModel->getAttributes());
+        // Use only attributes that the model has
+        $attrs = array_intersect_key($attrs,$tempModel->attributes);
 		$model = X2Model::model($this->modelClass)->findByAttributes($attrs);
 
 		// Did we find the requested model? If not, raise an error
@@ -388,7 +378,6 @@ class ApiController extends x2base {
 		$rType = Yii::app()->request->requestType;
 		switch($rType){
 			case 'GET': // Look up relationships on a model
-				$relationship = new Relationships('api');
 				$attr = array('firstType'=>$_GET['model']);
 				$relationships = Relationships::model()->findAllByAttributes(array_merge(array_intersect_key($_GET,array_flip(Relationships::model()->safeAttributeNames)),$attr));
 				if(empty($relationships))
@@ -498,9 +487,6 @@ class ApiController extends x2base {
 		// each class:
 		if ($model->save()) {
 			switch ($this->modelClass) {
-				case 'Actions':
-					$model->syncGoogleCalendar('update');
-					break;
 				default:
 					$this->_sendResponse(200, $model->attributes,true);
 			}
@@ -556,11 +542,13 @@ class ApiController extends x2base {
 			$matches = array();
 			if (preg_match('/\d{10,}/', $_GET['data'], $matches)) {
 				$number = ltrim($matches[0],'1');
-				$phoneCrit = new CDbCriteria(array(
-							'condition' => "modelType='Contacts' AND number LIKE :number",
-							'params' => array(':number'=>"%$number%")
-						)
-					);
+                $phoneCrit = new CDbCriteria(array(
+                    'condition' => "modelType='Contacts' AND number LIKE :number",
+                    'params' => array(':number'=>"%$number%")
+                ));
+                $phoneCrit->join =
+                    'join x2_contacts on modelId=x2_contacts.id AND '.
+                    Contacts::model ()->getHiddenCondition ('x2_contacts');
 				$phoneNumber = PhoneNumber::model()->find($phoneCrit);
 				if(!empty($phoneNumber)){
 					$contact = X2Model::model('Contacts')->findByPk($phoneNumber->modelId);
@@ -648,7 +636,8 @@ class ApiController extends x2base {
 
 						$this->_sendResponse($failure ? 500 : 200,$message);
 					} else {
-						$this->_sendResponse(404,'Phone number record refers to a contact that no longer exists.');
+						$this->_sendResponse(
+                            404,'Phone number record refers to a contact that no longer exists.');
 					}
 				}else{
 					$this->_sendResponse(404,'No matching phone number found.');
@@ -751,6 +740,10 @@ class ApiController extends x2base {
             $this->_sendResponse(503,"X2Engine is currently undergoing maintenance. Please try again later.");
         }
         
+        if(Yii::app()->settings->api2->disableLegacy) {
+            $this->_sendResponse(503,"The legacy web API has been disabled.");
+        }
+        
         $filterChain->run();
     }
 
@@ -824,7 +817,7 @@ class ApiController extends x2base {
 	 * automatically)
 	 */
 	public function modelSetUsernameFields(&$model) {
-		X2ChangeLogBehavior::usernameFieldsSet($model,$this->user->username);
+		ChangeLogBehavior::usernameFieldsSet($model,$this->user->username);
 
 		if($model->hasAttribute('assignedTo')){
 			if(array_key_exists('assignedTo', $_POST)){

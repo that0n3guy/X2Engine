@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.tests.api.Api2TestBase');
 
@@ -49,25 +50,52 @@ Yii::import('application.tests.api.Api2TestBase');
  */
 class Api2InputTest extends Api2TestBase {
 
-    public $action;
-
     public $fixtures = array(
         'contacts' => 'Contacts',
         'accounts' => 'Accounts',
         'relationships' => 'Relationships',
-        'tags' => 'Tags'
+        'tags' => 'Tags',
+        'user' => 'User',
     );
 
-    public function urlFormat(){
-        $urlFormats = array(
-            'model' => 'api2/{modelAction}',
-            'relationships' => 'api2/{_class}/{_id}/relationships',
-            'relationships_get' => 'api2/{_class}/{_id}/relationships/{_relatedId}.json',
-            'tags' => 'api2/{_class}/{_id}/tags',
-            'tags_get' => 'api2/{_class}/{_id}/tags/{tagname}.json',
-        );
-        return $urlFormats[$this->action];
-    }
+    /**
+     * Test can be reinstated if API support for upserting is added
+     */
+//    public function testUpdate () {
+//        $this->action = 'model';
+//        // create with PUT
+//        $emailNotFound = 'emailNotFound@example.com';
+//        $contact = array(
+//            'firstName' => 'notFound',
+//            'lastName' => 'notFound',
+//            'visibility' => 1,
+//            'trackingKey' => '1234',
+//        );
+//        $ch = $this->getCurlHandle(
+//            'PUT',
+//            array('{modelAction}'=>"Contacts/by:email={$emailNotFound}.json"),
+//            'admin',$contact);
+//        $response = json_decode(curl_exec($ch),1);
+//        print_r ($response);
+//        $id = $response['id'];
+//        $this->assertResponseCodeIs(200, $ch);
+//        $this->assertTrue((bool) ($newContact = Contacts::model()->findBySql(
+//                "SELECT * FROM x2_contacts
+//                WHERE email='$emailNotFound'")));
+//
+//        // update with PUT
+//        $contact['firstName'] = 'found';
+//        $ch = $this->getCurlHandle(
+//            'PUT',
+//            array('{modelAction}'=>"Contacts/{$id}.json"),
+//            'admin',$contact);
+//        $response = json_decode(curl_exec($ch),1);
+//        $this->assertResponseCodeIs(200, $ch);
+//        $this->assertTrue((bool) ($newContact = Contacts::model()->findBySql(
+//                "SELECT * FROM x2_contacts
+//                WHERE id=$id AND firstName='found' AND
+//                AND email='$emailNotFound'")));
+//    }
 
     /**
      * Really rudimentary test: contact
@@ -76,28 +104,44 @@ class Api2InputTest extends Api2TestBase {
         $this->action = 'model';
         // Create
         $contact = array(
-            'firstName' => 'Walter',
+            'firstName' => 'Walt',
             'lastName' => 'White',
             'email' => 'walter.white@sandia.gov',
-            'visibility' => 1
+            'visibility' => 1,
+            'trackingKey' => '1234',
         );
         $ch = $this->getCurlHandle('POST',array('{modelAction}'=>'Contacts'),'admin',$contact);
         $response = json_decode(curl_exec($ch),1);
         $id = $response['id'];
         $this->assertResponseCodeIs(201, $ch);
         $this->assertTrue((bool) ($newContact = Contacts::model()->findBySql(
-                'SELECT * FROM x2_contacts '
-                . 'WHERE firstName="Walter" '
-                . 'AND lastName="White" '
-                . 'AND email="walter.white@sandia.gov"')));
+                'SELECT * FROM x2_contacts
+                WHERE firstName="Walt" 
+                AND lastName="White" 
+                AND email="walter.white@sandia.gov"
+                AND trackingKey="1234"')));
 
         // Update
-        $contact['firstName'] = 'Walter "Heisenberg"';
+        $contact['firstName'] = 'Walter';
         $ch = $this->getCurlHandle('PUT',array('{modelAction}'=>"Contacts/$id.json"),'admin',$contact);
         $response = json_decode(curl_exec($ch),1);
         $this->assertResponseCodeIs(200, $ch);
         $newContact->refresh();
         $this->assertEquals($contact['firstName'],$newContact['firstName']);
+
+        // Update by attributes:
+        $contact['firstName'] = 'Walter "Heisenberg"';
+        $ch = $this->getCurlHandle('PUT',
+                array(
+                    '{modelAction}'=>"Contacts/by:email={$contact['email']}.json"
+                ),
+                'admin',
+                $contact);
+        $response = json_decode(curl_exec($ch),1);
+        $this->assertResponseCodeIs(200, $ch);
+        $newContact->refresh();
+        $this->assertEquals($contact['firstName'],$newContact['firstName']);
+
 
         // Delete
         $ch = $this->getCurlHandle('DELETE',array('{modelAction}'=>"Contacts/$id.json"),'admin');
@@ -134,14 +178,15 @@ class Api2InputTest extends Api2TestBase {
         $action = array(
             'actionDescription' => 'Lunch meeting',
             'type' => 'event',
-            'associationType' => 'contacts',
-            'associationId' => $this->contacts('testFormula')->id,
+            // these should be set automatically by the api2 actions kludge
+            //'associationType' => 'contacts',
+            //'associationId' => $this->contacts('testFormula')->id,
             'dueDate' => 1398987130,
             'complete' => 'No',
         );
         $ch = $this->getCurlHandle('POST',array('{modelAction}'=>'Contacts/'.$this->contacts('testFormula')->id.'/Actions'),'admin',$action);
         $response = curl_exec($ch);
-        $this->assertResponseCodeIs(201, $ch,VERBOSE_MODE?$response:'');
+        $this->assertResponseCodeIs(201, $ch,X2_TEST_DEBUG_LEVEL > 1?$response:'');
         $response = json_decode($response,1);
         $this->assertEquals($action['actionDescription'],$response['actionDescription']);
         $this->assertEquals($action['type'],$response['type']);
@@ -187,13 +232,13 @@ class Api2InputTest extends Api2TestBase {
         $response = curl_exec($ch);
         $this->assertResponseCodeIs(201, $ch);
 
-        // Create it again just to test that validation works (don't set w/same ID)
+        // Validation should fail due to duplicate record
         $ch = $this->getCurlHandle('POST',array(
             '{_class}'=>'Contacts',
             '{_id}' => $this->contacts('testFormula')->id
         ),'admin',$oldRelationship);
         $response = json_decode(curl_exec($ch),1);
-        $this->assertResponseCodeIs(201, $ch);
+        $this->assertResponseCodeIs(422, $ch);
 
         // Create it once more but with a nonexistent ID to test that validation works
         $oldRelationship['secondId'] = 2424242;

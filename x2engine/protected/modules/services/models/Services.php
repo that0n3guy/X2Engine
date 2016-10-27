@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.models.X2Model');
 Yii::import('application.modules.user.models.*');
@@ -45,6 +46,8 @@ Yii::import('application.modules.user.models.*');
 class Services extends X2Model {
 
 	public $account;
+
+    public $verifyCode; // CAPTCHA for Service case form
 
 	/**
 	 * Returns the static model of the specified AR class.
@@ -63,13 +66,13 @@ class Services extends X2Model {
 
 	public function behaviors() {
 		return array_merge(parent::behaviors(),array(
-			'X2LinkableBehavior'=>array(
-				'class'=>'X2LinkableBehavior',
+			'LinkableBehavior'=>array(
+				'class'=>'LinkableBehavior',
 				'module'=>'services',
 		//		'icon'=>'accounts_icon.png',
 			),
 			'ERememberFiltersBehavior' => array(
-				'class'=>'application.components.ERememberFiltersBehavior',
+				'class'=>'application.components.behaviors.ERememberFiltersBehavior',
 				'defaults'=>array(),
 				'defaultStickOnClear'=>false
 			)
@@ -77,10 +80,12 @@ class Services extends X2Model {
 	}
 
     public function rules () {
-        $parentRules = parent::rules ();
-        /*$parentRules[]= array (
-            'firstName,lastName', 'required', 'on' => 'webForm');*/
-        return $parentRules;
+        $rules = array_merge(parent::rules (), array(
+            array(
+                'verifyCode', 'captcha', 'allowEmpty' => !CCaptcha::checkRequirements(),
+                    'on' => 'webFormWithCaptcha', 'captchaAction' => 'site/webleadCaptcha')
+        ));
+        return $rules;
     }
 
     public function afterFind(){
@@ -145,7 +150,7 @@ class Services extends X2Model {
 			}
 		}
 		$criteria->together = true;
-		return $this->searchBase($criteria, $pageSize, $uniqueId);
+		return $this->searchBase($criteria, $pageSize);
 	}
 
 

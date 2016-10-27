@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 
 /* base prototype */
@@ -131,7 +132,7 @@ TagCreationContainer.prototype._appendTagInput = function(linkContainer) {
     });
     
     // create tag if it loses focus and if input isn't empty
-    tagtext.blur(function() {
+    tagtext.blur(function(event) {
         that._tagInputEnd (event, parent, tagtext);
     });        
     
@@ -149,7 +150,7 @@ TagCreationContainer.prototype._tagInputEnd = function (event, span, textfield) 
     } else { // create new tag
         var value = textfield.val();
         value = value.replace(/#/g, ''); // strip illegal chars
-        value = '#' + encodeURIComponent(value); // format into a tag
+        value = '#' + value; // format into a tag
 
         that._afterCreateNewTag (textfield, value, span);
 
@@ -182,7 +183,7 @@ TagCreationContainer.prototype._convertInputToTag = function(textfield, value, s
     var that = this; 
 
     var link = $('<a>', {
-        'html': value
+        'text': value
     });
     textfield.remove();
     span.find ('.delete-tag').remove ();
@@ -204,7 +205,7 @@ TagCreationContainer.prototype._resizeTag = function(textfield) {
 
     x2.DEBUG && console.log ('_resizeTag');
     $(textfield).each(function() {
-        that.textsize.html(encodeURIComponent($(this).val()));
+        that.textsize.text ($(this).val());
         x2.DEBUG && console.log ('that.textsize.width = ' + that.textsize.width ());
         $(this).css('width', (that.textsize.width() + 10) + 'px');
     });

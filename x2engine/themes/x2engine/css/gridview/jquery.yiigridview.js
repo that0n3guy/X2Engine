@@ -48,6 +48,7 @@
 		 * @return object the jQuery object
 		 */
 		init: function (options) {
+
             /* x2modstart */  
             var uniqueId = $(this).selector.replace (/(^[a-zA-Z])|([^0-9a-zA-Z]?)/g, '');
             $(document).unbind ('click.yiiGridView' + uniqueId);
@@ -63,7 +64,7 @@
 					loadingClass: 'loading',
 					filterClass: 'filters',
 					tableClass: 'items',
-					selectableRows: 1
+					selectableRows: 1,
 					// updateSelector: '#id .pager a, '#id .grid thead th a',
 					// beforeAjaxUpdate: function (id) {},
 					// afterAjaxUpdate: function (id, data) {},
@@ -94,6 +95,15 @@
 					$(document).on('click.yiiGridView' + uniqueId, 
                     /* x2modend */      
                         settings.updateSelector, function () {
+
+                        /* x2modstart */ 
+                        // account for nested grid views: don't perform action unless clicked
+                        // link is for this grid view (and not for a nested grid view)
+                        if ($(this).closest ('.grid-view').attr ('id') !== id) {
+                            return false;
+                        }
+                        /* x2modend */ 
+
 						// Check to see if History.js is enabled for our Browser
 						if (settings.enableHistory && window.History.enabled) {
 							// Ajaxify this link
@@ -103,7 +113,17 @@
 							delete params[settings.ajaxVar];
 							window.History.pushState(null, document.title, decodeURIComponent($.param.querystring(url[0], params)));
 						} else {
-							$('#' + id).yiiGridView('update', {url: $(this).attr('href')});
+                            /* x2modstart */     
+                            // Checks if id is present in the href and uses it if it is.
+                            // This modification was made for the grid reports grid view which 
+                            // moves a pager from one grid to another.
+                            if ($(this).closest ('.pager').data ('grid-id')) {
+                                var linkGridId = $(this).closest ('.pager').data ('grid-id');
+                            } else {
+                                var linkGridId = id;
+                            }
+							$('#' + linkGridId).yiiGridView('update', {url: $(this).attr('href')});
+                            /* x2modend */ 
 						}
 						return false;
 					});
@@ -269,8 +289,15 @@
 					settings = gridSettings[id];
 				$grid.addClass(settings.loadingClass);
 
+                /* x2modstart */ 
+                var requestType = (typeof settings.updateRequestType !== 'undefined') ? 
+                    settings.updateRequestType : 'GET';
+                /* x2modend */ 
+
 				options = $.extend({
-					type: 'GET',
+                    /* x2modstart */ 
+					type: requestType,
+                    /* x2modend */ 
 					url: $grid.yiiGridView('getUrl'),
 					success: function (data) {
 						var $data = $('<div>' + data + '</div>');
@@ -279,6 +306,7 @@
                         /* x2modstart  */
 						if($grid.hasClass('x2-gridview')) {
 							var $data = data;
+                            $grid.siblings ('.x2-sibling-grid').remove ();
 							$grid.replaceWith(data);
 						} else {
 							var $data = $('<div>' + data + '</div>');
@@ -335,17 +363,34 @@
 					}
 				}, options || {});
 				if (options.data !== undefined && options.type === 'GET') {
-					options.url = $.param.querystring(options.url, options.data);
+                    /* x2modstart */ 
+                    var overrideParams = 0;
+					options.url = $.param.querystring(options.url, options.data, overrideParams);
+                    /* x2modend */ 
 					options.data = {};
 				}
 
 				if (settings.ajaxUpdate !== false) {
 					options.url = $.param.querystring(options.url, settings.ajaxVar + '=' + id);
+                    /* x2modstart */ 
+                    if (options.type === 'POST') {
+                        if (typeof options.data === 'undefined') options.data = {};
+                        options.data = $.extend (
+                            $.deparam.querystring (options.url), options.data);
+                    }
+                    /* x2modend */ 
 					if (settings.beforeAjaxUpdate !== undefined) {
 						settings.beforeAjaxUpdate(id, options);
 					}
 					$.ajax(options);
 				} else {  // non-ajax mode
+                    /* x2modstart */ 
+                    if (options.type === 'POST') {
+                        if (typeof options.data === 'undefined') options.data = {};
+                        options.data = $.extend (
+                            $.deparam.querystring (options.url), options.data);
+                    }
+                    /* x2modend */ 
 					if (options.type === 'GET') {
 						window.location.href = options.url;
 					} else {  // POST mode
@@ -389,9 +434,12 @@
 		 * @return array the key values of the currently checked rows.
 		 */
 		getChecked: function (column_id) {
+            /* x2modstart */  
+            // added namespace to keys class to prevent class name conflicts in nested grids
 			var settings = gridSettings[this.attr('id')],
-				keys = this.find('.keys span'),
+				keys = this.find('.' + settings.namespacePrefix + 'keys span'),
 				checked = [];
+            /* x2modend */ 
 			if (column_id.substring(column_id.length - 2) !== '[]') {
 				column_id = column_id + '[]';
 			}

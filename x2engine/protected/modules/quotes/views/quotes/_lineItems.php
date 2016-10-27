@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /*
 view data:
@@ -47,7 +48,7 @@ view data:
 */
 
 $module = isset ($module) ? $module : $this->module;
-$actionsTab = isset ($actionsTab) ? $actionsTab : false;
+$mini = isset ($mini) ? $mini : false;
 
 $currency = Yii::app()->params->currency;
 if (isset ($model)) {
@@ -62,7 +63,9 @@ Send a dictionary containing translations for the types of each input field.
 Used for html title attributes.
 */
 $titleTranslations = array( // keys correspond to CSS classes of each input field
-    'product-name'=>Yii::t('quotes', 'Product Name'),
+    'product-name'=>Yii::t('quotes', '{product} Name',array(
+        '{product}'=>Modules::displayName(false, "Products")
+    )),
     'adjustment-name'=>Yii::t('quotes', 'Adjustment Name'),
     'price'=>Yii::t('quotes', 'Price'),
     'quantity'=>Yii::t('quotes', 'Quantity'),
@@ -71,6 +74,9 @@ $titleTranslations = array( // keys correspond to CSS classes of each input fiel
 );
 
 if (!$readOnly) {
+    Yii::app()->clientScript->registerScriptFile(
+        Yii::app()->getBaseUrl ().'/js/ComboBox.js', CClientScript::POS_HEAD);  
+    Yii::app()->clientScript->registerCssFile(Yii::app()->theme->baseUrl.'/css/comboBox.css'); 
     Yii::app()->clientScript->registerCssFiles('lineItemsCss',
         array (
             $module->assetsUrl . '/css/lineItemsMain.css',
@@ -84,7 +90,14 @@ if (!$readOnly) {
         ), false);
 }
 
-Yii::app()->clientScript->registerScriptFile ($module->assetsUrl.'/js/LineItems.js', CClientScript::POS_HEAD);
+if ($mini) {
+    Yii::app()->clientScript->registerCssFile(
+        $module->assetsUrl.'/css/lineItemsMini.css');
+
+}
+
+Yii::app()->clientScript->registerScriptFile (  
+    $module->assetsUrl.'/js/LineItems.js', CClientScript::POS_HEAD);
 
 $lineItemsVarInsertionScript = '';
 
@@ -161,35 +174,28 @@ x2.<?php echo $namespacePrefix; ?>lineItems = new x2.LineItems ({
     view: 'default',
     productLines: productLines,
     adjustmentLines: adjustmentLines,
-    namespacePrefix: '<?php echo $namespacePrefix; ?>'
+    namespacePrefix: '<?php echo $namespacePrefix; ?>',
+    getItemsUrl: '<?php echo Yii::app()->createUrl ('/products/products/getItems2'); ?>',
+    modelName: '<?php echo isset ($modelName) ? $modelName : ''; ?>'
 });
 
 }) ();
 
 </script>
+
 <?php
-
-$debug = 0;
-if (YII_DEBUG && $debug) {
-    Yii::app()->clientScript->registerScriptFile(Yii::app()->request->baseUrl.'/js/qunit/qunit-1.11.0.js',
-        CClientScript::POS_HEAD);
-    Yii::app()->clientScript->registerCssFile(Yii::app()->request->baseUrl.'/js/qunit/qunit-1.11.0.css',
-        CClientScript::POS_HEAD);
-    Yii::app()->clientScript->registerScriptFile($module->assetsUrl . '/js/quotesUnitTests.js',
-        CClientScript::POS_HEAD);
-}
-
+//if (YII_DEBUG && YII_UNIT_TESTING) {
+//    Yii::app()->clientScript->registerScriptFile($module->assetsUrl . '/js/quotesUnitTests.js',
+//        CClientScript::POS_END);
+//}
 ?>
 
-<div id="<?php echo $namespacePrefix ?>-line-items-table" class='line-items-table<?php echo $actionsTab ? ' line-items-mini' : ''; echo $readOnly ? ' line-items-read' : ' line-items-write'; ?>'>
+<div id="<?php echo $namespacePrefix ?>-line-items-table" class='line-items-table<?php echo $mini ? ' line-items-mini' : ''; echo $readOnly ? ' line-items-read' : ' line-items-write'; ?>'>
 
 <?php
-/*
-commented until namespace protection added
-if (YII_DEBUG && $debug) {
-    echo "<div id='qunit'></div>";
-    echo "<div id='qunit-fixture'></div>";
-}*/
+//if (YII_DEBUG && YII_UNIT_TESTING) {
+//    echo "<div id='qunit-fixture'></div>";
+//}
 ?>
 
 <?php
@@ -221,8 +227,8 @@ if (YII_DEBUG && $debug) {
     </tbody>
     <tr class='subtotal-row'>
         <td class='first-cell'> </td>
-        <td colspan='<?php echo $actionsTab ? 2 : 4; ?>'> </td>
-        <td class="text-field"><span style="font-weight:bold"> Subtotal: </span></td>
+        <td colspan='<?php echo $mini ? 2 : 4; ?>'> </td>
+        <td class="text-field"><span style="font-weight:bold">  <?php echo Yii::t('quotes','Subtotal:');?> </span></td>
         <td class="subtotal-container input-cell">
             <input type="text" readonly='readonly' onfocus='this.blur();'
              style="font-weight:bold" id="<?php echo $namespacePrefix ?>-subtotal"  
@@ -236,8 +242,8 @@ if (YII_DEBUG && $debug) {
     <tbody id='quote-total-section'>
     <tr>
         <td class='first-cell'> </td>
-        <td colspan='<?php echo $actionsTab ? 2 : 4; ?>'> </td>
-        <td class='text-field'><span style="font-weight:bold"> Total: </span></td>
+        <td colspan='<?php echo $mini ? 2 : 4; ?>'> </td>
+        <td class='text-field'><span style="font-weight:bold"> <?php echo Yii::t('quotes','Total:');?> </span></td>
         <td class="total-container input-cell">
             <input type="text" readonly='readonly' onfocus='this.blur();' style="font-weight:bold" 
              id="<?php echo $namespacePrefix; ?>-total" class='total' name="Quote[total]">

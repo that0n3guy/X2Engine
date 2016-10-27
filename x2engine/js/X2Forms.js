@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 if (typeof x2 === 'undefined') x2 = {};
 
@@ -43,6 +44,7 @@ function X2Forms (argsDict) {
         translations: {}
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
+    this.defaultTextColor = 'rgb(93,93,93)';
 
     this._init ();
 }
@@ -59,6 +61,53 @@ Private static methods
 Public instance methods
 */
 
+X2Forms.prototype.hint = function (text) {
+    var span$ = $('<span>', {
+        'class': 'x2-hint x2-question-mark fa fa-question-circle',
+        'title': text
+    });
+    span$.qtip (this._getQtipConfig ());
+    return span$;
+};
+
+X2Forms.prototype._getQtipConfig = function () {
+    return {
+        events: {
+            show: function (event, api) {
+                var tooltip = api.elements.tooltip;
+                var windowWidth = $(window).width ();
+                var elemWidth = $(api.elements.target).width ();
+                var elemLeft = $(api.elements.target).offset ().left;
+                var tooltipWidth = $(api.elements.tooltip).width ();
+
+                if (elemLeft + elemWidth + tooltipWidth > windowWidth) {
+
+                    // flip tooltip if it would go off screen
+                    api.set ({
+                        'position.my': 'top right',
+                        'position.at': 'bottom right'
+                    });
+                } else {
+                    api.set ({
+                        'position.my': 'top left',
+                        'position.at': 'bottom right'
+                    });
+                }
+            }
+        }
+    };
+};
+
+/**
+ * Set up x2 helper tooltips
+ */
+X2Forms.prototype.setUpQTips = function () {
+    if (typeof $().qtip !== 'undefined') {
+        $('.x2-hint').qtip(this._getQtipConfig ());
+        $('.x2-info').qtip(); // no format qtip (.x2-hint turns text blue)
+    }
+};
+
 /**
  * Initializes all elements with the class 'x2-multiselect-dropdown' as multiselect dropdown 
  * elements. The value of the element's 'data-selected-text' attribute will be used as the
@@ -66,7 +115,7 @@ Public instance methods
  */
 X2Forms.prototype.initializeMultiselectDropdowns = function () {
     var that = this;
-    $('.x2-multiselect-dropdown').each (function () {
+    $('.x2-multiselect-dropdown').not ('[data-skip-auto-init="1"]').each (function () {
 
         // don't reinitialize
         if ($(this).next ().hasClass ('.ui-multiselect')) return;
@@ -77,6 +126,19 @@ X2Forms.prototype.initializeMultiselectDropdowns = function () {
             checkAllText: that.translations['Check All'], 
             uncheckAllText: that.translations['Uncheck All'], 
             'classes': 'x2-multiselect-dropdown-menu'
+        });
+    });
+};
+
+X2Forms.prototype.initializeMultiselects = function () {
+    var that = this;
+    $('.x2-multiselect').not ('[data-skip-auto-init="1"]').each (function () {
+
+        // don't reinitialize
+        if ($(this).next ().hasClass ('.ui-multiselect')) return;
+
+        $(this).multiselect ({ 
+            searchable: false 
         });
     });
 };
@@ -103,14 +165,14 @@ X2Forms.prototype.errorMessage = function (message) {
  */
 X2Forms.prototype.errorSummary = function (errorHeader, errorMessages, css) {
     var css = typeof css === 'undefined' ? [] : css; 
-	var errorBox = $('<div>', {'class': 'error-summary-container'}).append (
-		$("<div>", { 'class': "error-summary"}).append ($("<ul>")));
+    var errorBox = $('<div>', {'class': 'error-summary-container'}).append (
+        $("<div>", { 'class': "error-summary"}).append ($("<ul>")));
     if (errorHeader !== '') {
         errorBox.find ('.error-summary').prepend ($('<p>', { text: errorHeader }));
     }
     $(errorBox).css (css);
     this._appendErrorMessages (errorBox, errorMessages);
-	return errorBox;
+    return errorBox;
 };
 
 /**
@@ -131,6 +193,7 @@ X2Forms.prototype.errorSummaryAppend = function (form$, errorMessages) {
 X2Forms.prototype.clearErrorMessages = function (form) {
     $(form).find ('.x2-forms-error-msg').remove ();
     $(form).find ('.error-summary-container').remove ();
+    $(form).find ('.errorSummary').remove ();
     $(form).find ('.error').removeClass ('error');
 };
 
@@ -146,7 +209,6 @@ X2Forms.prototype.clearForm = function (container, preserveDefaults) {
     if (preserveDefaults) {
         $(container).find ('textarea, input, select').each (function () {
             var defaultVal = $(this).attr ('data-default') || $(this)[0].defaultValue;
-
             if (typeof defaultVal === 'undefined') {
                 $(this).val (''); 
             } else {
@@ -160,6 +222,7 @@ X2Forms.prototype.clearForm = function (container, preserveDefaults) {
     $(container).find ('.error').removeClass ('error');
     $(container).find ('.x2-forms-error-msg').remove ();
     $(container).find ('.error-summary-container').remove ();
+    $(container).find ('.errorSummary').remove ();
 };
 
 /**
@@ -238,7 +301,7 @@ X2Forms.prototype.showShortDefaultText = function(field) {
     var longDefaultText = $(field).attr ('data-long-default-text');
     if(field.value === longDefaultText) {
         field.value = shortDefaultText;
-        field.style.color = '#aaa'
+        field.style.color = this.defaultTextColor;
     }
 };
 
@@ -256,7 +319,7 @@ X2Forms.prototype.showLongDefaultText = function(field) {
     var shortDefaultText = $(field).attr ('data-short-default-text');
     if(field.value === shortDefaultText) {
         field.value = longDefaultText;
-        field.style.color = '#aaa'
+        field.style.color = this.defaultTextColor
     }
 };
 
@@ -277,7 +340,7 @@ X2Forms.prototype.toggleTextResponsive = function(field) {
             field.style.color = 'black';
         } else {
             field.value = shortDefault;
-            field.style.color = '#aaa';
+            field.style.color = this.defaultTextColor;
         }
     } else {
         if (field.value === longDefault) {
@@ -285,7 +348,7 @@ X2Forms.prototype.toggleTextResponsive = function(field) {
             field.style.color = 'black';
         } else {
             field.value = longDefault;
-            field.style.color = '#aaa';
+            field.style.color = this.defaultTextColor;
         }
     }
 };
@@ -295,11 +358,11 @@ X2Forms.prototype.toggleTextResponsive = function(field) {
  */
 X2Forms.prototype.toggleText = function(field, focus) {
     if(field.defaultValue==field.value) {
-        field.value = ''
-        field.style.color = 'black'
+        field.value = '';
+        field.style.color = 'black';
     } else if(field.value=='') {
-        field.value = field.defaultValue
-        field.style.color = '#aaa'
+        field.value = field.defaultValue;
+        field.style.color = this.defaultTextColor;
     }
 };
 
@@ -311,20 +374,21 @@ X2Forms.prototype.toggleText = function(field, focus) {
  * @param object jQuery object
  */
 X2Forms.prototype.enableDefaultText = function (element) {
+    var that = this;
     if (!$(element).attr ('data-default-text')) {
         return;
     }
     var defaultText = $(element).attr ('data-default-text');
     if ($(element).val () === '') {
         $(element).val (defaultText); 
-        $(element).css ({color: '#aaa'});
+        $(element).css ({color: this.defaultTextColor});
     }
     $(element).off ('blur.defaultText').
         on ('blur.defaultText', function () {
 
         if ($(element).val () === '') {
             $(element).val (defaultText); 
-            $(element).css ({color: '#aaa'});
+            $(element).css ({color: that.defaultTextColor});
         }
     });
     $(element).off ('focus.defaultText').
@@ -333,6 +397,25 @@ X2Forms.prototype.enableDefaultText = function (element) {
         if ($(element).val () === $(element).attr ('data-default-text')) {
             $(element).val (''); 
             $(element).css ({color: 'black'});
+        }
+    });
+};
+
+/**
+ * Clears default values to prepare form for submission
+ */
+X2Forms.prototype.clearDefaultValues = function (form$) {
+    form$.find ('.x2-default-field').each (function () {
+        if ($(this).val () === $(this).attr ('data-default-text')) {
+            $(this).val ('');
+        }
+    });
+};
+
+X2Forms.prototype.restoreDefaultValues = function (form$) {
+    form$.find ('.x2-default-field').each (function () {
+        if ($(this).val () === '') { 
+            $(this).val ($(this).attr ('data-default-text'));
         }
     });
 };
@@ -349,7 +432,7 @@ X2Forms.prototype.formFieldBlur = function(elem) {
     var field = $(elem);
     if(field.val() == '') {
         field.val(field.attr('title'));
-        field.css('color','#aaa');
+        field.css('color',this.defaultTextColor);
     }
 };
 
@@ -412,106 +495,104 @@ X2Forms.prototype.renderContactLookup = function(item) {
     return label;
 };
 
-X2Forms.prototype.fileUpload = function(form, fileField, action_url, remove_url) {
-    // Create the iframe...
-    var iframe = document.createElement("iframe");
-    iframe.setAttribute("id", "upload_iframe");
-    iframe.setAttribute("name", "upload_iframe");
-    iframe.setAttribute("width", "0");
-    iframe.setAttribute("height", "0");
-    iframe.setAttribute("border", "0");
-    iframe.setAttribute("style", "width: 0; height: 0; border: none;");
+X2Forms.prototype.fileUpload = function(fileField, action_url, remove_url) {
+    var that = this;
 
-    // Add to document...
-    form.parentNode.appendChild(iframe);
+    // Create the iframe
+    var iframe = $("<iframe>");
+    $(iframe).attr("id", "upload_iframe");
+    $(iframe).attr("name", "upload_iframe");
+    $(iframe).attr("width", "0");
+    $(iframe).attr("height", "0");
+    $(iframe).attr("border", "0");
+    $(iframe).attr("style", "width: 0; height: 0; border: none;");
+
+    // Add to document
+    var form = $(fileField).closest ('form');
+
+    $(form).parent ().append (iframe);
     window.frames['upload_iframe'].name = "upload_iframe";
+    var iframeElem = $(iframe).eq (0);
 
-    iframeId = document.getElementById("upload_iframe");
-
-    // Add event...
+    // Add event
     var eventHandler = function () {
+        $(iframe).off ('load', eventHandler);
 
-            if(iframeId.detachEvent) iframeId.detachEvent("onload", eventHandler);
-            else iframeId.removeEventListener("load", eventHandler, false);
-
-            // Message from server...
-            if(iframeId.contentDocument) {
-                var content = iframeId.contentDocument.body.innerHTML;
-            } else if(iframeId.contentWindow) {
-                var content = iframeId.contentWindow.document.body.innerHTML;
-            } else if(iframeId.document) {
-                var content = iframeId.document.body.innerHTML;
-            }
-
-            var response = $.parseJSON(content)
-
-            if(response['status'] == 'success') {
-                // success uploading temp file
-                // save it's name in the form so it gets attached when the user clicks send
-                var file = $('<input>', {
-                    'type': 'hidden',
-                    'name': 'AttachmentFiles[id][]',
-                    'class': 'AttachmentFiles',
-                    'value': response['id'] // name of temp file
-                });
-
-                var temp = $('<input>', {
-                    'type': 'hidden',
-                    'name': 'AttachmentFiles[temp][]',
-                    'value': true
-                });
-
-                var parent = fileField.parent().parent().parent();
-
-                parent.parent().find('.error').html(''); // clear error messages
-                
-                // save copy of file upload span before we start making changes
-                var newFileChooser = parent.clone(); 
-
-                parent.removeClass('next-attachment');
-                parent.append(file);
-                parent.append(temp);
-
-                var remove = $("<a>", {
-                    'href': "#",
-                    'html': "[x]"
-                });
-
-                parent.find('.filename').html(response['name']);
-                parent.find('.remove').append(remove);
-
-                remove.click(function() {
-                    removeAttachmentFile(remove.parent().parent(), remove_url); return false;
-                });
-
-                fileField.parent().parent().remove();
-
-                parent.after(newFileChooser);
-                initX2FileInput();
-
-            } else {
-                fileField.parent().parent().parent().find('.error').html(response['message']);
-                fileField.val("");
-            }
-
-            // Del the iframe...
-            setTimeout('iframeId.parentNode.removeChild(iframeId)', 250);
+        // Message from server
+        var iframeElem = $(iframe)[0];
+        if(iframeElem.contentDocument) {
+            var content = iframeElem.contentDocument.body.innerHTML;
+        } else if(iframeElem.contentWindow) {
+            var content = iframeElem.contentWindow.document.body.innerHTML;
+        } else if(iframeElem.document) {
+            var content = iframeElem.document.body.innerHTML;
         }
 
-    if(iframeId.addEventListener)
-        iframeId.addEventListener("load", eventHandler, true);
-    if(iframeId.attachEvent)
-        iframeId.attachEvent("onload", eventHandler);
+        var response = $.parseJSON(content)
 
-    // Set properties of form...
-    form.setAttribute("target", "upload_iframe");
-    form.setAttribute("action", action_url);
-    form.setAttribute("method", "post");
-    form.setAttribute("enctype", "multipart/form-data");
-    form.setAttribute("encoding", "multipart/form-data");
+        if(response['status'] === 'success') {
 
-    // Submit the form...
-    form.submit();
+            // success uploading temp file
+            // save it's name in the form so it gets attached when the user clicks send
+            var file = $('<input>', {
+                'type': 'hidden',
+                'name': 'AttachmentFiles[id][]',
+                'class': 'AttachmentFiles',
+                'value': response['id'] // name of temp file
+            });
+
+            var temp = $('<input>', {
+                'type': 'hidden',
+                'name': 'AttachmentFiles[types][]',
+                'value': 'temp'
+            });
+
+            var parent = fileField.parent().parent().parent();
+
+            parent.parent().find('.error').html(''); // clear error messages
+            
+            // save copy of file upload span before we start making changes
+            var newFileChooser = parent.clone(); 
+
+            parent.removeClass('next-attachment');
+            parent.addClass ('upload-file-container');
+            parent.append(file);
+            parent.append(temp);
+            parent.find('.filename').html(response['name']);
+
+            var remove = parent.find('.remove');
+
+            remove.click(function() {
+                that.removeAttachmentFile ($(this).parent(), remove_url); 
+                return false;
+            });
+
+            fileField.parent().parent().remove();
+
+            parent.after(newFileChooser);
+            that.initX2FileInput();
+
+        } else {
+            fileField.parent().parent().parent().find('.error').html(response['message']);
+            fileField.val("");
+        }
+
+        // remove iframe
+        setTimeout(function () {
+            iframeElem.parentNode.removeChild(iframeElem);
+        }, 250);
+    };
+
+    $(iframeElem).on ('load', eventHandler);
+
+    // Set properties of form
+    $(form).attr ("target", "upload_iframe");
+    $(form).attr ("action", action_url);
+    $(form).attr ("method", "post");
+    $(form).attr ("enctype", "multipart/form-data");
+    $(form).attr ("encoding", "multipart/form-data");
+
+    $(form).submit();
 };
 
 // remove an attachment that is stored on the server as a temp file
@@ -559,21 +640,60 @@ X2Forms.prototype.initX2FileInput = function() {
 
 };
 
+X2Forms.prototype.getThrobber = function () {
+    var throbber$ = $('<div>', {
+        'class': 'x2-loading-icon load8 input-loading-icon x2-loader',
+        'style': 'float: left; position: absolute;'
+    });
+    throbber$.append ($('<div>', {
+        'class': 'loader',
+        'style': 'margin: auto;'
+    }));
+    return throbber$;
+};
+
+X2Forms.prototype.inputLoadingRight = function (elem, disable) {
+    options = typeof options === 'undefined' ? {} : options; 
+    disable = typeof disable === 'undefined' ? true : disable; 
+    throbber$ = this.getThrobber ();
+    throbber$.width ($(elem).width ());
+    $(elem).before (throbber$);
+    throbber$.position ({
+        my: 'center center',
+        at: 'right+30 center-14',
+        of: $(elem)
+    });
+    if (disable) $(elem).attr ({'disabled': 'disabled'});
+    throbber$.children ().attr (options);
+    return throbber$;
+};
+
+X2Forms.prototype.inputLoadingRightStop = function (elem) {
+    $(elem).prev ('.x2-loading-icon').remove ();
+    $(elem).css ({'visibility': ''});
+    $(elem).removeAttr ('disabled');
+};
+
 /**
  * Hide input and place a loading gif in its place 
  * @param object the input element
  */
-X2Forms.prototype.inputLoading = function (elem) {
-    $(elem).before ($('<div>', {
-        'class': 'x2-loading-icon',
-        style: 'position: absolute; height: 27px; background-size: 27px;'
-    }));
-    $(elem).prev ().position ({
-        my: 'center',
-        at: 'center',
-        of: $(elem)
-    });
+X2Forms.prototype.inputLoading = function (elem, position, options) {
+    position = typeof position === 'undefined' ? true : position; 
+    options = typeof options === 'undefined' ? {} : options; 
+    throbber$ = this.getThrobber ();
+    throbber$.width ($(elem).width ());
+    $(elem).before (throbber$);
+    if (position) {
+        $(elem).prev ().position ({
+            my: 'center center-10',
+            at: 'center',
+            of: $(elem)
+        });
+    } 
     $(elem).css ({'visibility': 'hidden'});
+    throbber$.children ().attr (options);
+    return throbber$;
 };
 
 /**
@@ -581,7 +701,7 @@ X2Forms.prototype.inputLoading = function (elem) {
  * @param object the input element
  */
 X2Forms.prototype.inputLoadingStop = function (elem) {
-    $(elem).prev ().remove ();
+    $(elem).prev ('.x2-loading-icon').remove ();
     $(elem).css ({'visibility': ''});
 };
 
@@ -609,6 +729,37 @@ X2Forms.prototype.initializeDefaultFields = function () {
     $('.x2-default-field').each (function () { that.enableDefaultText ($(this)); });
 };
 
+X2Forms.prototype.initializeProtectedFields = function () {
+    var that = this;
+    $('.x2-protected-field').each (function () { 
+        $(this).attr ('data-init-val', $(this).val ());
+        $(this).unbind ('keydown.initializeProtectedFields').
+            bind ('keydown.initializeProtectedFields', function () {
+                $(this).unbind ('keydown.initializeProtectedFields');
+                $(this).removeClass ('x2-protected-field');
+                $(this).val ('');
+            });
+    });
+};
+
+/**
+ * @param mixed headerCell selector or jQuery element for headerCell in column of table
+ * @param function fn function to apply to each cell in same column as headerCell in body of table
+ */
+X2Forms.prototype.forEachCellInColumn = function (headerCell, fn) {
+    var headerRow$ = $(headerCell).closest ('tr'); 
+    var table$ = $(headerCell).closest ('table');
+    var columnNumber = headerRow$.find ('th').index (headerCell);
+    var columns = headerRow$.find ('th').length;
+    var tableCells = $.makeArray (table$.find ('tbody td'));
+    if (columns < 1) return false;
+    var i = columnNumber;
+    while (i < tableCells.length) {
+        fn.apply (tableCells[i]);
+        i += columns;
+    }
+};
+
 /*
 Private instance methods
 */
@@ -634,44 +785,16 @@ X2Forms.prototype._setUpFormElementBehavior = function () {
             });
         }
     });
-
+    $('.inlineLabel').find('input:text, textarea').each(function(){
+        that.formFieldBlur(this);
+    });
     $('.inlineLabel').find('input:text, textarea').focus(function() { 
             that.formFieldFocus(this); 
         }).blur(function() { 
             that.formFieldBlur(this); 
         });
-
-    // set up x2 helper tooltips
-    if (typeof $().qtip !== 'undefined') {
-        $('.x2-hint').qtip({
-            events: {
-                show: function (event, api) {
-                    var tooltip = api.elements.tooltip;
-                    var windowWidth = $(window).width ();
-                    var elemWidth = $(api.elements.target).width ();
-                    var elemLeft = $(api.elements.target).offset ().left;
-                    var tooltipWidth = $(api.elements.tooltip).width ();
-
-                    if (elemLeft + elemWidth + tooltipWidth > windowWidth) {
-
-                        // flip tooltip if it would go off screen
-                        api.set ({
-                            'position.my': 'top right',
-                            'position.at': 'bottom right'
-                        });
-                    } else {
-                        api.set ({
-                            'position.my': 'top left',
-                            'position.at': 'bottom right'
-                        });
-                    }
-                }
-            }
-
-        });
-        $('.x2-info').qtip(); // no format qtip (.x2-hint turns text blue)
-    }
-
+    
+    this.setUpQTips ();
 };
 
 /**
@@ -705,13 +828,76 @@ X2Forms.prototype.setUpRichTextareas = function () {
     });
 };
 
+X2Forms.prototype.setUpCodeEditors = function () {
+    $('.x2-code-editor').each (function () {
+        if (typeof CodeMirror !== 'undefined') {
+            CodeMirror.fromTextArea ($(this)[0], {
+                mode: 'css',
+                showCursorWhenSelecting: true
+            });
+        }
+    });
+};
+
+X2Forms.prototype.setUpCollapsibles = function () {
+    $('.x2-collapsible-outer > .x2-collapse-handle').unbind ('click.setUpCollapibles').
+        bind ('click.setUpCollapibles', function () {
+
+        var collapsibleOuter$ = $(this).parent ();
+        var collapsible$ = collapsibleOuter$.find ('.x2-collapsible');
+        var collapseButton$ = collapsibleOuter$.find ('.x2-collapse-button');
+        var expandButton$ = collapsibleOuter$.find ('.x2-expand-button');
+        if (collapsibleOuter$.hasClass ('collapsed')) {
+            collapsibleOuter$.find ('.x2-collapsible').slideDown (200);
+            collapsibleOuter$.removeClass ('collapsed');
+            expandButton$.show ();
+            collapseButton$.hide ();
+        } else {
+            collapsibleOuter$.find ('.x2-collapsible').slideUp (200);
+            collapsibleOuter$.addClass ('collapsed');
+            expandButton$.hide ();
+            collapseButton$.show ();
+        }
+    });
+};
+
+X2Forms.prototype.disableButton = function (button$) {
+    button$.attr ('disabled', 'disabled');
+    button$.addClass ('x2-disabled-button');
+};
+
+X2Forms.prototype.enableButton = function (button$) {
+    button$.removeAttr ('disabled');
+    button$.removeClass ('x2-disabled-button');
+};
+
+X2Forms.prototype.setUpAttachments = function (){
+    $('body').on('click', '.attachment-input .remove', function() {
+        $(this).parent().remove();
+    });
+}
+
+X2Forms.prototype.flattenSerializedArray = function (form$) {
+    var data = form$.serializeArray ();
+    var flattened = {};
+    for (var i in data) {
+        flattened[data[i].name] = data[i].value;
+    }
+    return flattened;
+};
+
 X2Forms.prototype._init = function () {
     var that = this;
     $(function () { 
         that._setUpFormElementBehavior (); 
         that.initializeDefaultFields ();
+        that.initializeProtectedFields ();
         that.initializeMultiselectDropdowns ();
+        that.initializeMultiselects ();
         that.setUpRichTextareas ();
+        that.setUpCodeEditors ();
+        that.setUpCollapsibles ();
+        that.setUpAttachments ();
     });
 };
 

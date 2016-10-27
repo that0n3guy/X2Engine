@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,16 +34,17 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * RBAC auth manager for X2Engine
+ * 
+ *
  *
  * @package application.components
  * @author Demitri Morgan <demitri@x2engine.com>
  */
 class X2AuthManager extends CDbAuthManager {
-
 
     public $caching = true;
 
@@ -57,7 +59,8 @@ class X2AuthManager extends CDbAuthManager {
      * Internal "cache" of user names
      * @var type
      */
-    private $_usernames = array();
+    private $_assignments = array();
+    protected $_usernames = array();
 
     /**
      * Access check function.
@@ -78,23 +81,48 @@ class X2AuthManager extends CDbAuthManager {
      * @return boolean
      */
     public function checkAccess($itemName, $userId, $params = array()) {
-        if(!isset($this->_access))
+        if (!isset($params['userId']))
+            $params['userId'] = $userId;
+        if (!isset($this->_access))
             $this->_access = array();
 
-        if(isset($this->_access[$userId][$itemName])) {
-            // Shortcut 1: return data stored in the component's property
-            return $this->_access[$userId][$itemName];
-        } else if($this->caching && empty($params)) {
+        if (isset($this->_access[$userId][$itemName]) && 
+            !empty($this->_access[$userId][$itemName])) {
+
+            $checkParams = $this->getCacheParams($params);
+            if ($checkParams !== false) {
+                $checkParams = json_encode ($checkParams);
+
+                // Shortcut 1: return data stored in the component's property
+                if (isset ($this->_access[$userId][$itemName][$checkParams])) {
+                    return $this->_access[$userId][$itemName][$checkParams];
+                }
+            }
+        } else if ($this->caching) {
+
             // Shortcut 2: load the auth cache data and return if a result was found
-            if(!isset($this->_access[$userId]))
+            if (!isset($this->_access[$userId])) {
                 $this->_access[$userId] = Yii::app()->authCache->loadAuthCache($userId);
-            if(isset($this->_access[$userId][$itemName]))
-                return $this->_access[$userId][$itemName];
-        } else {
-            // Merely prepare _access[$userId]
-            if(!isset($this->_access[$userId]))
-                $this->_access[$userId] = array();
+            }
+            if (isset($this->_access[$userId][$itemName]) && 
+                !empty($this->_access[$userId][$itemName])) {
+
+                $checkParams = $this->getCacheParams($params);
+
+                if ($checkParams !== false) {
+                    $checkParams = json_encode ($checkParams);
+
+                    if (isset ($this->_access[$userId][$itemName][$checkParams])) {
+                        return $this->_access[$userId][$itemName][$checkParams];
+                    }
+                }
+            }
         }
+
+        if (!isset($this->_access[$userId]))
+            $this->_access[$userId] = array();
+        if (!isset($this->_access[$userId][$itemName]))
+            $this->_access[$userId][$itemName] = array();
 
         // Get assignments via roles.
         //
@@ -102,38 +130,74 @@ class X2AuthManager extends CDbAuthManager {
         // to roles. Hence, the ID of each role is sent to 
         // parent::getAuthAssignments rather than a user ID, which would be
         // meaningless in light of how x2_auth_assignment stores roles.
-        $roles = Roles::getUserRoles($userId);
-        $assignments = array();
-        foreach($roles as $roleId) {
-            $assignments = array_merge($assignments, parent::getAuthAssignments($roleId));
+        if (isset($this->_assignments[$userId])) {
+            $assignments = $this->_assignments[$userId];
+        } else {
+            $roles = Roles::getUserRoles($userId);
+            $assignments = array();
+            foreach ($roles as $roleId) {
+                $assignments = array_merge($assignments, parent::getAuthAssignments($roleId));
+            }
+            $this->_assignments[$userId] = $assignments;
         }
 
         // Prepare the username for the session-agnostic permissions check:
-        if(!isset($this->_usernames[$userId])) {
-            if($userId == Yii::app()->getSuId())
+        if (!isset($this->_usernames[$userId])) {
+            if ($userId == Yii::app()->getSuId())
                 $user = Yii::app()->getSuModel();
             else
                 $user = User::model()->findByPk($userId);
-            if($user instanceof User)
+            if ($user instanceof User)
                 $this->_usernames[$userId] = $user->username;
             else
                 $this->_usernames[$userId] = 'Guest';
         }
-        if(!isset($params['userId']))
-            $params['userId'] = $userId;
 
+        
         // Get whether the user has access:
         $hasAccess = parent::checkAccessRecursive($itemName, $userId, $params, $assignments);
 
-        if(empty($params)) {
-            // Store locally.
-			$this->_access[$userId][$itemName] = $hasAccess;
+        // Store locally.
+        $cacheParams = $this->getCacheParams($params);
+        if ($cacheParams !== false) {
+            $this->_access[$userId][$itemName][json_encode ($cacheParams)] = $hasAccess;
+
             // Cache
-            if($this->caching)
-                Yii::app()->authCache->addResult($userId,$itemName,$hasAccess);
-		}
+            if ($this->caching) {
+                Yii::app()->authCache->addResult($userId, $itemName, $hasAccess, $cacheParams);
+            }
+        }
 
         return $hasAccess;
+    }
+
+    protected function getCacheParams(array $params) {
+        $ret = false;
+        unset($params['userId']);
+        if ($params == array ()) {
+            return array ();
+        } elseif (isset($params['X2Model']) && count ($params) === 1 && 
+            $params['X2Model']->asa('permissions') != null) {
+
+            $ret = array ();
+            $ret['modelType'] = get_class($params['X2Model']);
+            $assignmentAttr = $params['X2Model']->getAssignmentAttr();
+            if($assignmentAttr){
+                $ret[$assignmentAttr] = $params['X2Model']->$assignmentAttr;
+            }
+        } else {
+            $simpleParamFlag = true;
+            foreach ($params as $param) {
+                if (!is_scalar ($param)) {
+                    $simpleParamFlag = false;
+                    break;
+                }
+            }
+            if ($simpleParamFlag) {
+                $ret = $params;
+            }
+        }
+        return $ret;
     }
 
     /**
@@ -153,50 +217,47 @@ class X2AuthManager extends CDbAuthManager {
      *  and also expects a model (or module) parameter.
      */
     public function checkAdminOn($params) {
-        if(!isset($params['userId']))
+        if (!isset($params['userId']))
             return false;
 
         // Look in the $_GET superglobal for 'model' if the 'model' parameter is not available
-        $modelName = isset($params['model'])
-            ? ($params['model'] instanceof X2Model ? get_class($params['model']) : $params['model'])
-            : (isset($_GET['model']) ? $_GET['model'] : null);
+        $modelName = isset($params['model']) ? ($params['model'] instanceof X2Model ? get_class($params['model']) : $params['model']) : (isset($_GET['model']) ? $_GET['model'] : null);
 
         // Determine the module on which admin access will be checked, based on a model class:
-        if(empty($params['module']) && !empty($modelName)) {
-            if(($staticModel = X2Model::model($modelName)) instanceof X2Model) {
-                if(($lb = $staticModel->asa('X2LinkableBehavior')) instanceof X2LinkableBehavior) {
-                    $module = !empty($lb->module)?$lb->module:null;
+        if (empty($params['module']) && !empty($modelName)) {
+            if (($staticModel = X2Model::model($modelName)) instanceof X2Model) {
+                if (($lb = $staticModel->asa('LinkableBehavior')) instanceof LinkableBehavior) {
+                    $module = !empty($lb->module) ? $lb->module : null;
                 }
             }
         }
-        if(!isset($module)) // Check if module parameter is specified and use it if so:
+        if (!isset($module)) // Check if module parameter is specified and use it if so:
             $module = isset($params['module']) ? $params['module'] : null;
 
-        if(!empty($module)) {
-           // Perform a check for the existence of the item name (because, per the original 
-           // design of X2Engine's permissions, for backwards compatibility: if no auth 
-           // item exists, permission will be granted by default).
-           $itemName = ucfirst($module).'AdminAccess';
-            if(!(bool)$this->getAuthItem($itemName))
+        if (!empty($module)) {
+            // Perform a check for the existence of the item name (because, per the original 
+            // design of X2Engine's permissions, for backwards compatibility: if no auth 
+            // item exists, permission will be granted by default).
+            $itemName = ucfirst($module) . 'AdminAccess';
+            if (!(bool) $this->getAuthItem($itemName))
                 return false;
         } else {
             // Use the generic administrator auth item if there is no module specified:
             $itemName = 'administrator';
         }
-        AuxLib::debugLogR(compact('params','itemName','userId','module','modelName'));
-        return $this->checkAccess($itemName,$params['userId'],$params);
+        //AuxLib::debugLogR(compact('params','itemName','userId','module','modelName'));
+        return $this->checkAccess($itemName, $params['userId'], $params);
     }
 
     /**
-     * Assignment check function for business rules
-     *
+     * Assignment check function for business rules. Note that this method does not check for 
+     * assignment to "Anyone". At the time of this writing, checkAssignment is used exclusively
+     * for checking permissions related to private access.
      * @param array $params
      * @return boolean
      */
-    public function checkAssignment($params){
-        return isset($params['X2Model'])
-                && $params['X2Model'] instanceof X2Model
-                && $params['X2Model']->isAssignedTo($this->_usernames[$params['userId']]);
+    public function checkAssignment($params) {
+        return isset($params['X2Model']) && $params['X2Model']->asa('permissions') && $params['X2Model']->isAssignedTo($this->_usernames[$params['userId']], true);
     }
 
     /**
@@ -206,9 +267,7 @@ class X2AuthManager extends CDbAuthManager {
      * @return boolean
      */
     public function checkVisibility($params) {
-        return isset($params['X2Model'])
-                && $params['X2Model'] instanceof X2Model
-                && $params['X2Model']->isVisibleTo($this->_usernames[$params['userId']]);
+        return isset($params['X2Model']) && $params['X2Model']->asa('permissions') && $params['X2Model']->isVisibleTo($this->_usernames[$params['userId']]);
     }
 
 }

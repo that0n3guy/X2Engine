@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // uncomment the following to define a path alias
 // Yii::setPathOfAlias('local','path/to/local-folder');
@@ -43,8 +44,14 @@
 $config = require("main.php");
 
 unset($config['theme']);
-$config['components']['fixture'] = array(
+unset($config['controllerMap']);
+unset($config['components']['request']);
+/*$config['components']['fixture'] = array(
 	'class' => 'system.test.CDbFixtureManager',
+);*/
+$config['components']['fixture'] = array(
+	'class' => 'application.components.X2FixtureManager',
+	'initScriptSuffix' => '.init.php'
 );
 
 unset($config['components']['urlManager']);
@@ -55,8 +62,17 @@ $config['components']['log']['routes'] = array(
 	array(
 		'class' => 'CFileLogRoute',
 		'logFile' => 'console.log',
-	)
+	),
 );
+if (YII_DEBUG && YII_LOGGING)
+    $config['components']['log']['routes'][] =
+        array(
+            'class' => 'CFileLogRoute',
+            'categories' => 'application.debug',
+            'logFile' => 'debug.log',
+            'maxLogFiles' => 10,
+            'maxFileSize' => 128,
+        );
 
 $custom = dirname(__FILE__).'/../../custom/protected/config/'.(YII_UNIT_TESTING?'test':'console').'.php';
 if($custom = realpath($custom)) {

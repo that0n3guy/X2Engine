@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 if (typeof x2 === 'undefined') x2 = {};
 
@@ -60,18 +61,18 @@ x2.LayoutManager = function (argsDict) {
 	this.pageMode = -1;		// 0 compact (no widgets)
 	this.newPageMode = 0;	// 1 fixed width (960px)
 							// 2 fill screen (5% margins)
-    this._historyMode = -1;		
-
     // values cached on window resize
     this.windowWidth; 
     this.contentWidth;
 
     this._halfWidthSelector = '#main-column, .history'; 
     this._hideSideBarLeftThreshold = 657;
-    //this._hideWidgetsThreshold = 1040;
-    this._hideWidgetsThreshold = 940;
+    this._hideWidgetsThreshold = 1040;
+    //this._hideWidgetsThreshold = 940;
     this._fullSearchBarThreshold = x2.logoWidth ? x2.logoWidth + 915 : 915;
-    this._publisherHalfWidthThreshold = 940;
+    //this._publisherHalfWidthThreshold = 940;
+    this._recordViewSingleColumnThreshold = 1406;
+    this._recordViewSingleColumnThresholdNoWidgets = 1129;
     this._titleBarThresholds;
     this._logoWidth = x2.logoWidth ? x2.logoWidth : 30; // default logo width
     this._mobileLayout; // true if mobile layout is active
@@ -115,11 +116,16 @@ Private static methods
 Public instance methods
 */
 
+/**
+ * @deprecated
+ */
 x2.LayoutManager.prototype.setHalfWidthSelector = function (halfWidthSelector) {
     this._halfWidthSelector = halfWidthSelector;
-    this._historyMode = -1;
 };
 
+/**
+ * @deprecated
+ */
 x2.LayoutManager.prototype.setHalfWidthThreshold = function (halfWidthThreshold) {
     this._publisherHalfWidthThreshold = halfWidthThreshold;
 };
@@ -339,8 +345,10 @@ x2.LayoutManager.prototype._setUpX2UIElements = function () {
 
 		if (window.fullscreen) {	// hide widgets
 			that.$body.addClass('no-widgets');
+			that.$body.removeClass('show-widgets');
 		} else if(that.pageMode != 0) {	// don't bring them back if the page is in compact mode
 			that.$body.removeClass('no-widgets');
+			that.$body.addClass('show-widgets');
 			$(document).trigger ('showWidgets');
 		}
 
@@ -428,9 +436,11 @@ x2.LayoutManager.prototype._setUpWindowResizeEvent = function () {
 			
 			if(that.pageMode == 0) {
 				that.$body.addClass('no-widgets');
+				that.$body.removeClass('show-widgets');
 			} else {
 				 if(!window.fullscreen) {
 					that.$body.removeClass('no-widgets');
+					that.$body.addClass ('show-widgets');
 					$(document).trigger ('showWidgets');
 				}
 			}
@@ -440,18 +450,15 @@ x2.LayoutManager.prototype._setUpWindowResizeEvent = function () {
     // action history responsiveness setup
     this.addFnToResizeQueue ((function () {
         return function (windowWidth, contentWidth) {
-            if(contentWidth < that._publisherHalfWidthThreshold)
-                var newHistoryMode = 0; // underneath record
-            else
-                var newHistoryMode = 1 // side of record
-                
-            if(that._historyMode !== newHistoryMode) {
-                that._historyMode = newHistoryMode;
-                if(that._historyMode === 1) {
-                    $(that._halfWidthSelector).addClass('half-width');
-                } else {
-                    $(that._halfWidthSelector).removeClass('half-width');
-                }
+            if (that.$body.hasClass ('no-widgets') && 
+                windowWidth < that._recordViewSingleColumnThresholdNoWidgets) {
+                $('#content').addClass ('record-view-single-column');
+            } else if (that.$body.hasClass ('show-widgets') && 
+                windowWidth < that._recordViewSingleColumnThreshold) {
+
+                $('#content').addClass ('record-view-single-column');
+            } else {
+                $('#content').removeClass ('record-view-single-column');
             }
         };
     }) ());
@@ -570,7 +577,7 @@ x2.LayoutManager.prototype._showLeftBar = function (contentWidth) {
         searchBarHasFocus = false;
     });
 
-    $(window).one ('resize', function () { 
+    $(window).one ('resize._showLeftBar', function () { 
         if (!searchBarHasFocus) that._hideLeftBar (); 
     });
 
@@ -629,11 +636,12 @@ x2.LayoutManager.prototype._setUpTitleBarResponsiveness = function () {
             auxlib.onClickOutside ($('.responsive-page-title'), function () {
                 that._minimizeResponsiveTitleBar (titleBar);
             }, true);
+
             $(window).one ('resize._setUpTitleBarResponsiveness', function () {
                 if ($(titleBar).children ('.responsive-menu-items').is (':visible')) {
                     that._minimizeResponsiveTitleBar (titleBar);
                 }
-            }, '_setUpTitleBarResponsiveness');
+            });
             that._expandResponsiveTitleBar (titleBar);
         }
         delay = true;

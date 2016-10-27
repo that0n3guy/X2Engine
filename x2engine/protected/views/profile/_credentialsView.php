@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Credentials view file for the list view that includes controls for setting defaults.
@@ -47,14 +48,21 @@
 	<?php
 	$webUser = Yii::app()->user;
 	$canDelete = $webUser->checkAccess('CredentialsDelete',array('model'=>$data));
-	$deleteImg = CHtml::image(Yii::app()->theme->baseUrl.'/css/gridview/delete.png',Yii::t('app','Delete'),$canDelete ? array() : array('style'=>'opacity:0.5','title'=>Yii::t('app','Cannot delete. The item is in use by the system, or you do not have permission.')));
+	$deleteImg = X2Html::fa('fa-times fa-lg', array(
+		'class'=>'x2-delete-icon',
+		'title'=> $canDelete ? Yii::t('app','Delete') : Yii::t('app', 'Cannot delete. The item is in use by the system, or you do not have permission.')
+	));
+	// $deleteImg = CHtml::image(Yii::app()->theme->baseUrl.'/css/gridview/delete.png',Yii::t('app','Delete'),$canDelete ? array() : array('style'=>'opacity:0.5','title'=>Yii::t('app','Cannot delete. The item is in use by the system, or you do not have permission.')));
 	$delete = $canDelete ? CHtml::link($deleteImg,array('/profile/deleteCredentials','id'=>$data->id),array('class'=>'delete','confirm'=>Yii::t('app','Are you sure you want to delete this item?'))) : $deleteImg;
 	echo CHtml::tag('div',array('class'=>'credentials-delete'),$delete);
 	?>
 	<div class="info-display">
 	<?php
 	$canAccess = $webUser->checkAccess('CredentialsCreateUpdate',array('model' => $data));
-	$editImg = CHtml::image(Yii::app()->theme->baseUrl.'/css/gridview/update.png',Yii::t('app','Edit'),$canAccess?array():array('style'=>'opacity:0.5'));
+	// $editImg = CHtml::image(Yii::app()->theme->baseUrl.'/css/gridview/update.png',Yii::t('app','Edit'),$canAccess?array():array('style'=>'opacity:0.5'));
+	$editImg = X2Html::fa('fa-edit', array(
+		'title'=>Yii::t('app','Edit')
+	));
 	?>
 	<?php
 	echo $canAccess ? CHtml::link($editImg,array('/profile/createUpdateCredentials','id'=>$data->id),array('class'=>'update')) : $editImg;
@@ -64,7 +72,11 @@
 	?>
 	
 	<?php
-	echo CHtml::image(Yii::app()->theme->baseUrl."/images/credentials/$encryptedState-$privateState.png",$message,array('title'=>$message));
+	echo X2Html::fa('fa-lock fa-lg', array(
+		'class' => $encryptedState,
+		'title' => $message
+	));
+	// echo CHtml::image(Yii::app()->theme->baseUrl."/images/credentials/$encryptedState-$privateState.png",$message,array('title'=>$message));
 
 
 	?>
@@ -96,7 +108,8 @@
 	$subsLabels = $data->substituteLabels;
 	$sysUseLabels = $data->sysUseLabel;
 	$setSys = $data->userId == Credentials::SYS_ID 
-            ? $webUser->checkAccess('CredentialsSetDefaultSystemwide',array('model'=>$data,'userId'=>$webUser->id))
+            ? $webUser->checkAccess(
+                'CredentialsSetDefaultSystemwide',array('model'=>$data,'userId'=>$webUser->id))
             : false;
 	$nDefaultForMe = count($defaultOf);
 	$defaultForMe = $nDefaultForMe == count($subsLabels);
@@ -106,53 +119,66 @@
 	
 	
 	if($webUser->checkAccess('CredentialsSetDefault',array('model'=>$data,'userId'=>$webUser->id)) && ($nDefault < $nLabels)){
-		echo '&nbsp;<div class="default-state">';
-		echo CHtml::beginForm(array('setDefaultCredentials','id'=>$data->id), 'post');
-		echo ($setSys ? Yii::t('app', 'Set as default') : Yii::t('app','Set as my default')).'&nbsp;';
-		if(count($subsLabels) > 1){
-			$options = array();
-			if(array_key_exists($user->id, $data->defaultCredentials)){
-				$defaults = $data->defaultCredentials[$user->id];
-				foreach($subsLabels as $sub => $label){
-					if(isset($defaults[$sub])){
-						if($defaults[$sub] == $data->id){
-							$options[$sub] = array('selected' => true);
-						}
-					}
-				}
-			}
-			
-			echo CHtml::dropDownList('default', array_keys($options), $subsLabels, array('multiple' => 'multiple', 'options' => $options),array('class'=>'set-default'));
-		}else{
-			echo CHtml::checkBox('default', false,array('class'=>'set-default'));
-		}
+        if ($data->modelClass !== 'TwitterApp') {
+		    echo '&nbsp;<div class="default-state">';
+            echo CHtml::beginForm(array('setDefaultCredentials','id'=>$data->id), 'post');
+            echo ($setSys ? 
+                Yii::t('app', 'Set as default') : Yii::t('app','Set as my default')).'&nbsp;';
+            if(count($subsLabels) > 1){
+                $options = array();
+                if(array_key_exists($user->id, $data->defaultCredentials)){
+                    $defaults = $data->defaultCredentials[$user->id];
+                    foreach($subsLabels as $sub => $label){
+                        if(isset($defaults[$sub])){
+                            if($defaults[$sub] == $data->id){
+                                $options[$sub] = array('selected' => true);
+                            }
+                        }
+                    }
+                }
+                
+                echo CHtml::dropDownList(
+                    'default',
+                    array_keys($options),
+                    $subsLabels,
+                    array(
+                        'multiple' => 'multiple',
+                        'options' => $options
+                    ),array('class'=>'set-default'));
+            }else{
+                echo CHtml::checkBox('default', false,array('class'=>'set-default'));
+            }
 
-		$setFor = $defaultForMe ? array() : array($webUser->id=>Yii::t('app','You'));
-		if($setSys) {
-			foreach($data->sysUseLabel as $id => $label)
-				if(in_array(Credentials::$sysUseTypes[$id],$data->defaultSubstitutesInv[$data->modelClass]))
-					// Display only credentials of the appropriate type for each specific system usage
-					if(!in_array($label,$defaultOf))
-						// Display only credentials 
-						$setFor[$id] = $label;
+            $setFor = $defaultForMe ? array() : array($webUser->id=>Yii::t('app','You'));
+            if($setSys) {
+                foreach($data->sysUseLabel as $id => $label)
+                    if(in_array(
+                        Credentials::$sysUseTypes[$id],
+                        $data->defaultSubstitutesInv[$data->modelClass])) {
+                        // Display only credentials of the appropriate type for each specific 
+                        // system usage
+                        if(!in_array($label,$defaultOf))
+                            // Display only credentials 
+                            $setFor[$id] = $label;
+                    }
+            }
+            
+            echo '<div class="default-apply">';
+            if(count($setFor) > 1 || $setSys) {
+                echo '&nbsp;'.Yii::t('app','for').'&nbsp;';
+                echo CHtml::dropDownList('userId',$webUser->id,$setFor,array(
+                    'class' => 'x2-select'
+                ));
+            } else {
+                echo CHtml::hiddenField('userId',$webUser->id);
+            }
 
-		}
-		
-		echo '<div class="default-apply">';
-		if(count($setFor) > 1 || $setSys) {
-			echo '&nbsp;'.Yii::t('app','for').'&nbsp;';
-			echo CHtml::dropDownList('userId',$webUser->id,$setFor,array(
-                'class' => 'x2-select'
+            echo '&nbsp;'.CHtml::submitButton(Yii::t('app', 'Apply'),array(
+                'class' => 'x2-button',
             ));
-		} else {
-			echo CHtml::hiddenField('userId',$webUser->id);
-		}
-
-		echo '&nbsp;'.CHtml::submitButton(Yii::t('app', 'Apply'),array(
-            'class' => 'x2-button',
-        ));
-		echo '</div>';
-		echo CHtml::endForm();
+            echo '</div>';
+            echo CHtml::endForm();
+        }
 		echo '</div>&nbsp;';
 	}
 	if($nDefault) {

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,49 +33,71 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 ?>
 
-<html>
-	<head>
-		<meta charset="UTF-8">
-		<link rel='stylesheet' type='text/css' 
-		 href='<?php echo Yii::app()->getTheme()->getBaseUrl().'/css/x2forms.css'; ?>'/>
-		<link rel='stylesheet' type='text/css' 
-		 href='<?php echo Yii::app()->getTheme()->getBaseUrl().'/css/printableRecord.css'; ?>'/>
-		<!--<link rel='stylesheet' type='text/css' 
-		 href='<?php //echo Yii::app()->getClientScript()->getCoreScriptUrl().'/rating/jquery.rating.css'; ?>'/>-->
-		<link rel='stylesheet' type='text/css' 
-		 href='<?php echo Yii::app()->theme->getBaseUrl().'/css/rating/jquery.rating.css'; ?>'/>
-		<script src='<?php echo Yii::app()->getClientScript()->getCoreScriptUrl().
-		 '/jquery.js'; ?>'></script>
-		<script src='<?php echo Yii::app()->getClientScript()->getCoreScriptUrl().
-		 '/jquery.metadata.js'; ?>'></script>
-		<script src='<?php echo Yii::app()->getClientScript()->getCoreScriptUrl().
-		 '/jquery.rating.js'; ?>'></script>
-	</head>
-	<body>
+<meta charset="UTF-8">
+<link rel='stylesheet' type='text/css' 
+ href='<?php echo Yii::app()->getTheme()->getBaseUrl().'/css/x2forms.css'; ?>'/>
+<link rel='stylesheet' type='text/css' 
+ href='<?php echo Yii::app()->getTheme()->getBaseUrl().'/css/printableRecord.css'; ?>'/>
+<!--<link rel='stylesheet' type='text/css' 
+ href='<?php //echo Yii::app()->getClientScript()->getCoreScriptUrl().'/rating/jquery.rating.css'; ?>'/>-->
+<link rel='stylesheet' type='text/css' 
+ href='<?php echo Yii::app()->theme->getBaseUrl().'/css/rating/jquery.rating.css'; ?>'/>
+<script src='<?php echo Yii::app()->getClientScript()->getCoreScriptUrl().
+ '/jquery.js'; ?>'></script>
+<script src='<?php echo Yii::app()->getClientScript()->getCoreScriptUrl().
+ '/jquery.metadata.js'; ?>'></script>
+<script src='<?php echo Yii::app()->getClientScript()->getCoreScriptUrl().
+ '/jquery.rating.js'; ?>'></script>
 
-	<h1 id='page-title'><?php echo addslashes ($pageTitle); ?></h1>
+<div class='config-panel-content'>
+</div>
 
-	<?php 
-	$this->renderPartial('application.components.views._detailView', 
-		array('model' => $model, 'modelName' => $modelClass)); 
-	?>
+<h1 id='page-title'><?php echo addslashes ($pageTitle); ?></h1>
+<h3 id='model-title'><?php echo addslashes ($modelTitle); ?></h3>
 
-	<script>
-		// replace stars with textual representation
-		$('span[id^="<?php echo $modelClass; ?>-<?php echo $id; ?>-rating"]').each (function () {
-			var stars = $(this).find ('[checked="checked"]').val ();
-            stars = stars ? stars : 0;
-			$(this).children ().remove ();
-			$(this).html (stars + '/5 <?php echo addslashes (Yii::t('app', 'Stars')); ?>');
+<?php //echo X2Html::divider(); ?>
+
+<?php 
+$this->widget ('DetailView', array(
+    'model' => $model,
+    'modelName' => $modelClass
+));
+
+//$this->renderPartial('application.components.views.@DETAILVIEW', array('model' => $model, 'modelName' => $modelClass));
+?>
+
+<script>
+	$('title').html("<?php echo $pageTitle ?>");
+
+	// replace stars with textual representation
+	$('span[id^="<?php echo $modelClass; ?>-<?php echo $id; ?>-rating"]').each (function () {
+		var stars = $(this).find ('[checked="checked"]').val ();
+        stars = stars ? stars : 0;
+		$(this).children ().remove ();
+		$(this).html (stars + '/5 <?php echo addslashes (Yii::t('app', 'Stars')); ?>');
+	});
+
+	var sections = 1;
+	$('.sectionTitle').each(function(){
+		var title = $(this).html();
+		if (!title) {
+			title = 'Section ' + sections++;
+		}
+		var row = $('<div class="row"></div>').appendTo($('.config-panel-content'));
+		$('<span class="label"></span>').appendTo(row).html(title)
+		var check = $('<input type="checkbox" checked />').appendTo(row);
+
+		var that = this;
+		check.change(function(){
+			$(that).closest('.formSection').toggle();
 		});
-	</script>
+	});
 
-	</body>
-</html>
+</script>
 
 
 

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,45 +33,40 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-
-$menuItems = array(
-    array('label'=>Yii::t('contacts','All Contacts'),'url'=>array('index')),
-    array('label'=>Yii::t('contacts','Lists'),'url'=>array('lists')),
-    array('label'=>Yii::t('contacts','Create Contact'),'url'=>array('create')),
-    array('label'=>Yii::t('contacts','Create List'),'url'=>array('createList')),
-    array('label'=>Yii::t('contacts','View List')),
-    array('label'=>Yii::t('contacts','Import Contacts'), 'url'=>array('admin/importModels', 'model'=>'Contacts')),
-    array('label'=>Yii::t('contacts', 'Export Contacts'),'url'=>array('admin/exportModels', 'model'=>'Contacts')),
-    array('label'=>Yii::t('contacts','Contact Map'),'url'=>array('googleMaps')),
-    array('label'=>Yii::t('contacts','Saved Maps'),'url'=>array('savedMaps')),
-    //array('label'=>Yii::t('contacts','Saved Searches'),'url'=>array('savedSearches'))
+ **********************************************************************************/
+$modTitles = array(
+    'contact' => Modules::displayName(false),
+    'contacts' => Modules::displayName(),
 );
 
 $heading = '';
 
-if($this->route=='contacts/contacts/index') {
-	$heading = Yii::t('contacts','All Contacts');
-	$dataProvider = $model->searchAll();
-	unset($menuItems[0]['url']);
-	unset($menuItems[3]);
-	unset($menuItems[4]);
-} elseif($this->route=='contacts/contacts/myContacts') {
-	$heading = Yii::t('contacts','My Contacts');
-	$dataProvider = $model->searchMyContacts();
-} elseif($this->route=='contacts/contacts/newContacts') {
-	$heading = Yii::t('contacts','Today\'s Contacts');
-	$dataProvider = $model->searchNewContacts();
+$opportunityModule = Modules::model()->findByAttributes(array('name' => 'opportunities'));
+$accountModule = Modules::model()->findByAttributes(array('name' => 'accounts'));
+
+$menuOptions = array(
+    'all', 'lists', 'create', 'import', 'export', 'map', 'savedMaps',
+);
+$enableSelectAllOnAllPages = false;
+if ($this->route == 'contacts/contacts/index') {
+    $heading = Yii::t('contacts', 'All {module}', array('{module}' => $modTitles['contacts']));
+    
+    $dataProvider = $model->searchAll();
+    $enableSelectAllOnAllPages = true;
+    //unset($menuItems[0]['url']);
+    //unset($menuItems[4]); // View List
+} elseif ($this->route == 'contacts/contacts/myContacts') {
+    $heading = Yii::t('contacts', 'My {module}', array('{module}' => $modTitles['contacts']));
+    $dataProvider = $model->searchMyContacts();
+    $menuOptions = array_merge($menuOptions, array('createList', 'viewList'));
+} elseif ($this->route == 'contacts/contacts/newContacts') {
+    $heading = Yii::t('contacts', 'Today\'s {module}', array('{module}' => $modTitles['contacts']));
+    $dataProvider = $model->searchNewContacts();
+    $menuOptions = array_merge($menuOptions, array('createList', 'viewList'));
 }
-
-$opportunityModule = Modules::model()->findByAttributes(array('name'=>'opportunities'));
-$accountModule = Modules::model()->findByAttributes(array('name'=>'accounts'));
-
-if($opportunityModule->visible && $accountModule->visible)
-	$menuItems[] = 	array('label'=>Yii::t('app', 'Quick Create'), 'url'=>array('/site/createRecords', 'ret'=>'contacts'), 'linkOptions'=>array('id'=>'x2-create-multiple-records-button', 'class'=>'x2-hint', 'title'=>Yii::t('app', 'Create a Contact, Account, and Opportunity.')));
-
-$this->actionMenu = $this->formatMenu($menuItems);
-
+if ($opportunityModule->visible && $accountModule->visible)
+    $menuOptions[] = 'quick';
+$this->insertMenu($menuOptions);
 
 Yii::app()->clientScript->registerScript('search', "
 /*$('.search-button').unbind('click').click(function(){
@@ -85,73 +81,75 @@ $('.search-form form').submit(function(){
 });*/
 
 $('#content').on('mouseup','#contacts-grid a',function(e) {
-	document.cookie = 'vcr-list=".$this->getAction()->getId()."; expires=0; path=/';
+	document.cookie = 'vcr-list=" . $this->getAction()->getId() . "; expires=0; path=/';
 });
-",CClientScript::POS_READY);
+", CClientScript::POS_READY);
 ?>
 
 
 <div class="search-form" style="display:none">
-<?php $this->renderPartial('_search',array(
-	'model'=>$model,
-	'users'=>User::getNames(),
-)); ?>
+    <?php
+//    $this->renderPartial('_search', array(
+//        'model' => $model,
+//        'users' => User::getNames(),
+//    ));
+    ?>
 </div><!-- search-form -->
-<form>
 <?php
-
 $this->widget('X2GridView', array(
-	'id'=>'contacts-grid',
+    'id' => 'contacts-grid',
     'enableQtips' => true,
-    'qtipManager' => array (
-        'X2QtipManager',
-        'loadingText'=> addslashes(Yii::t('app','loading...')),
+    'qtipManager' => array(
+        'X2GridViewQtipManager',
+        'loadingText' => addslashes(Yii::t('app', 'loading...')),
         'qtipSelector' => ".contact-name"
     ),
-	'title'=>$heading,
-	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize'),
-	'template'=> 
-        '<div id="x2-gridview-top-bar-outer" class="x2-gridview-fixed-top-bar-outer">'.
-        '<div id="x2-gridview-top-bar-inner" class="x2-gridview-fixed-top-bar-inner">'.
-        '<div id="x2-gridview-page-title" '.
-         'class="page-title icon contacts x2-gridview-fixed-title">'.
-        '{title}{buttons}{filterHint}{massActionButtons}{summary}{topPager}'.
-            '{items}{pager}',
-    'fixedHeader'=>true,
-	'dataProvider'=>$dataProvider,
-	// 'enableSorting'=>false,
-	// 'model'=>$model,
-	'filter'=>$model,
-	'pager'=>array('class'=>'CLinkPager','maxButtonCount'=>10),
-	// 'columns'=>$columns,
-	'modelName'=>'Contacts',
-	'viewName'=>'contacts',
-	// 'columnSelectorId'=>'contacts-column-selector',
-	'defaultGvSettings'=>array(
-		'gvCheckbox' => 30,
-		'name' => 125,
-		'email' => 165,
-		'leadSource' => 83,
-		'leadstatus' => 91,
-		'phone' => 107,
-		'lastActivity' => 78,
-		'gvControls' => 73,
-	),
-	'specialColumns'=>array(
-		'name'=>array(
-			'name'=>'name',
-			'header'=>Yii::t('contacts','Name'),
-			'value'=>'$data->link',
-			'type'=>'raw',
-		),
-	),
-    'massActions'=>array(
-        'addToList', 'newList'
+    'title' => $heading,
+    'enableSelectAllOnAllPages' => $enableSelectAllOnAllPages,
+    'buttons' => array('advancedSearch', 'clearFilters', 'columnSelector', 'autoResize', 'showHidden'),
+    'template' =>
+    '<div id="x2-gridview-top-bar-outer" class="x2-gridview-fixed-top-bar-outer">' .
+    '<div id="x2-gridview-top-bar-inner" class="x2-gridview-fixed-top-bar-inner">' .
+    '<div id="x2-gridview-page-title" ' .
+    'class="page-title icon contacts x2-gridview-fixed-title">' .
+    '{title}{buttons}{filterHint}{massActionButtons}{summary}{topPager}' .
+    '{items}{pager}',
+    'fixedHeader' => true,
+    'dataProvider' => $dataProvider,
+    // 'enableSorting'=>false,
+    // 'model'=>$model,
+    'filter' => $model,
+    'pager' => array('class' => 'CLinkPager', 'maxButtonCount' => 10),
+    // 'columns'=>$columns,
+    'modelName' => 'Contacts',
+    'viewName' => 'contacts',
+    // 'columnSelectorId'=>'contacts-column-selector',
+    'defaultGvSettings' => array(
+        'gvCheckbox' => 30,
+        'name' => 125,
+        'email' => 165,
+        'leadSource' => 83,
+        'leadstatus' => 91,
+        'phone' => 107,
+        'lastActivity' => 78,
+        'gvControls' => 73,
     ),
-	'enableControls'=>true,
-	'enableTags'=>true,
-	'fullscreen'=>true,
+    'specialColumns' => array(
+        'name' => array(
+            'name' => 'name',
+            'header' => Yii::t('contacts', 'Name'),
+            'value' => '$data->link',
+            'type' => 'raw',
+        ),
+    ),
+    'massActions' => array(
+        'MassDelete', 'MassTag', 'MassTagRemove', 'MassUpdateFields', 
+        'MergeRecords', 'MassPublishNote', 'MassPublishCall', 'MassPublishTime', 
+        'MassPublishAction', 'MassAddRelationship', 
+        'MassAddToList', 'NewListFromSelection', 'MassExecuteMacro'
+    ),
+    'enableControls' => true,
+    'enableTags' => true,
+    'fullscreen' => true,
 ));
 ?>
-
-</form>

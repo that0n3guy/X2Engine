@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 <div id="emailProgressControl" class="x2-layout form-view">
     <div class="formSection">
@@ -43,9 +44,19 @@
             <div class="emailProgressControl-section"><div id="emailProgressControl-bar"><div id="emailProgressControl-text"></div></div></div>
             <div class="emailProgressControl-section">
                 <div id="emailProgressControl-toolbar">
-                    <button class="startPause x2-button"><?php echo Yii::t('marketing', 'Pause') ?></button>
-                    <button class="refresh x2-button" title="<?php echo CHtml::encode(Yii::t('marketing','Click to refresh displays of campaign data on this page.')); ?>"><?php echo Yii::t('marketing', 'Update'); ?></button>
-                    <img id="emailProgressControl-throbber" style="display: none;" src="<?php echo Yii::app()->theme->baseUrl; ?>/images/loading.gif" />
+                    <button class="startPause x2-button">
+                    
+                        <?php echo X2Html::fa('fa-pause'); ?>
+                        <?php echo X2Html::fa('fa-play'); ?>
+                        <span class='button-text'>
+                            <?php echo Yii::t('marketing', 'Pause') ?>
+                        </span>
+                    </button>
+                    <button class="refresh x2-button" title="<?php echo CHtml::encode(Yii::t('marketing','Click to refresh displays of campaign data on this page.')); ?>">
+                        <?php echo X2Html::fa('fa-refresh'); ?>
+                        <?php echo Yii::t('marketing', 'Refresh'); ?>
+                    </button>
+                    <span id="emailProgressControl-throbber" style="display: none;" class='load8 x2-loader loader' ></span>
                     <div id="emailProgressControl-textStatus"></div>
                 </div>
             </div>

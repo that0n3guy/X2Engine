@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 
 Yii::app()->clientScript->registerCss('filterControlsCss',"
@@ -69,7 +70,7 @@ $visibility=array(
     '1'=>'Public',
     '0'=>'Private',
 );
-$socialSubtypes=json_decode(Dropdowns::model()->findByPk(113)->options,true);
+$socialSubtypes = Dropdowns::getSocialSubtypes ();
 $users=User::getNames();
 $eventTypeList=Yii::app()->db->createCommand()
         ->select('type')
@@ -213,6 +214,7 @@ $this->beginWidget('zii.widgets.CPortlet',
 );
 echo '<ul style="font-size: 0.8em; font-weight: bold; color: black;">';
 foreach($eventTypes as $type=>$name) {
+    $type = CHtml::encode($type);
     echo "<li>\n";
     $checked = in_array($type,$typeFilters)?false:true;
     $title = '';
@@ -225,7 +227,7 @@ foreach($eventTypes as $type=>$name) {
         )
     );
     $filterDisplayName = $name; // capitalize filter name for label
-    echo "<label for=\"$type\" title=\"$title\">".$name."</label>";
+    echo "<label for=\"$type\" title=\"$title\">".CHtml::encode($name)."</label>";
     echo "</li>\n";
 }
 echo "</ul>\n";
@@ -310,7 +312,7 @@ foreach($socialSubtypes as $key=>$value) {
         )
     );
     $filterDisplayName = $value; // capitalize filter name for label
-    echo "<label for=\"$key\" title=\"$title\">".Yii::t('app',$value)."</label>";
+    echo "<label for=\"sidebar-filter-default\" title=\"$title\">".Yii::t('app',$value)."</label>";
     echo "</li>\n";
 }
 echo "</ul>\n";
@@ -326,6 +328,13 @@ echo CHtml::link(
 echo "</div>";
 echo "<br>";
 
+echo "<div id='sidebar-full-controls-button-container'>";
+echo CHtml::link(
+        Yii::t('app','Create Report'),'#',
+        array('class'=>'x2-button x2-hint','style'=>'color:#000','id'=>'sidebar-create-activity-report',
+            'title'=>Yii::t('app','Create an email report using the selected filters which will be mailed to you periodically.')));
+echo "</div>";
+
 $this->endWidget();
 echo "</div>";
 
@@ -339,26 +348,53 @@ $this->beginWidget('LeftWidget',
         'id'=>'type-filter',
     )
 );
-echo CHtml::link(
-    Yii::t('app','All'),'#',
-    array(
-        'class'=>'x2-minimal-button filter-control-button',
-        'id'=>'all-button',
-        'style'=>'width:107px;'
-    )
-)."<br>";
-foreach($eventTypes as $type=>$name) {
-    echo CHtml::link(
-        $name,'#',
-        array(
-            'class'=>'x2-minimal-button filter-control-button',
-            'id'=>$type.'-button','style'=>'width:107px;'
-        )
-    )."<br>";
+
+
+/*********************************
+* Sortable Filter Controls
+********************************/
+
+//Construct an array with ids as the filter type
+$filterButtons = array('all-button' => Yii::t('app', 'All'));
+foreach($eventTypes as $type => $name) {
+    $type = CHtml::encode($type);
+    $filterButtons[$type.'-button'] = CHtml::encode($name);
 }
+
+// Go throught the ordered list and create the links
+$filterOrder = Profile::getWidgetSetting('FilterControls', 'order');
+foreach($filterOrder as $id) {
+    if (!isset($filterButtons[$id]))
+        continue;
+
+    echo CHtml::link(
+        $filterButtons[$id],
+        '#',
+        array(
+            'class' => 'x2-minimal-button filter-control-button',
+            'id' => $id,
+        )
+    );
+
+    unset($filterButtons[$id]);
+}
+
+// If any links werent in the list, create them at the bottom
+foreach($filterButtons as $id=>$name) {
+    echo CHtml::link(
+        $name, '#',
+        array(
+            'class' => 'x2-minimal-button filter-control-button',
+            'id' => $id,
+        )
+    );
+}
+
 $this->endWidget();
 $this->endWidget();
 echo "</div>";
+
+$settingsUrl = Yii::app()->createUrl('site/widgetSetting');
 Yii::app()->clientScript->registerScript('feed-filters','
     $("#sidebar-apply-feed-filters").click(function(e){
         e.preventDefault();
@@ -400,6 +436,47 @@ Yii::app()->clientScript->registerScript('feed-filters','
         var str2=pieces[0];
         pieces2=str2.split("#");
         window.location= pieces2[0] + "?filters=true&visibility=" + visibility + 
+            "&users=" + users+"&types=" + eventTypes +"&subtypes=" + subtypes + 
+            "&default=" + defaultFilters;
+        return false;
+    });
+    
+    $("#sidebar-create-activity-report").click(function(e){
+        e.preventDefault();
+        var visibility=new Array();
+        $.each($(".visibility.filter-checkbox"),function(){
+            if(typeof $(this).attr("checked")=="undefined"){
+                visibility.push($(this).attr("name"));
+            }
+        });
+
+        var users=new Array();
+        $.each($(".users.filter-checkbox"),function(){
+            if(typeof $(this).attr("checked")=="undefined"){
+                users.push($(this).attr("name"));
+            }
+        });
+
+        var eventTypes=new Array();
+        $.each($(".event-type.filter-checkbox"),function(){
+            if(typeof $(this).attr("checked")=="undefined"){
+                eventTypes.push($(this).attr("name"));
+            }
+        });
+
+        var subtypes=new Array();
+        $.each($(".subtypes.filter-checkbox"),function(){
+            if(typeof $(this).attr("checked")=="undefined"){
+                subtypes.push($(this).attr("name"));
+            }
+        });
+
+        var defaultCheckbox=$("#sidebar-filter-default");
+        var defaultFilters=false;
+        if($(defaultCheckbox).attr("checked")=="checked"){
+            defaultFilters=true;
+        }
+        window.location= "createActivityReport" + "?filters=true&visibility=" + visibility + 
             "&users=" + users+"&types=" + eventTypes +"&subtypes=" + subtypes + 
             "&default=" + defaultFilters;
         return false;
@@ -453,6 +530,19 @@ Yii::app()->clientScript->registerScript('feed-filters','
                 }
             }
         });
+    });
+
+    $("#sidebar-simple-controls .portlet-content").sortable({
+        stop: function (event, ui) {
+            $.ajax({
+                url: "'.$settingsUrl.'",
+                data: {
+                    widget: "FilterControls",
+                    setting: "order",
+                    value: $(this).sortable("toArray")
+                }
+            });
+        }
     });
 
 

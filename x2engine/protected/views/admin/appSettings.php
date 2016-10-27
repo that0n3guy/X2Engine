@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,12 +33,17 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+Yii::app()->clientScript->registerCss('appSettingsCss',"
+#settings-form {
+    padding-bottom: 1px;
+}
+");
 
 Yii::app()->clientScript->registerScript('updateChatPollSlider', "
-
 $('#settings-form input, #settings-form select, #settings-form textarea').change(function() {
-	$('#save-button').addClass('highlight'); //css('background','yellow');
+	$('#save-button').addClass('highlight'); 
 });
 
 $('#chatPollTime').change(function() {
@@ -48,6 +54,9 @@ $('#timeout').change(function() {
 });
 $('#batchTimeout').change(function(){
     $('#batchTimeoutSlider').slider('value',$(this).val());
+});
+$('#massActionsBatchSize').change(function(){
+    $('#massActionsBatchSizeSlider').slider('value',$(this).val());
 });
 
 $('#currency').change(function() {
@@ -96,7 +105,7 @@ $('#currency').change(function() {
         ?><br>
         <?php echo Yii::t('admin', 'Set the duration between notification requests in milliseconds.'); ?>
         <br><br>
-        <?php echo Yii::t('admin', 'Decreasing this number allows for more instantaneous notifications, but generates more server requests, so adjust it to taste. The default value is 2000 (2 seconds).'); ?>
+        <?php echo Yii::t('admin', 'Decreasing this number allows for more instantaneous notifications, but generates more server requests, so adjust it to taste. The default value is 3000 (3 seconds).'); ?>
     </div>
     <div class="form">
         <?php
@@ -161,15 +170,53 @@ $('#currency').change(function() {
         ?>
     </div>
     <div class="form">
-        <label for="Admin_quoteStrictLock"><?php echo Yii::t('admin', 'Enable Strict Lock on Quotes'); ?> <span class="x2-hint" title="<?php echo Yii::t('admin', 'Enabling strict lock completely disables locked quotes from being edited. While this setting is off, there will be a confirm dialog before editing a locked quote.'); ?>">[?]</span></label>
-        <?php echo $form->checkBox($model, 'quoteStrictLock'); ?>
-        <br><br>
-        <label for="Admin_userActionBackdating"><?php echo Yii::t('admin', 'Allow Users to Backdate Actions'); ?> <span class="x2-hint" title="<?php echo Yii::t('admin', 'Enabling action backdating will allow any user to change the automatically set date fields (i.e. create date). While this setting is off, only those with Admin access to the Actions module will be allowed to backdate actions.'); ?>">[?]</span></label>
-        <?php echo $form->checkBox($model, 'userActionBackdating'); ?>
+        <?php
+        echo $form->labelEx($model,'massActionsBatchSize');
+        $this->widget('zii.widgets.jui.CJuiSlider', array(
+            'value' => $model->massActionsBatchSize,
+            // additional javascript options for the slider plugin
+            'options' => array(
+                'min' => 5,
+                'max' => 100,
+                'step' => 5,
+                'change' => "js:function(event,ui) {
+					$('#massActionsBatchSize').val(ui.value);
+					$('#save-button').addClass('highlight');
+				}",
+                'slide' => "js:function(event,ui) {
+					$('#massActionsBatchSize').val(ui.value);
+				}",
+            ),
+            'htmlOptions' => array(
+                'style' => 'margin:10px 0;',
+                'id' => 'massActionsBatchSizeSlider',
+                'style' => 'margin:10px 0;',
+                'class'=>'x2-wide-slider',
+            ),
+        ));
+        echo $form->textField($model,'massActionsBatchSize',array('style'=>'width:50px;','id'=>'massActionsBatchSize'));
+        ?>
     </div>
     <div class="form">
-        <label for="Admin_historyPrivacy"><?php echo Yii::t('admin', 'Event/Action History Privacy'); ?> <span class="x2-hint" title="<?php echo Yii::t('admin', 'Default will allow users to see actions/events which are public or assigned to them. User Only will allow users to only see actions/events assigned to them. Group Only will allow users to see actions/events assigned to members of their groups.') ?>">[?]</span></label>
+        <label class='left-label' for="Admin_quoteStrictLock"><?php echo Yii::t('admin', 'Enable Strict Lock on Quotes'); ?></label><?php echo X2Html::hint2 (Yii::t('admin', 'Enabling strict lock completely disables locked quotes from being edited. While this setting is off, there will be a confirm dialog before editing a locked quote.'));
+        echo X2Html::clearfix (); 
+        echo $form->checkBox($model, 'quoteStrictLock'); ?>
+        <br><br>
+        <label class='left-label' for="Admin_userActionBackdating"><?php echo Yii::t('admin', 'Allow Users to Backdate Actions'); ?></label><?php echo X2Html::hint2 (Yii::t('admin', 'Enabling action backdating will allow any user to change the automatically set date fields (i.e. create date). While this setting is off, only those with Admin access to the Actions module will be allowed to backdate actions.'));
+        echo X2Html::clearfix ();
+        echo $form->checkBox($model, 'userActionBackdating'); ?>
+        <br><br>
         <?php
+        echo $form->label ($model, 'disableAutomaticRecordTagging', array (
+            'class' => 'left-label',
+        ));
+        echo X2Html::hint2 (Yii::t('admin', 'Enabling action backdating will allow any user to change the automatically set date fields (i.e. create date). While this setting is off, only those with Admin access to the Actions module will be allowed to backdate actions.'));
+        echo X2Html::clearfix ();
+        echo $form->checkBox($model, 'disableAutomaticRecordTagging'); ?>
+    </div>
+    <div class="form">
+        <label class='left-label' for="Admin_historyPrivacy"><?php echo Yii::t('admin', 'Event/Action History Privacy'); ?></label><?php echo X2Html::hint2 (Yii::t('admin', 'Default will allow users to see actions/events which are public or assigned to them. User Only will allow users to only see actions/events assigned to them. Group Only will allow users to see actions/events assigned to members of their groups.'));
+        echo X2Html::clearfix ();
         echo $form->dropDownList($model, 'historyPrivacy', array(
             'default' => Yii::t('admin', 'Default'),
             'user' => Yii::t('admin', 'User Only'),
@@ -178,13 +225,6 @@ $('#currency').change(function() {
         ?>
         <br><br>
         <?php echo Yii::t('admin', 'Choose a privacy setting for the Action History widget and Activity Feed. Please note that any user with Admin level access to the module that the History is on will ignore this setting. Only users with full Admin access will ignore this setting on the Activity Feed.') ?>
-    </div>
-    <div class="form">
-        <?php echo $form->labelEx($model, 'corporateAddress'); ?>
-        <div> 
-        <?php echo Yii::t('admin', 'Enter your corporate address to enable directions on the Google Maps widget.') ?>
-        </div>
-<?php echo $form->textArea($model, 'corporateAddress', array('id' => 'corporateAddress', 'style' => 'height:100px;', 'class'=>'x2-extra-wide-input')); ?>
     </div>
     <div class="form">
         <?php echo $form->labelEx($model, 'properCaseNames'); ?>

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 <div class="page-title"><h2><?php echo Yii::t('admin', 'Tag Manager'); ?></h2></div>
 <div class="form">
@@ -54,7 +55,14 @@ $this->widget('zii.widgets.grid.CGridView', array(
             'header' => Yii::t('admin','Tag'),
             'name' => 'tag',
             'type' => 'raw',
-            'value' => "CHtml::link(\$data->tag,array('/search/search','term'=>'#'.ltrim(\$data->tag,'#')), array('class'=>'x2-link x2-tag'))"
+            'value' => "CHtml::link(
+                CHtml::encode(\$data->tag), 
+                array(
+                    '/search/search',
+                    'term'=>CHtml::encode (\$data->tag)
+                ), 
+                array('class'=>'x2-link x2-tag')
+            )"
         ),
         array(
             'header' => Yii::t('admin','# of Records'),
@@ -64,9 +72,17 @@ $this->widget('zii.widgets.grid.CGridView', array(
         array(
             'header' => Yii::t('admin','Delete Tag'),
             'type' => 'raw',
-            'value' => "CHtml::link(Yii::t('admin','Delete Tag'),'#',array('class'=>'x2-button', 'submit'=>'deleteTag?tag='.\substr(\$data->tag,1),'confirm'=>Yii::t('admin','Are you sure you want to delete this tag?')))"
+            'value' => "CHtml::link(Yii::t('admin','Delete Tag'),'#',array('class'=>'x2-button', 'csrf'=>true,'submit'=>'deleteTag?tag='.urlencode (\$data->tag),'confirm'=>Yii::t('admin','Are you sure you want to delete this tag?')))"
         ),
     ),
 ));
 ?><br>
-<?php echo CHtml::link(Yii::t('admin', 'Delete All'), '#', array('class' => 'x2-button', 'submit' => 'deleteTag?tag=all', 'confirm' => Yii::t('admin','Are you sure you want to delete all tags?'))); ?>
+<?php 
+echo CHtml::link(
+    Yii::t('admin', 'Delete All'), '#',
+    array(
+        'class' => 'x2-button',
+        'submit' => 'deleteTag?tag=all', 
+        'confirm' => Yii::t('admin','Are you sure you want to delete all tags?'),
+        'csrf' => true
+    )); ?>

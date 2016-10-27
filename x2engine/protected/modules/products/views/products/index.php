@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,14 +33,13 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('products','Product List')),
-	array('label'=>Yii::t('products','Create'), 'url'=>array('create')),
-        array('label'=>Yii::t('products', 'Import Products'), 'url'=>array('admin/importModels', 'model'=>'Product'), 'visible'=>Yii::app()->params->isAdmin),
-        array('label'=>Yii::t('products', 'Export Products'), 'url'=>array('admin/exportModels', 'model'=>'Product'), 'visible'=>Yii::app()->params->isAdmin),
-));
+
+$menuOptions = array(
+    'index', 'create', 'import', 'export',
+);
+$this->insertMenu($menuOptions);
 
 Yii::app()->clientScript->registerScript('search', "
 $('.search-button').click(function(){
@@ -64,15 +64,15 @@ $('.search-form form').submit(function(){
 <?php
 $this->widget('X2GridView', array(
 	'id'=>'product-grid',
-	'title'=>Yii::t('products','Products'),
-	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize'),
+	'title'=>Yii::t('products','{module}', array('{module}'=>Modules::displayName())),
+	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize','showHidden'),
 	'template'=> 
         '<div id="x2-gridview-top-bar-outer" class="x2-gridview-fixed-top-bar-outer">'.
         '<div id="x2-gridview-top-bar-inner" class="x2-gridview-fixed-top-bar-inner">'.
         '<div id="x2-gridview-page-title" '.
-         'class="page-title icon quotes x2-gridview-fixed-title">'.
+         'class="page-title icon products x2-gridview-fixed-title">'.
         '{title}{buttons}{filterHint}'.
-        
+        '{massActionButtons}'.
         '{summary}{topPager}{items}{pager}',
     'fixedHeader'=>true,
 	'dataProvider'=>$model->search(),

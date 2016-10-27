@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // Quick quote create javascript.
 // To use: just stick a hidden div with id="quote-form-wrapper" somewhere and
@@ -49,6 +50,32 @@ if(typeof x2.inlineQuotes == 'undefined')
 
 jQuery(document).ready(function ($) {
 
+// eventually all inline quotes code should all be moved into this class
+var InlineQuotes = (function () {
+
+function InlineQuotes (argsDict) {
+    var argsDict = typeof argsDict === 'undefined' ? {} : argsDict;
+    var defaultArgs = {
+        DEBUG: x2.DEBUG && false
+    };
+    auxlib.applyArgs (this, defaultArgs, argsDict);
+    x2.Widget.call (this, argsDict);
+    this._init ();
+}
+
+InlineQuotes.prototype = auxlib.create (x2.Widget.prototype);
+
+InlineQuotes.prototype._init = function () {
+    this.element$.find ('.widget-close-button').click (function () {
+        x2.inlineQuotes.toggle ();
+        return false;
+    });
+};
+
+return InlineQuotes;
+
+}) ();
+
 	// Declare all properties required for proper function
 	x2.inlineQuotes.declare = function() {
 
@@ -56,6 +83,9 @@ jQuery(document).ready(function ($) {
            quote table */
         x2.quotes = {};
         x2.quotes.view = "x2.inlineQuotes";
+        x2.inlineQuotes.obj = new InlineQuotes ({
+            element: $('#wide-quote-form')
+        });
 
 		// Basic properties:
 		x2.inlineQuotes.wrapper = $('#quote-create-form-wrapper').first();
@@ -95,8 +125,6 @@ jQuery(document).ready(function ($) {
         }
     }
 
-	x2.inlineQuotes.declare();
-
 	x2.inlineQuotes.moveWrapper = function(sel) {
 		x2.inlineQuotes.wrapper = $(sel);
 		x2.inlineQuotes.wrapperOriginalHtml = x2.inlineQuotes.wrapper.html();
@@ -124,10 +152,14 @@ jQuery(document).ready(function ($) {
 		}).done(function(html) {
 			$('#quote-form-wrapper').html(html).find('#quotes-form .wide.form').addClass('focus-mini-module');
 			x2.inlineQuotes.declare();
-			$.fn.yiiGridView.update("relationships-grid");
-			$.fn.yiiListView.update("history");
+            if (x2.inlineRelationshipsWidget)
+                x2.inlineRelationshipsWidget.refresh ();
+            x2.actionHistory.update ();
+            x2.TransactionalViewWidget.refresh ('QuotesWidget'); 
 			$('html,body').animate({
-				scrollTop: x2.inlineQuotes.updatingId ? $('#quote-detail-' + id).offset().top : x2.inlineQuotes.wrapper.parents('#quote-form-wrapper').first().offset().top
+				scrollTop: x2.inlineQuotes.updatingId ? 
+                    $('#quote-detail-' + id).offset().top : 
+                    x2.inlineQuotes.wrapper.parents('#quote-form-wrapper').first().offset().top
 			},300);
 		});
 	}
@@ -179,7 +211,7 @@ jQuery(document).ready(function ($) {
 		x2.inlineQuotes.form.find('.x2-hint').qtip();
 		// These things are last-minute stylistic adjustments and widget initializationst that don't happen because the scripts are never rende'
 		x2.inlineQuotes.form.find('div.x2-layout.form-view > div:last-child div.formInputBox').css({
-			'margin-bottom':'-495px'
+			//'margin-bottom':'-495px'
 		});
 //		$('html,body').animate({
 //			scrollTop: x2.inlineQuotes.wrapper.offset().top
@@ -360,5 +392,7 @@ jQuery(document).ready(function ($) {
             x2.inlineQuotes.openForm(id);
         }
     }
+
+	x2.inlineQuotes.declare();
 
 });

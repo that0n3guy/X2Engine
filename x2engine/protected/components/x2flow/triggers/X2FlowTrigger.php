@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Color utilities (unused)
@@ -53,23 +54,23 @@ abstract class X2FlowTrigger extends X2FlowItem {
     /**
      * @return array all standard comparison operators
      */
-    public static function getComparisonOptions() {
+    public static function getFieldComparisonOptions () {
         return array(
-            '=' => Yii::t('studio','equals'),
-            '>' => Yii::t('studio','greater than'),
-            '<' => Yii::t('studio','less than'),
-            '>=' => Yii::t('studio','greater than or equal to'),
-            '<=' => Yii::t('studio','less than or equal to'),
-            '<>' => Yii::t('studio','not equal to'),
-            'list' => Yii::t('studio','in list'),
-            'notList' => Yii::t('studio','not in list'),
-            'empty' => Yii::t('studio','empty'),
-            'notEmpty' => Yii::t('studio','not empty'),
-            'contains' => Yii::t('studio','contains'),
-            'noContains' => Yii::t('studio','does not contain'),
-            'changed' => Yii::t('studio','changed'),
-            'before' => Yii::t('studio','before'),
-            'after' => Yii::t('studio','after'),
+            '=' => Yii::t('app','equals'),
+            '>' => Yii::t('app','greater than'),
+            '<' => Yii::t('app','less than'),
+            '>=' => Yii::t('app','greater than or equal to'),
+            '<=' => Yii::t('app','less than or equal to'),
+            '<>' => Yii::t('app','not equal to'),
+            'list' => Yii::t('app','in list'),
+            'notList' => Yii::t('app','not in list'),
+            'empty' => Yii::t('app','empty'),
+            'notEmpty' => Yii::t('app','not empty'),
+            'contains' => Yii::t('app','contains'),
+            'noContains' => Yii::t('app','does not contain'),
+            'changed' => Yii::t('app','changed'),
+            'before' => Yii::t('app','before'),
+            'after' => Yii::t('app','after'),
         );
     }
 
@@ -99,6 +100,8 @@ abstract class X2FlowTrigger extends X2FlowItem {
         'current_time' => 'Current Time',
         'user_active' => 'User Logged In',
         'on_list' => 'On List',
+        'has_tags' => 'Has Tags',
+        'email_open' => 'Email Opened',
         // 'workflow_status'    => 'Workflow Status',
         // 'current_local_time' => ''),
     );
@@ -180,6 +183,17 @@ abstract class X2FlowTrigger extends X2FlowItem {
                     'linkSource'=>Yii::app()->controller->createUrl(
                         CActiveRecord::model('X2List')->autoCompleteSource)
                 );
+            case 'has_tags':
+                return array(
+                    'label' => Yii::t('studio','Has Tags'),
+                    'type' => 'tags',
+                );
+            case 'email_open':
+                return array(
+                    'label' => Yii::t('studio', 'Email Opened'),
+                    'type' => 'dropdown',
+                    'options' => array(),
+                );
             default:
                 return false;
             // case 'workflow_status':
@@ -212,7 +226,7 @@ abstract class X2FlowTrigger extends X2FlowItem {
     /**
      * Checks if all all the params are ship-shape
      */
-    public function validate(&$params=array(), $flowId) {
+    public function validate(&$params=array(), $flowId=null) {
         $paramRules = $this->paramRules();
         if(!isset($paramRules['options'],$this->config['options'])) {
             return $this->afterValidate (
@@ -253,8 +267,8 @@ abstract class X2FlowTrigger extends X2FlowItem {
     }
 
     /**
-     * Default condition processor for main config panel. Checks each option against the key in $params of the same name,
-     * using an operator if provided (defaults to "=")
+     * Default condition processor for main config panel. Checks each option against the key in 
+     * $params of the same name, using an operator if provided (defaults to "=")
      * @return array (error status, message)
      */
     public function check(&$params) {
@@ -268,19 +282,33 @@ abstract class X2FlowTrigger extends X2FlowItem {
                 continue;
 
             $value = $option['value'];
+
             if(isset($option['type']))
                 $value = X2Flow::parseValue($value,$option['type'],$params);
 
-            if(!self::evalComparison($params[$name], $option['operator'], $value)) {
-                return array (
-                    false, 
-                    Yii::t('studio', 'the following condition did not pass: ' .
-                        '{name} {operator} {value}', array (
-                            '{name}' => $params[$name],
-                            '{operator}' => $option['operator'],
-                            '{value}' => $value,
-                        ))
-                );
+            if (isset ($option['comparison']) && !$option['comparison']) {
+                continue;
+            }
+
+            if(!static::evalComparison($params[$name], $option['operator'], $value)) {
+                if (is_string ($value) && is_string ($params[$name]) && 
+                    is_string ($option['operator'])) {
+
+                    return array (
+                        false, 
+                        Yii::t('studio', 'The following condition did not pass: ' .
+                            '{name} {operator} {value}', array (
+                                '{name}' => $params[$name],
+                                '{operator}' => $option['operator'],
+                                '{value}' => (string) $value,
+                            ))
+                    );
+                } else {
+                    return array (
+                        false, 
+                        Yii::t('studio', 'Condition failed')
+                    );
+                }
             }
         }
 
@@ -398,10 +426,7 @@ abstract class X2FlowTrigger extends X2FlowItem {
                     return false;
 
                 if($operator === 'changed') {
-                    $oldAttributes = $model->getOldAttributes();
-                    return (!isset($oldAttributes[$attr]) && $model->isNewRecord) || 
-                        (in_array ($attr, array_keys ($oldAttributes)) && 
-                         $model->getAttribute($attr) != $oldAttributes[$attr]);
+                    return $model->attributeChanged ($attr);
                 }
 
                 if ($field->type === 'link') {
@@ -411,7 +436,7 @@ abstract class X2FlowTrigger extends X2FlowItem {
                 }
 
                 return self::evalComparison(
-                    $attrVal,$operator, X2Flow::parseValue($value,$field->type,$params));
+                    $attrVal,$operator, X2Flow::parseValue($value,$field->type,$params), $field);
 
             case 'current_user':
                 return self::evalComparison(
@@ -453,6 +478,11 @@ abstract class X2FlowTrigger extends X2FlowItem {
                 }
 
                 return ($list !== null && $list->hasRecord ($model));
+            case 'has_tags':
+                if(!isset($model,$value))
+                    return false;
+                $tags = X2Flow::parseValue ($value, 'tags');
+                return $model->hasTags ($tags, 'AND');
             case 'workflow_status':
                 if(!isset($model,$condition['workflowId'],$condition['stageNumber']))
                     return false;
@@ -490,11 +520,16 @@ abstract class X2FlowTrigger extends X2FlowItem {
                                 ':workflow' => $condition['workflowId'],
                             ));
                         return $actionCount >= $stageCount;
-                    default:
-                        return false;
                 }
-            return false;
+                return false;
+            case 'email_open':
+                if (isset($params['sentEmails'], $params['sentEmails'][$value])) {
+                    $trackEmail = TrackEmail::model()->findByAttributes(array('uniqueId' => $params['sentEmails'][$value]));
+                    return $trackEmail && !is_null($trackEmail->opened);
+                }
+                return false;
         }
+        return false;
 
         // foreach($condition as $key = >$value) {
 
@@ -510,16 +545,11 @@ abstract class X2FlowTrigger extends X2FlowItem {
         // }
     }
 
-    /**
-     * @param mixed $subject if applicable, the value to compare $subject with (value of model 
-     *  attribute)
-     * @param string $operator the type of comparison to be used
-     * @param mixed $value the value being analyzed (specified in config menu)
-     * @return boolean
-     */
-    public static function evalComparison($subject,$operator,$value=null) {
+    protected static function parseArray ($operator, $value) {
+        $expectsArray = array ('list', 'notList', 'between');
+
         // $value needs to be a comma separated list
-        if(in_array($operator,array('list','notList','between'),true) && !is_array($value)) {    
+        if(in_array($operator, $expectsArray, true) && !is_array($value)) {    
             $value = explode(',',$value);
 
             $len = count($value);
@@ -529,9 +559,53 @@ abstract class X2FlowTrigger extends X2FlowItem {
                     unset($value[$i]);
             }
         }
+        return $value;
+    }
+
+    /**
+     * @param mixed $subject if applicable, the value to compare $subject with (value of model 
+     *  attribute)
+     * @param string $operator the type of comparison to be used
+     * @param mixed $value the value being analyzed (specified in config menu)
+     * @return boolean
+     */
+    public static function evalComparison($subject,$operator,$value=null, Fields $field = null) {
+        $value = self::parseArray ($operator, $value);
+//        if (!in_array ($operator, $expectsArray, true) && is_array ($value)) {
+//            if (count ($value) > 1) {
+//                return false;
+//            } else {
+//                $value = array_pop ($value);
+//            }
+//        }
 
         switch($operator) {
             case '=':
+                // check for multiselect dropdown
+                if ($field && $field->type === 'dropdown') {
+                    $dropdown = $field->getDropdown (); 
+                    if ($dropdown && $dropdown->multi) {
+                        $subject = StringUtil::jsonDecode ($subject, false);
+                        AuxLib::coerceToArray ($subject);
+                        AuxLib::coerceToArray ($value);
+                        return $subject === $value;
+                    }
+                // check for muti-assignment field
+                } else if ($field && $field->type === 'assignment' && 
+                    $field->linkType === 'multiple') {
+
+                    $subject = explode (Fields::MULTI_ASSIGNMENT_DELIM, $subject); 
+                    AuxLib::coerceToArray ($subject);
+                    AuxLib::coerceToArray ($value);
+                    return $subject === $value;
+                } 
+
+                // this case occurs when dropdown or assignment fields are changed from multiple
+                // to single selection, and flow conditions are left over from before the change 
+                // was made
+                if (is_array ($value)) { 
+                    AuxLib::coerceToArray ($subject);
+                }
                 return $subject == $value;
 
             case '>':
@@ -834,6 +908,6 @@ abstract class X2FlowTrigger extends X2FlowItem {
     }
 
     public static function getTriggerInstances(){
-        return self::getInstances('triggers',array(__CLASS__,'X2FlowSwitch','BaseTagTrigger','BaseWorkflowStageTrigger', 'BaseWorkflowTrigger'));
+        return self::getInstances('triggers',array(__CLASS__,'X2FlowSwitch','X2FlowSplitter','BaseTagTrigger','BaseWorkflowStageTrigger', 'BaseWorkflowTrigger', 'BaseUserTrigger', 'MultiChildNode'));
     }
 }

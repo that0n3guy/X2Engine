@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.components.util.*');
 
@@ -45,18 +46,58 @@ Yii::import('application.components.util.*');
  */
 class ExportFixtureCommand extends CConsoleCommand {
 
+    private $_mode; 
+
 	/**
 	 * @var array Specification for the command line arguments.
 	 * 
 	 * Each entry takes this form:
-	 * array([local var name],[command line description],[default value],[validation expression],[validation error message])
+	 * array(
+     *  [local var name],
+     *  [command line description],
+     *  [default value],
+     *  [validation expression],
+     *  [validation error message]
+     * )
 	 */
 	public $args = array(
-		0 => array('tableName', 'table name', null, '$pass = array_key_exists($arg_in,Yii::app()->db->schema->tables);', "Table doesn't exist"),
-		1 => array('type', 'fixture (f) or init script (i)', 'f', '$pass = in_array($arg_in,array("i","f"));', 'Must be "i" or "f"'),
-		2 => array('range', '"WHERE" clause', '1', '$pass=($arg_in != null);', 'cannot be null'),
-		3 => array('columns', 'table columns to include', '*', '$pass=($arg_in != null);', 'cannot be null'),
-		4 => array('writeCond', 'overwrite (o), rename existing (r)', 'r', '$pass=in_array($arg_in,array("o","r"));', 'Must be "o" or "r"'),
+		0 => array(
+            'tableName',
+            'table name',
+            null,
+            '$pass = array_key_exists($arg_in, Yii::app()->db->schema->tables);',
+            "Table doesn't exist"
+        ),
+		1 => array(
+            'type',
+            'fixture (f) or init script (i)',
+            'f',
+            '$pass = in_array($arg_in, array("i", "f"));',
+            'Must be "i" or "f"'
+        ),
+		2 => array(
+            'range',
+            '"WHERE" clause',
+            '1',
+            '$pass=($arg_in != null);',
+            'cannot be null'
+        ),
+		3 => array(
+            'columns',
+            'table columns to include',
+            '*',
+            '$pass=($arg_in != null);',
+            'cannot be null'
+        ),
+		4 => array(
+            'writeCond', 
+            'overwrite (o), rename existing (r), output to stdout (s), output to file ([filename])',
+            's',
+            '$pass=true;',
+            '',
+            //'$pass=in_array($arg_in, array("o","r","s"));',
+            //'Must be "o", "r", or "s"'
+        ),
 	);
 	public $fixtureDir;
 
@@ -78,11 +119,12 @@ class ExportFixtureCommand extends CConsoleCommand {
 	 * Export the contents of a table in the live database as a fixture or init script.
 	 * 
 	 * Usage:
-	 * <tt>./yiic exportfixture [table name] [f|i] [range] [columns] [o|r]</tt>
+	 * <tt>./yiic exportfixture interactive [table name] [f|i] [range] [columns] [o|r]</tt>
 	 * 
 	 * @param array $args 
 	 */
-	public function run($args) {
+	public function actionInteractive($args) {
+        $this->_mode = 'interactive';
 		$this->fixtureDir = Yii::app()->basePath . '/tests/fixtures';
 		foreach ($this->args as $pos => $spec) {
 			$valid = false;
@@ -107,25 +149,47 @@ class ExportFixtureCommand extends CConsoleCommand {
 			echo $this->getHelp();
 			Yii::app()->end();
 		}
+        $this->actionExport ($tableName, $type, $range, $columns, $writeCond);
+    }
+
+    /**
+     * Non-interactive fixture export with option to specify aliases as command line args
+     */
+    public function actionExport (
+        $tableName, $type='f', $range=1, $columns='*', $writeCond='s', array $aliases=array ()) {
+
 		$fileName = $tableName . ($type == 'i' ? '.init' : '') . '.php';
 		$filePath = $this->fixtureDir . '/' . $tableName . ($type == 'i' ? '.init' : '') . '.php';
 
 		if (file_exists(FileUtil::rpath($filePath))) {
-			if ($writeCond == 'r') {
-				$i = 0;
-				$backup = $filePath;
-				while (file_exists(FileUtil::rpath($backup))) {
-					$backup = "$filePath.$i";
-					$i++;
-				}
-				$this->copyFiles(array("backup of existing: $fileName" => array('source' => $filePath, 'target' => $backup)));
-			} else {
-				echo "\nOverwriting existing file $fileName\n";
-			}
+            switch ($writeCond) {
+                case 'r': 
+                    $i = 0;
+                    $backup = $filePath;
+                    while (file_exists(FileUtil::rpath($backup))) {
+                        $backup = "$filePath.$i";
+                        $i++;
+                    }
+                    $this->copyFiles(
+                        array(
+                            "backup of existing: $fileName" => array(
+                                'source' => $filePath, 
+                                'target' => $backup
+                            )
+                        ));
+                    break;
+                case 'o': 
+				    echo "\nOverwriting existing file $fileName\n";
+                    break;
+                case 's': 
+                    break;
+                default: // filename
+				    echo "\nWriting to file $writeCond\n";
+            }
 		}
 
 		$aliasPrompt = false;
-		if ($type == 'f') {
+		if ($type == 'f' && $this->_mode==='interactive') {
 			$aliasPrompt = $this->confirm('Prompt for row aliases?');
 		}
 
@@ -135,11 +199,14 @@ class ExportFixtureCommand extends CConsoleCommand {
             ->where($range)
             ->queryAll();
 		$fileCont = "<?php\nreturn array(\n";
-		$aliases = array();
 		foreach ($records as $index => $record) {
 			$alias = null;
 			if ($type == 'f') {
-				$alias = $index;
+                if (!$aliasPrompt && isset ($aliases[$index])) {
+				    $alias = $aliases[$index];
+                } else {
+				    $alias = $index;
+                }
 				if ($aliasPrompt) {
 					var_dump($record);
 					$alias = $this->prompt("Alias for this record (enter for \"$index\"):");
@@ -161,13 +228,19 @@ class ExportFixtureCommand extends CConsoleCommand {
 		}
 		$fileCont .= ");\n?>";
 
-		file_put_contents($filePath, $fileCont);
+        if (!in_array ($writeCond, array ('s', 'r', 'o'))) {
+		    file_put_contents($writeCond, $fileCont);
+        } elseif ($writeCond !== 's')  {
+		    file_put_contents($filePath, $fileCont);
+        } else {
+            /**/print ($fileCont);
+        }
 		echo "\nExport complete.\n";
 	}
 
-	public function getHelp() {
-		return "\n***Usage:***\n\tyiic exportfixture [tableName] [type (f|i)] [range] [columns] [writeCond (o|r)]\n\n";
-	}
+//	public function getHelp() {
+//		return "\n***Usage:***\n\tyiic exportfixture [tableName] [type (f|i)] [range] [columns] [writeCond (o|r|s)]\n\n";
+//	}
 
 }
 

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 <div class="wide form">
 
@@ -101,11 +102,13 @@ $(document).ready(function() {
 		<?php echo $form->error($model,'password'); ?>
 	</div>
 
+	<?php if((isset($create) && !$create) || !isset($create)){ ?>
 	<div class="row">
 		<?php echo $form->labelEx($model,'userKey'); ?>
 		<?php echo $form->textField($model,'userKey',array('size'=>20,'maxlength'=>30)); ?>
 		<?php echo $form->error($model,'userKey'); ?>
 	</div>
+    <?php } ?>
 
 	<?php if((isset($flag) && !$flag) || !isset($flag)){ ?>
 	<div class="row">
@@ -161,12 +164,14 @@ $(document).ready(function() {
 		<?php echo $form->error($model,'emailAddress'); ?>
 	</div>
 
+    <?php if((isset($create) && !$create) || !isset($create)) { ?>
 	<div class="row">
         <?php if(isset($flag) && $flag){ $model->status=1; } ?>
 		<?php echo $form->labelEx($model,'status'); ?>
 		<?php echo $form->dropDownList($model,'status', array(1=>'Active', 0=>'Inactive'),array('disabled'=>isset($flag)&&$flag?'disabled':'')); ?>
 		<?php echo $form->error($model,'status'); ?>
 	</div>
+    <?php } ?>
        <?php if((isset($flag) && !$flag) || !isset($flag)){?>
             <label><?php echo Yii::t('users','Roles');?></label>
             <br />
@@ -174,7 +179,7 @@ $(document).ready(function() {
             echo CHtml::dropDownList('roles[]',$selectedRoles,$roles,array('class'=>'multiselect','multiple'=>'multiple', 'size'=>6));
             ?>
             <br />
-            <label><?php echo Yii::t('app','Groups');?></label>
+            <label><?php echo Yii::t('app','{groups}', array('{groups}'=>Modules::displayName(true, "Groups")));?></label>
             <br />
             <?php
             echo CHtml::dropDownList('groups[]',$selectedGroups,$groups,array('class'=>'multiselect','multiple'=>'multiple', 'size'=>6));

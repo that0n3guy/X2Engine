@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,8 +34,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
+Yii::app()->clientScript->registerCssFile(Yii::app()->theme->baseUrl.'/css/importexport.css');
 ?>
 <div class="page-title"><h2><?php echo Yii::t('admin','Import {model} from Template', array('{model}'=>(empty($model)? "" : X2Model::getModelTitle ($model)))); ?></h2></div>
 <div class="form">
@@ -52,20 +54,55 @@
     <br><br>
     <?php echo Yii::t('admin','If you decide to map the "Create Date", "Last Updated", or any other explicit date field, be sure that you have a valid date format entered so that the software can convert to a UNIX Timestamp (if it is already a UNIX Timestamp even better).  Visibility should be either "1" for Public or "0" for Private (it will default to 1 if not provided).'); ?>
 
-    <br><br><?php echo Yii::t('admin','Example');?> <a href="#" id="example-link">[+]</a>
-    <div id="example-box" style="display:none;"><img src="<?php echo Yii::app()->getBaseUrl()."/images/examplecsv.png" ?>"/></div>
+    <br><br><?php echo Yii::t('admin','Example').
+        X2Html::minimizeButton (array('class' => 'pseudo-link'), '#example-box') ;?></a>
+    <div id="example-box" style="display:none;"><img src="<?php echo Yii::app()->theme->getBaseUrl()."/images/examplecsv.png" ?>"/></div>
     <br><br>
     </div>
     <div class="form" style="width:600px;">
+<?php unset($_SESSION['model']); ?>
+    <h3><?php echo Yii::t('admin','Upload File'); ?></h3>
+    <?php
+        echo CHtml::form('importModels','post',array('enctype'=>'multipart/form-data','id'=>'importModels'));
+        echo CHtml::fileField('data', '', array('id'=>'data'))."<br>";
+        echo CHtml::hiddenField('model', $model);
+    ?>
+        <i><?php echo Yii::t('app','Allowed filetypes: .csv'); ?></i>
+        <br><br>
+        <h3><?php
+            echo Yii::t('admin', 'Customize CSV') .
+                X2Html::minimizeButton (array('class' => 'pseudo-link'), '#importSeparator'); ?>
+        </h3>
+    <div id='importSeparator' style='display:none'>
+        <?php
+            echo CHtml::label(Yii::t('admin', 'Delimeter'), 'delimeter');
+            echo CHtml::textField('delimeter', ',').'<br />';
+            echo CHtml::label(Yii::t('admin', 'Enclosure'), 'enclosure');
+            echo CHtml::textField('enclosure', '"');
+        ?>
+    </div>
 <?php
-    unset($_SESSION['model']);
-    echo "<h3>".Yii::t('admin','Upload File')."</h3>";
-    echo CHtml::form('importModels','post',array('enctype'=>'multipart/form-data','id'=>'importModels'));
-    echo CHtml::fileField('data', '', array('id'=>'data'))."<br>";
-    echo CHtml::hiddenField('model', $model);
-    echo "<i>".Yii::t('app','Allowed filetypes: .csv')."</i><br><br>";
-    echo "<h3>".Yii::t('admin', 'Upload Import Map')." <a href='#' id='toggle-map-upload'>[+]</a></h3>";
+    echo "<h3>".Yii::t('admin', 'Import Map').
+        X2Html::minimizeButton (array('class' => 'pseudo-link'), '#upload-map')."</h3>";
     echo "<div id='upload-map' style='display:none;'>";
+    echo Yii::t('admin', 'Please select the default mapping option for any fields that cannot be automatically mapped.')."<br />";
+    echo CHtml::dropDownList ('defaultMapOption', '', array(
+        '' => Yii::t('admin', 'DO NOT MAP'),
+        'createNew' => Yii::t('admin', 'CREATE NEW'),
+    )).'<br /><br />';
+
+    echo Yii::t('admin', "You may select a predefined map here, or upload your own.")."<br />";
+    $availImportMaps = $this->availableImportMaps($model);
+    if (empty($availImportMaps)) {
+        echo "<div style='color:red'>";
+        echo Yii::t('app', "No related import maps were found.");
+        echo "</div>";
+    } else {
+        echo CHtml::radioButtonList('x2maps', null, $availImportMaps, array(
+            'labelOptions'=>array('style'=>'display:inline')
+        ));
+    }
+    echo "<br /><br />";
     echo CHtml::fileField('mapping', '', array('id'=>'mapping'))."<br>";
     echo "<i>".Yii::t('app','Allowed filetypes: .json')."</i>";
     echo "</div><br><br>";
@@ -81,20 +118,31 @@
 ?>
 
 </div>
-<script>
-    $('#example-link').click(function(){
-       $('#example-box').toggle(); 
+
+<?php
+Yii::app()->clientScript->registerScript('recordExportJs', "
+    /**
+     * Set up event listeners for export button and download link
+     */
+    $('#expand-importSeparator').on('click', function() {
+        $('#importSeparator').slideToggle();
     });
-    $('#toggle-map-upload').click(function() {
-        $('#upload-map').toggle();
+
+    $('#x2maps').change(function() {
+        // Reset the file upload if a radio button is selected
+        $('#mapping').val('');
+    });
+    $('#mapping').change(function() {
+        // Deselect the radio buttons when a file is selected instead
+        $('#x2maps').find('input:radio:checked').prop('checked', false);
     });
     $(document).on('submit','#importModels',function(){
-        var fileName=$("#data").val();
+        var fileName=$('#data').val();
         var pieces=fileName.split('.');
         var ext=pieces[pieces.length-1];
         if(ext!='csv'){
-            $("#data").val("");
-            alert("File must be a .csv file.");
+            $('#data').val('');
+            alert('File must be a .csv file.');
             return false;
         }
         var mapfileName = $('#mapping').val();
@@ -102,11 +150,16 @@
             var pieces = mapfileName.split('.');
             var ext = pieces[pieces.length - 1];
             if (ext != 'json'){
-                $('#mapping').val("");
+                $('#mapping').val('');
                 alert('Map file must be a .json file.');
                 return false;
             }
         }
+        if ($('#delimeter').val().length != 1 || $('#enclosure').val().length != 1) {
+            alert (".CJSON::encode(Yii::t('admin', 'Invalid CSV parameters! Delimeter '.
+                        'and enclosure can only be a single character')).");
+            return false;
+        }
     });
-</script>
-    
+", CClientScript::POS_READY);
+?>

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 
 <?php
@@ -46,20 +47,29 @@ $form=$this->beginWidget('CActiveForm', array(
 	// $isQuickCreate = true;	//signal subforms not to call beginWidget()/endWidget(), create submit buttons, etc
 	//var_dump(scandir(''));
 	//include('../x2engine/protected/views/contacts/_form.php');
-	echo $this->renderPartial('application.components.views._form',
-	array(
-		'model'=>$contactModel,
-		'modelName'=>'contacts',
-		'users'=>$users,
-		'isQuickCreate'=>true,
-		'form'=>$form,
+	
+	$this->widget ('FormView', array(
+		'model' => $contactModel,
+		'form' => $form,
+		'suppressQuickCreate' => true,
 	));
+	// echo $this->renderPartial('application.components.views.@FORMVIEW',
+	// array(
+		// 'model'=>$contactModel,
+		// 'modelName'=>'contacts',
+		// 'users'=>$users,
+		// 'isQuickCreate'=>true,
+		// 'form'=>$form,
+	// ));
 	?>
 		<?php echo $form->hiddenField($actionModel,'associationId'); ?>
 
 		
-		
-	<h2><?php echo Yii::t('actions','Action'); ?></h2>
+    <h2>
+        <?php echo Yii::t('actions','{module}', array(
+            '{module}' => Modules::displayName(false),
+        )); ?>
+    </h2>
 
 
 	<?php echo $form->errorSummary($actionModel); ?>
@@ -112,7 +122,10 @@ $form=$this->beginWidget('CActiveForm', array(
 
 	<div class="row buttons">
 		<?php
-		echo CHtml::htmlButton($actionModel->isNewRecord ? Yii::t('app','Submit Contact + Action'):Yii::t('app','Save'),
+            echo CHtml::htmlButton($actionModel->isNewRecord ? Yii::t('app','Submit {contact} + {action}', array(
+                '{contact}' => Modules::displayName(false, "Contacts"),
+                '{action}' => Modules::displayName(false),
+            )) : Yii::t('app','Save'),
 			array('type'=>'submit',
 				'class'=>'x2-button',
 				'id'=>'save-button1',
@@ -123,7 +136,9 @@ $form=$this->beginWidget('CActiveForm', array(
 		); ?>
 
 		<?php
-			echo CHtml::htmlButton(Yii::t('app','Submit Contact + Comment'),
+            echo CHtml::htmlButton(Yii::t('app','Submit {contact} + Comment', array(
+                '{contact}' => Modules::displayName(false, "Contacts"),
+            )),
 				array(
 					'type'=>'submit',
 					'class'=>'x2-button',

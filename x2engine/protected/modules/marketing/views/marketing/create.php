@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,42 +33,34 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+Tours::loadTips('marketing.create');
 
 $this->pageTitle = Yii::t('marketing','Create Campaign');
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('marketing','All Campaigns'), 'url'=>array('index')),
-	array('label'=>Yii::t('marketing','Create Campaign')),
-	array('label'=>Yii::t('contacts','Contact Lists'), 'url'=>array('/contacts/contacts/lists')),
-	array(
-        'label'=>Yii::t('marketing','Newsletters'), 
-        'url'=>array('/marketing/weblist/index'),
-        'visible'=>(Yii::app()->contEd('pro'))
-    ),
-	array('label'=>Yii::t('marketing','Web Lead Form'), 'url'=>array('webleadForm')),
-	array(
-        'label'=>Yii::t('marketing','Web Tracker'), 
-        'url'=>array('webTracker'),
-        'visible'=>(Yii::app()->contEd('pro'))
-    ),
-    
-	array(
-        'label'=>Yii::t('app','X2Flow'),
-        'url'=>array('/studio/flowIndex'),
-        'visible'=>(Yii::app()->contEd('pro'))
-    ),
-));
+$menuOptions = array(
+    'all', 'create', 'lists', 'newsletters', 'weblead', 'webtracker', 'x2flow',
+);
+
+$plaOptions = array(
+    'anoncontacts', 'fingerprints'
+);
+$menuOptions = array_merge($menuOptions, $plaOptions);
+
+$this->insertMenu($menuOptions);
 
 $form = $this->beginWidget('CActiveForm', array(
-	'id'=>'campaign-form',
-	'enableAjaxValidation'=>false
+    'id'=>'campaign-form',
+    'enableAjaxValidation'=>false
 ));
+
 ?>
 
 <div class="page-title icon marketing">
-	<h2><?php echo Yii::t('marketing','Create Campaign'); ?></h2>
-	<?php echo CHtml::submitButton(Yii::t('module','Create'),array('class'=>'x2-button highlight right')); ?>
+    <h2><?php echo Yii::t('marketing','Create Campaign'); ?></h2>
+    <?php echo CHtml::submitButton(Yii::t('module','Create'),array('class'=>'x2-button highlight right')); ?>
 </div>
+
 <?php
 $this->renderPartial('_form', array('model'=>$model, 'modelName'=>'Campaign','form'=>$form));
 

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * This is the model class for table "x2_form_versions".
@@ -152,9 +153,7 @@ class FormLayout extends CActiveRecord {
 							if(isset($col['items'])) {
 								foreach($col['items'] as &$item) {
 
-                                    if(isset($item['name'],$item['labelType'],$item['readOnly'],
-                                        $item['height'],$item['width'])) {
-
+                                    if(isset($item['name'],$item['labelType'],$item['readOnly'])) {
                                         $fieldName = preg_replace('/^formItem_/u','',$item['name']);
 
                                         if(in_array (
@@ -174,4 +173,30 @@ class FormLayout extends CActiveRecord {
         return $editableFieldsInLayout;
     }
 
+    /**
+     * Helper method to unset all defaultView or defaultForm flags
+     * @param string $type Form type, either 'view' or 'form', or both if argument is omitted
+     * @param string Model type to unset flags for
+     */
+    public static function clearDefaultFormLayouts($type = null, $model = null, $scenario = null) {
+        // Construct attributes to select form layouts
+        $attr = array('model' => $model);
+        if ($scenario)
+            $attr['scenario'] = $scenario;
+        if ($type === 'view')
+            $attr['defaultView'] = 1;
+        else if ($type === 'form')
+            $attr['defaultForm'] = 1;
+        $layouts = FormLayout::model()->findAllByAttributes ($attr);
+
+        foreach ($layouts as &$layout) {
+            if ($type === 'view')
+                $layout->defaultView = false;
+            else if ($type === 'form')
+                $layout->defaultForm = false;
+            else
+                $layout->defaultView = $layout->defaultForm = false;
+            $layout->save();
+        }
+    }
 }

@@ -61,7 +61,13 @@ CREATE TABLE x2_quotes_products(
 INSERT INTO `x2_modules`
 (`name`, title, visible, menuPosition, searchable, editable, adminOnly, custom, toggleable)
 VALUES
-('quotes', 'Quotes', 1, 12, 1, 1, 0, 0, 0);
+('quotes', 'Quotes', 1, 14, 1, 1, 0, 0, 0);
+/*&*/
+INSERT INTO `x2_mobile_layouts`
+(`modelName`, `layout`, `defaultView`, `defaultForm`, `version`)
+VALUES
+('Quote', '["name","status","expirationDate","associatedContacts","accountName","probability","description","assignedTo"]', 1, 0, '5.4'),
+('Quote', '["name","status","expirationDate","associatedContacts","accountName","probability","description","assignedTo"]', 0, 1, '5.4');
 /*&*/
 INSERT INTO x2_fields
 (modelName, fieldName, attributeLabel, modified, custom, `type`, required, readOnly, linkType, searchable, isVirtual, relevance, uniqueConstraint, safe, keyType)
@@ -80,6 +86,7 @@ VALUES
 ('Quote', 'associatedContacts', 'Contact',             0, 0, 'link',       0, 0, 'Contacts', 0, 0, '',     0, 1, 'MUL'),
 ('Quote', 'lastUpdated',        'Last Updated',        0, 0, 'dateTime',   0, 1, NULL,       0, 0, '',     0, 1, NULL),
 ('Quote', 'lastActivity',       'Last Activity',       0, 0, 'dateTime',   0, 1, NULL,       0, 0, '',     0, 1, NULL),
+('Quote', 'createdBy',          'Created By',          0, 0, 'varchar',    0, 1, NULL,       0, 0, '',     0, 1, NULL),
 ('Quote', 'updatedBy',          'Updated By',          0, 0, 'varchar',    0, 1, NULL,       0, 0, '',     0, 1, NULL),
 ('Quote', 'status',             'Status',              0, 0, 'dropdown',   0, 0, '106',      0, 0, '',     0, 1, NULL),
 ('Quote', 'expirationDate',     'Expiration Date',     0, 0, 'date',       0, 0, NULL,       0, 0, '',     0, 1, NULL),
@@ -89,7 +96,9 @@ VALUES
 ('Quote',  'invoiceStatus',     'Invoice Status',      0, 0, 'dropdown',   0, 0, '114',      0, 0, '',     0, 1, NULL),
 ('Quote',  'invoiceCreateDate', 'Invoice Created',     0, 0, 'date',       0, 0, NULL,       0, 0, '',     0, 1, NULL),
 ('Quote',  'invoiceIssuedDate', 'Invoice Issued',      0, 0, 'date',       0, 0, NULL,       0, 0, '',     0, 1, NULL),
-('Quote',  'invoicePayedDate',  'Invoice Payed',       0, 0, 'date',       0, 0, NULL,       0, 0, '',     0, 1, NULL),
+('Quote',  'invoicePayedDate',  'Invoice Paid',       0, 0, 'date',       0, 0, NULL,       0, 0, '',     0, 1, NULL),
 ('Quote', 'template',           'Quote Template',      0, 0, 'link',       0, 0, 'Docs',     0, 0, '',     0, 1, 'MUL'),
 ('Quote', 'total',              'Total',               0, 0, 'currency',   0, 0, NULL,       0, 0, '',     0, 1, NULL),
-('Quote', 'subtotal',           'Subtotal',            0, 0, 'currency',   0, 0, NULL,       0, 0, '',     0, 1, NULL);
+('Quote', 'subtotal',           'Subtotal',            0, 0, 'currency',   0, 0, NULL,       0, 0, '',     0, 1, NULL),
+('Quote', 'type',               'Type',                0, 0, 'varchar',    0, 1, NULL,       0, 0, '',     0, 1, NULL),
+('Quote', 'currency',           'Currency',            0, 0, 'varchar',    0, 1, NULL,       0, 0, '',     0, 1, NULL);

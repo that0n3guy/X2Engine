@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,11 +33,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-require_once 'protected/extensions/google-api-php-client/src/Google_Client.php';
-require_once 'protected/extensions/google-api-php-client/src/contrib/Google_DriveService.php';
-require_once 'protected/extensions/google-api-php-client/src/contrib/Google_Oauth2Service.php';
-require_once "protected/extensions/google-api-php-client/src/contrib/Google_CalendarService.php";
+ **********************************************************************************/
+
+require_once 'protected/integration/Google/google-api-php-client/src/Google/autoload.php';
 
 /**
  * Wrapper class for interaction with Google's API and authentication methods.
@@ -96,24 +95,16 @@ class GoogleAuthenticator {
     /**
      * Constructor that sets up the Authenticator with all the required data to
      * connect to Google properly.
-     * @param string $clientId Optional to override the admin settings for this property
-     * @param string $clientSecret Optional to override the admin setting for this property
-     * @param string $redirectUri Define a redirect if the user needs to authenticate again. Defaults to the URL of the current request.
      */
-    public function __construct($clientId = null, $clientSecret = null, $redirectUri = null){
+    public function __construct() {
         $this->_enabled = Yii::app()->settings->googleIntegration; // Check if integration is enabled in the first place
+        $credentials = Yii::app()->settings->getGoogleIntegrationCredentials ();
         if($this->_enabled){
-            $this->clientId = $clientId; // Set properties to the provided data/
-            $this->clientSecret = $clientSecret;
-            $this->redirectUri = $redirectUri;
-            if(empty($this->clientId)){ // If the data provided was empty, set it to what's configured in the admin settings.
-                $this->clientId = Yii::app()->settings->googleClientId;
-            }
-            if(empty($this->clientSecret)){
-                $this->clientSecret = Yii::app()->settings->googleClientSecret;
-            }
+            $this->clientId = $credentials['clientId'];
+            $this->clientSecret = $credentials['clientSecret'];
             if(empty($this->redirectUri)){
-                $this->redirectUri = (@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://').$_SERVER['HTTP_HOST'].Yii::app()->controller->createUrl('');
+                $this->redirectUri = (@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://').
+                    $_SERVER['HTTP_HOST'].Yii::app()->controller->createUrl('');
             }
         }
     }
@@ -164,13 +155,33 @@ class GoogleAuthenticator {
                 $client->setClientSecret($this->clientSecret);
                 $client->setRedirectUri($this->redirectUri);
                 $_GET['code'] = $authorizationCode;
-                return $client->authenticate();
-            }catch(Google_AuthException $e){
+                return $client->authenticate($authorizationCode);
+            }catch(Google_Auth_Exception $e){
                 $this->setErrors($e->getMessage());
                 throw new CodeExchangeException(null);
             }
         }else{
             return false;
+        }
+    }
+    
+    public function exchangeRefreshToken($refreshToken) {
+        if ($this->_enabled) {
+            $client = new Google_Client();
+            $client->setClientId($this->clientId);
+            $client->setClientSecret($this->clientSecret);
+            try {
+                $client->refreshToken($refreshToken); // Try to get an access token based on the stored refresh token
+                $credentials = $client->getAccessToken();
+                return $credentials;
+            } catch (Google_AuthException $e) {
+                $profile = Yii::app()->params->profile;
+                if (isset($profile)) { // If there was an error using the refresh token, remove it from the database so it can't cause issues.
+                    $profile->googleRefreshToken = null;
+                    $profile->update(array('googleRefreshToken'));
+                }
+                return false;
+            }
         }
     }
 
@@ -184,9 +195,8 @@ class GoogleAuthenticator {
     public function getUserInfo($credentials){
         if($this->_enabled){
             $apiClient = new Google_Client();
-            $apiClient->setUseObjects(true);
             $apiClient->setAccessToken($credentials);
-            $userInfoService = new Google_Oauth2Service($apiClient);
+            $userInfoService = new Google_Service_Oauth2 ($apiClient);
             $userInfo = null;
             try{
                 $userInfo = $userInfoService->userinfo->get();
@@ -218,7 +228,10 @@ class GoogleAuthenticator {
             switch($state){
                 case 'calendar':
                     $_SESSION['calendarForceRefresh']=1;
-                    $client->setRedirectUri((@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://').$_SERVER['HTTP_HOST'].Yii::app()->controller->createUrl('/calendar/calendar/syncActionsToGoogleCalendar'));
+                    $client->setRedirectUri(
+                        (@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://').$_SERVER['HTTP_HOST'].
+                            Yii::app()->controller->createUrl(
+                                '/calendar/calendar/syncActionsToGoogleCalendar'));
                     break;
                 default:
                     $client->setRedirectUri($this->redirectUri);
@@ -340,7 +353,7 @@ class GoogleAuthenticator {
 //            $token=json_decode($_SESSION['access_token']);
 //            $reqUrl = 'https://www.googleapis.com/oauth2/v1/tokeninfo?access_token='.
 //                    $token->access_token;
-//            $req = new Google_HttpRequest($reqUrl);
+//            $req = new Google_Http_Request($reqUrl);
 //
 //            $tokenInfo = json_decode(
 //                    $client::getIo()->authenticatedRequest($req)->getResponseBody());
@@ -356,7 +369,7 @@ class GoogleAuthenticator {
                     $_SESSION['token'] = $credentials; // Set credentials as a session variable for quicker lookup.
                     $_SESSION['access_token'] = $credentials;
                     return $credentials;
-                }catch(Google_AuthException $e){
+                }catch(Google_Auth_Exception $e){
                     $profile = Yii::app()->params->profile;
                     if(isset($profile)){ // If there was an error using the refresh token, remove it from the database so it can't cause issues.
                         $profile->googleRefreshToken = null;
@@ -387,7 +400,7 @@ class GoogleAuthenticator {
             $client->setRedirectUri($this->redirectUri);
             $client->setScopes(array('https://www.googleapis.com/auth/drive'));
             $client->setAccessToken($this->getAccessToken());
-            return new Google_DriveService($client);
+            return new Google_Service_Drive ($client);
         }else{
             return false;
         }
@@ -403,7 +416,7 @@ class GoogleAuthenticator {
                 'https://www.googleapis.com/auth/calendar',
                 'https://www.googleapis.com/auth/calendar.readonly'));
             $client->setAccessToken($this->getAccessToken());
-            return new Google_CalendarService($client);
+            return new Google_Service_Calendar($client);
         }else{
             return false;
         }

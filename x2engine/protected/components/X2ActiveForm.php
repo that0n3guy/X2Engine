@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,47 +33,109 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 class X2ActiveForm extends CActiveForm {
 
     /**
-     * Overrides parent method to add custom select class 
+     * @var string $id
      */
-    public function dropDownList($model,$attribute,$data,$htmlOptions=array())
-    {
-        /* x2modstart */    
-        if (isset ($htmlOptions['class'])) {
-            $htmlOptions['class'] .= ' x2-select';
-        } else {
-            $htmlOptions['class'] = 'x2-select';
-        }
-        /* x2modend */ 
-        return CHtml::activeDropDownList($model,$attribute,$data,$htmlOptions);
+    public $id = 'x2-form'; 
+
+    /**
+     * @var bool $instantiateJSClassOnInit
+     */
+    public $instantiateJSClassOnInit = true;
+
+    /**
+     * @var string $JSClass 
+     */
+    public $JSClass = 'X2Form'; 
+
+    /**
+     * @var CFormModel $formModel
+     */
+    public $formModel; 
+
+    public function __construct ($owner=null) {
+        $this->attachBehaviors ($this->behaviors ());
+        //$this->initNamespace ();
+        parent::__construct ($owner);
     }
 
+    public function behaviors () {
+        return array (
+            'WidgetBehavior' => array (
+                'class' => 'application.components.behaviors.WidgetBehavior'
+            ),
+        );
+    }
+
+    public function getJSClassParams () {
+        return array_merge (
+            $this->asa ('WidgetBehavior')->getJSClassParams (),
+            array (
+                'formSelector' => '#'.$this->id,
+                'submitUrl' => $this->action ? $this->action : '',
+                'formModelName' => get_class ($this->formModel),
+            )
+        );
+    }
+
+    public function getPackages () {
+        if (!isset ($this->_packages)) {
+            $this->_packages = array_merge ($this->asa ('WidgetBehavior')->getPackages (), array(
+                'X2FormJS' => array(
+                    'baseUrl' => Yii::app()->baseUrl,
+                    'js' => array(
+                        'js/X2Form.js',
+                    ),
+                    'depends' => array ('auxlib'),
+                ),
+            ));
+        }
+        return $this->_packages;
+    }
+
+    public function multiTypeAutocomplete (
+        $model, $typeAttribute, $idAttribute, $options, array $config = array ()) {
+        return X2Html::activeMultiTypeAutocomplete (
+            $model, $typeAttribute, $idAttribute, $options, $config);
+
+    }
+
+    /**
+     * This method is Copyright (c) 2008-2014 by Yii Software LLC
+     * http://www.yiiframework.com/license/ 
+     */
+	public function dropDownList($model,$attribute,$data,$htmlOptions=array()) {
+		return X2Html::activeDropDownList($model,$attribute,$data,$htmlOptions);
+	}
+
     public function richTextArea (CModel $model, $attribute, array $htmlOptions=array ()) {
-		Yii::app()->clientScript->registerScriptFile(
-            Yii::app()->getBaseUrl().'/js/emailEditor.js', CClientScript::POS_END);
-		Yii::app()->clientScript->registerScriptFile(
-            Yii::app()->getBaseUrl().'/js/ckeditor/ckeditor.js', CClientScript::POS_END);
-		Yii::app()->clientScript->registerScriptFile(
-            Yii::app()->getBaseUrl().'/js/ckeditor/adapters/jquery.js', CClientScript::POS_END);
+        return X2Html::activeRichTextArea ($model, $attribute, $htmlOptions);
+    }
 
-        if (isset ($htmlOptions['class'])) {
-            $htmlOptions['class'] .= ' x2-rich-textarea';
-        } else {
-            $htmlOptions['class'] = 'x2-rich-textarea';
+    public function codeEditor (CModel $model, $attribute, array $htmlOptions = array ()) {
+        return X2Html::activeCodeEditor ($model, $attribute, $htmlOptions);
+    }
+
+    public function resolveHtmlOptions (CModel $model, $attribute, array $htmlOptions = array ()) {
+        CHtml::resolveNameID ($model, $attribute, $htmlOptions);
+        $htmlOptions['id'] = $this->resolveId ($htmlOptions['id']);
+        return $htmlOptions;
+    }
+
+    public function init () {
+        $this->id = $this->resolveId ($this->id);
+
+        if ($this->instantiateJSClassOnInit) {
+            $this->registerPackages (); 
+            $this->instantiateJSClass (false);
         }
 
-        if (!isset ($htmlOptions['width'])) {
-            $htmlOptions['width'] = '725px';
-        }
-        if (!isset ($htmlOptions['height'])) {
-            $htmlOptions['height'] = '125px';
-        }
-
-        return $this->textArea ($model, $attribute, $htmlOptions);
+        parent::init ();
+        echo CHtml::hiddenField (WidgetBehavior::NAMESPACE_KEY, $this->namespace);
     }
 
 }

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerCss('viewNotificationsCss',"
 
@@ -54,8 +55,11 @@ $this->widget('zii.widgets.grid.CGridView', array(
 			'class'=>'x2-button right',
             'id' => 'clear-all-button',
 			'submit'=>array('/notifications/deleteAll'),
-			'confirm'=>Yii::t('app','Permanently delete all notifications?'
-		)))
+			'confirm'=>Yii::t('app','Permanently delete all notifications?'),
+			'params'=>array (
+                'YII_CSRF_TOKEN' => Yii::app()->request->csrfToken,
+            )
+		))
 		.'<div class="title-bar right">{summary}</div></div>{items}{pager}',
     'summaryText' => Yii::t('app', '<b>{start}&ndash;{end}</b> of <b>{count}</b>')
     .'<div class="form no-border" style="display:inline;"> '
@@ -87,7 +91,7 @@ $this->widget('zii.widgets.grid.CGridView', array(
 			'type'=>'raw',
 		),
 		array(
-			'class'=>'CButtonColumn',
+			'class'=>'X2ButtonColumn',
 			'template'=>'{delete}',
 			'deleteButtonUrl'=>'Yii::app()->controller->createUrl("/notifications/delete",array("id"=>$data->id))',
 			'afterDelete'=>'function(link,success,data){

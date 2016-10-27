@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,10 +33,10 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerScript('deleteActionJs', "
-function deleteAction(actionId) {
+function deleteAction(actionId, type) {
 
 	if(confirm('".Yii::t('app', 'Are you sure you want to delete this item?')."')) {
 		$.ajax({
@@ -49,6 +50,7 @@ function deleteAction(actionId) {
 
 					// event detected by x2chart.js
 					$(document).trigger ('deletedAction');
+                    x2.TransactionalViewWidget.refreshByActionType (type);
 				}
 		});
 	}
@@ -65,20 +67,6 @@ if(empty($data->type)){
 } else
     $type = $data->type;
 
-if($type == 'workflow'){
-
-    $workflowRecord = X2Model::model('Workflow')->findByPk($data->workflowId);
-    $stageRecords = X2Model::model('WorkflowStage')->findAllByAttributes(
-            array('workflowId' => $data->workflowId), new CDbCriteria(array('order' => 'id ASC'))
-    );
-
-    // see if this stage even exists; if not, delete this junk
-    if($workflowRecord === null || $data->stageNumber < 1 || $data->stageNumber > count($stageRecords)){
-        $data->delete();
-        return;
-    }
-}
-
 // if($type == 'call') {
 // $type = 'note';
 // $data->type = 'note';
@@ -91,7 +79,9 @@ if($type == 'workflow'){
     <!--<div class="deleteButton">
 <?php //echo CHtml::link('[x]',array('deleteNote','id'=>$data->id)); //,array('class'=>'x2-button')  ?>
     </div>-->
-    <div class="icon <?php echo $type; ?>"></div>
+    <div class="icon <?php echo $type; ?>">
+    <div class="stacked-icon"></div>
+    </div>
     <div class="header">
 <?php
 
@@ -110,7 +100,7 @@ if(empty($data->type) || $data->type == 'weblead'){
     }
 } elseif($data->type == 'workflow'){
     // $actionData = explode(':',$data->actionDescription);
-    echo Yii::t('workflow', 'Process:').'<b> '.$workflowRecord->name.'/'.$stageRecords[$data->stageNumber - 1]->name.'</b> ';
+    echo Yii::t('workflow', 'Process:').'<b> '.$data->workflow->name.'/'.$data->workflowStage->name.'</b> ';
 }elseif($data->type == 'event'){
     echo '<b>'.CHtml::link(Yii::t('calendar', 'Event').': ', '#', array('class' => 'action-frame-link', 'data-action-id' => $data->id));
     if($data->allDay){
@@ -144,7 +134,9 @@ if(empty($data->type) || $data->type == 'weblead'){
         $label = 'Quote:';
     } elseif(in_array($data->type, array('email', 'emailFrom', 'email_quote', 'email_invoice'))) {
         $label = 'Email Message:';
-    } elseif(in_array($data->type, array('emailOpened', 'emailOpened_quote', 'email_opened_invoice'))) {
+    } elseif(
+        in_array($data->type, array('emailOpened', 'emailOpened_quote', 'email_opened_invoice'))) {
+
         $label = 'Email Opened:';
     }
 
@@ -161,7 +153,7 @@ if(empty($data->type) || $data->type == 'weblead'){
                     array('assignedTo'=>$data->assignedTo))) {
 
                     echo CHtml::link(
-                        CHtml::image($themeUrl.'/images/icons/Uncomplete.png'), 
+                        X2Html::fa('fa-undo'), 
                         '#', array(   
                             'class' => 'uncomplete-button',
                             'title' => Yii::t('app', 'uncomplete'),
@@ -170,7 +162,7 @@ if(empty($data->type) || $data->type == 'weblead'){
                     'ActionsComplete',array('assignedTo'=>$data->assignedTo))){
 
                     echo CHtml::link(
-                        CHtml::image($themeUrl.'/images/icons/Complete.png'), 
+                        X2Html::fa('fa-check-circle'), 
                         '#', array(
                             'class' => 'complete-button', 
                             'title' => Yii::t('app', 'complete'),
@@ -183,7 +175,7 @@ if(empty($data->type) || $data->type == 'weblead'){
 
                     echo ($data->type != 'attachment' && $data->type != 'email') ?
                         ' '.CHtml::link(
-                            CHtml::image($themeUrl.'/images/icons/Edit.png'), 
+                            X2Html::fa('fa-edit'), 
                             '#', array(
                                 'class' => 'update-button', 'title' => Yii::t('app', 'edit'),
                                 'data-action-id' => $data->id)) : '';
@@ -192,9 +184,10 @@ if(empty($data->type) || $data->type == 'weblead'){
                     'ActionsDelete',array('assignedTo'=>$data->assignedTo))){
 
                     echo ' '.CHtml::link(
-                        CHtml::image($themeUrl.'/images/icons/Delete_Activity.png'), 
+                        X2Html::fa('fa-times'), 
                         '#', array(
-                            'onclick' => 'deleteAction('.$data->id.'); return false',
+                            'onclick' => 'deleteAction('.
+                                $data->id.', "'.$data->type.'"); return false',
                             'title' => Yii::t('app', 'delete')
                         ));
                 }
@@ -206,14 +199,12 @@ if(empty($data->type) || $data->type == 'weblead'){
     <div class="description">
 <?php
 if($type == 'attachment' && $data->completedBy != 'Email') {
-    echo Media::attachmentActionText(Yii::app()->controller->convertUrls($data->actionDescription), true, true);
+    echo Media::attachmentActionText($data, true, true);
 } else if($type == 'workflow'){
-
-    if(!empty($data->stageNumber) && !empty($data->workflowId) && $data->stageNumber <= count($stageRecords)){
-        if($data->complete == 'Yes')
-            echo ' <b>'.Yii::t('workflow', 'Completed').'</b> '.Formatter::formatLongDateTime($data->completeDate);
-        else
-            echo ' <b>'.Yii::t('workflow', 'Started').'</b> '.Formatter::formatLongDateTime($data->createDate);
+    if($data->complete == 'Yes') {
+        echo ' <b>' . Yii::t('workflow', 'Completed') . '</b> ' . Formatter::formatLongDateTime($data->completeDate);
+    } else {
+        echo ' <b>' . Yii::t('workflow', 'Started') . '</b> ' . Formatter::formatLongDateTime($data->createDate);
     }
     if(isset($data->actionDescription))
         echo '<br>'.CHtml::encode($data->actionDescription);
@@ -221,10 +212,20 @@ if($type == 'attachment' && $data->completedBy != 'Email') {
     if(!empty($data->actionDescription))
         echo CHtml::encode($data->actionDescription), '<br>';
     echo date('Y-m-d H:i:s', $data->completeDate);
-} elseif(in_array($data->type, array('email', 'emailFrom', 'email_quote', 'email_invoice', 'emailOpened', 'emailOpened_quote', 'emailOpened_invoice'))){
+} elseif(in_array($data->type, 
+    array(
+        'email',
+        'emailFrom',
+        'email_quote',
+        'email_invoice',
+        'emailOpened',
+        'emailOpened_quote', 
+        'emailOpened_invoice'
+    ))) {
 
     $legacy = false;
-    if(!preg_match(InlineEmail::insertedPattern('ah', '(.*)', 1, 'mis'), $data->actionDescription, $matches)){
+    if(!preg_match(
+        InlineEmail::insertedPattern('ah', '(.*)', 1, 'mis'), $data->actionDescription, $matches)){
         // Legacy pattern:
         preg_match('/<b>(.*?)<\/b>(.*)/mis', $data->actionDescription, $matches);
         $legacy = true;
@@ -249,26 +250,22 @@ if($type == 'attachment' && $data->completedBy != 'Email') {
     }else{
         echo $body;
     }
-    echo ($legacy ? '<br />' : '').CHtml::link('[View email]', '#', array('onclick' => 'return false;', 'id' => $data->id, 'class' => 'email-frame'));
+    echo ($legacy ? '<br />' : '').
+        CHtml::link(
+            Yii::t('app','[View email]'), '#', 
+            array('onclick' => 'return false;', 'id' => $data->id, 'class' => 'email-frame'));
+}elseif($data->type == 'quotesDeleted'){
+    echo $data->actionDescription;
 }elseif($data->type == 'quotes'){
-    $quotePrint = (bool)  preg_match('/^\d+$/',$data->actionDescription);
-    $objectId = $quotePrint ? $data->actionDescription : $data->id;
-    echo CHtml::link(
-        '[View quote]', 'javascript:void(0);',
-        array(
-            'onclick' => 'return false;',
-            'id' => $objectId,
-            'class' => $quotePrint ? 'quote-print-frame' : 'quote-frame'
-        )
-    );
+    $data->renderInlineViewLink ();
 } else
     echo Yii::app()->controller->convertUrls(CHtml::encode($data->actionDescription)); // convert LF and CRLF to <br />
 ?>
     </div>
     <div class="footer">
         <?php
-        if(isset($relationshipFlag) && $relationshipFlag){
-            $relString=" | ".X2Model::getModelLink($data->associationId,X2Model::getModelName($data->associationType));
+        if(isset($relationshipFlag) && $relationshipFlag && $data->associationId !== 0 && X2Model::getModelName($data->associationType) !== false){
+            $relString=" | ".X2Model::getModelLink($data->associationId, X2Model::getModelName($data->associationType));
         }else{
             $relString="";
         }

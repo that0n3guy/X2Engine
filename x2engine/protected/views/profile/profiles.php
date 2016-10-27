@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerScript('search', "
 $('.search-button').click(function(){
@@ -85,7 +86,7 @@ $this->actionMenu = $this->formatMenu(array(
 	),
 ));*/
 
-$this->widget('X2GridViewLess', array(
+$this->widget('X2ActiveGridView', array(
 	'id'=>'profiles-grid',
 	'title'=>Yii::t('profile', 'People'),
 	'buttons'=>array('advancedSearch','clearFilters','columnSelector','autoResize'),
@@ -106,14 +107,20 @@ $this->widget('X2GridViewLess', array(
 		'tagLine' => 165,
 		'isActive' => 80,
 	),
-    'modelAttrColumnNames'=>array (
+    'includedFields'=>array (
         'tagLine', 'username', 'officePhone', 'cellPhone', 'emailAddress', 'googleId'
     ),
 	'specialColumns'=>array(
 		'fullName'=>array(
 			'name'=>'fullName',
 			'header'=>Yii::t('profile', 'Full Name'),
-			'value'=>'CHtml::link($data->fullName,array("view","id"=>$data->id))',
+			'value'=>'CHtml::link(CHtml::encode($data->fullName),array("view","id"=>$data->id))',
+			'type'=>'raw',
+		),
+		'tagLine'=>array(
+			'name'=>'tagLine',
+			'header'=>Yii::t('profile', 'Tag Line'),
+			'value'=>'CHtml::encode($data->tagLine)',
 			'type'=>'raw',
 		),
 		'isActive'=>array(

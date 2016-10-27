@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 $isGuest = Yii::app()->user->isGuest;
 $auth = Yii::app()->authManager;
@@ -67,6 +68,37 @@ if ($isAdmin && file_exists(
             .'&nbsp;&bull;&nbsp;'.CHtml::link(Yii::t('admin','Updater Settings'),array('/admin/updaterSettings')));
     Yii::app()->session['alertUpdate'] = false;
 }
+
+
+// Warn the administrator if their license key has expired
+$expirationDate = Yii::app()->settings->getProductKeyExpirationDate ();
+if ($isAdmin && isset($expirationDate)) {
+    $supportLink = CHtml::link ('X2Engine', 'http://www.x2crm.com');
+    
+    if (X2_PARTNER_DISPLAY_BRANDING) {
+        $supportLink = CHtml::link (X2_PARTNER_PRODUCT_NAME, X2_PARTNER_RENEWAL_LINK_URL);
+    }
+    
+
+    if ($expirationDate === 'invalid') {
+        Yii::app()->user->setFlash ('admin.licenseError', Yii::t ('admin', 'Your license is invalid. Please contact {link} to purchase a new license.', array(
+            '{link}' => $supportLink,
+        )));
+    } else if ($expirationDate < time()) {
+        $dateString = Yii::app()->dateFormatter->formatDateTime ($expirationDate,'long',null);
+        Yii::app()->user->setFlash ('admin.licenseError', Yii::t ('admin', 'Your license is expired as of {date}. Please contact {link} to complete your renewal.', array(
+            '{date}' => $dateString,
+            '{link}' => $supportLink,
+        )));
+    } else if ($expirationDate < time() + (7 * 24 * 60 * 60)) {
+        $dateString = Yii::app()->dateFormatter->formatDateTime ($expirationDate,'long',null);
+        Yii::app()->user->setFlash ('admin.licenseWarning', Yii::t ('admin', 'Your license is about to expire on {date}. Please contact {link} to complete your renewal.', array(
+            '{date}' => $dateString,
+            '{link}' => $supportLink,
+        )));
+    }
+}
+
 
 if(is_int(Yii::app()->locked)) {
     $lockMsg = '<strong>'.Yii::t('admin','The application is currently locked.').'</strong>';
@@ -103,78 +135,28 @@ foreach($checkFiles as $key => $value){
     if(!file_exists($key) || hash_file('md5', $key) !== $value)
         $logoMissing = true;
 }
-$theme2Css = '';
-if($logoMissing) {
-    $theme2Css = 
-        'html * {
-            background:url('.CHtml::normalizeUrl(array('/site/warning')).') !important;
-        } 
-        #bg{
-            display:none !important;
-        }';
-}
 
-$themeCss = '';
-if ($preferences != null && $preferences['menuTextColor'])
-    $themeCss .= '
-    ul.main-menu > li > a, ul.main-menu > li > span {
-        color:#'.$preferences['menuTextColor']." !important;
-    }\n";
-if ($preferences != null && $preferences['pageHeaderTextColor'])
-    $themeCss .= 
-    '.page-title .x2-minimal-button,
-    div.page-title, div.page-title h2 {
-        color:#'.$preferences['pageHeaderTextColor']." !important;
-    }\n";
-// calculate a slight gradient for menu bar color
-if ($preferences != null && $preferences['menuBgColor']) {
-    $themeCss .= '#header {
-        background: #' . $preferences['menuBgColor'] . ' !important;
-    }';
-}
-// calculate a slight gradient for menu bar color
-if ($preferences != null && $preferences['pageHeaderBgColor']) {
-    /*$rgb = X2Color::hex2rgb($preferences['pageHeaderBgColor']);*/
-    /*$darkerBgColor = '#'.X2Color::rgb2hex(
-        floor($rgb[0]*0.85),floor($rgb[1]*0.85),floor($rgb[2]*0.85));*/
-    /*$themeCss .= X2Color::gradientCss('#'.$preferences['pageHeaderBgColor'],$darkerBgColor).'}';*/
-    $themeCss .= '
-    div.page-title {
-        background-color: #'.$preferences['pageHeaderBgColor'].' !important;
-    }
-    ';
-}
-
-if ($preferences != null && $preferences['activityFeedWidgetBgColor']){
-    $themeCss .= '#feed-box {
-        background-color: #'.$preferences['activityFeedWidgetBgColor'].';
-     }';
-}
-if ($preferences != null && $preferences['gridViewRowColorEven']){
-    $themeCss .= 'div.grid-view table.items tr.even {
-        background: #'.$preferences['gridViewRowColorEven'].' !important;
-     }';
-}
-if ($preferences != null && $preferences['gridViewRowColorOdd']){
-    $themeCss .= 'div.x2-gridview tr.odd {
-        background: #'.$preferences['gridViewRowColorOdd'].' !important;
-     }';
-}
+/*********************************
+* Generate that the theme!
+********************************/
+ThemeGenerator::render();
 
 /* Retrieve flash messages and calculate the appropriate styles for flash messages if applicable */
 $allFlashes = Yii::app()->user->getFlashes();
 $adminFlashes = array();
-$index = 0;
 foreach($allFlashes as $key => $message){
     if(strpos($key, 'admin') === 0){
-        $adminFlashes[$index] = $message;
-        $index++;
+        $adminFlashes[] = array(
+            'message' => $message,
+            'class' => ($key === 'admin.licenseError' ? 'admin-flash-error' : ''),
+        );
     }
 }
 
+
 if($n_flash = count($adminFlashes)) {
     $flashTotalHeight = 17; // See layout.css for details
-    $themeCss .= '
+    $themeCss = '
     div#header {
         position:fixed;
         top: '.($flashTotalHeight*$n_flash).'px;
@@ -183,22 +165,35 @@ if($n_flash = count($adminFlashes)) {
     div#page {
         margin-top:'.(32 + $flashTotalHeight*$n_flash).'px !important;
     }
-    div#x2-gridview-top-bar-outer {
+    div.page-title-fixed-outer {
         position:fixed;
         top: '.(32 +$flashTotalHeight*$n_flash).'px;
         left: 0;
     }
+    div#x2-gridview-top-bar-outer.x2-gridview-fixed-top-bar-outer {
+        position:fixed;
+        top: '.(32 +$flashTotalHeight*$n_flash).'px;
+        left: 0;
+    }
+    div#top-flashes-container-outer {
+        top: '.(32 +$flashTotalHeight*$n_flash).'px;
+    }
+    #user-menu-2 {
+        top: '.($flashTotalHeight*$n_flash).'px;
+    }
     ';
-    foreach($adminFlashes as $index => $message) {
+    foreach($adminFlashes as $index => $flashInfo) {
         $themeCss .= "
         div.flash-message-$index {
                 top: ".(string)($index*$flashTotalHeight)."px;
         }";
     }
+    
+    $cs->registerCss('applyTheme', $themeCss, 'screen', CClientScript::POS_HEAD);
 }
 
-$cs->registerCss('applyTheme', $themeCss, 'screen', CClientScript::POS_HEAD);
-$cs->registerCss('applyTheme2', $theme2Css, 'screen', CClientScript::POS_HEAD);
+// $themeCss .= $theme2Css;
+//$cs->registerCss('applyTheme2', $theme2Css, 'screen', CClientScript::POS_HEAD);
 
 mb_internal_encoding('UTF-8');
 mb_regex_encoding('UTF-8');
@@ -212,61 +207,128 @@ if($isGuest){
 }
 
 $modules = Modules::model()->findAll(
-    array('condition' => 'visible="1"', 'order' => 'menuPosition ASC'));
-$standardMenuItems = array();
-foreach($modules as $moduleItem){
-    if(($isAdmin || $moduleItem->adminOnly == 0) && $moduleItem->name != 'users'){
-        if($moduleItem->name != 'document')
-            $standardMenuItems[$moduleItem->name] = $moduleItem->title;
-        else
-            $standardMenuItems[$moduleItem->title] = $moduleItem->title;
+    array('condition' => 'visible="1"'));
+usort ($modules, function ($a, $b) {
+    $aPos = $a->menuPosition === null ? INF : ((int) $a->menuPosition);
+    $bPos = $b->menuPosition === null ? INF : ((int) $b->menuPosition);
+    if ($aPos < $bPos) {
+        return -1;
+    } elseif ($aPos > $bPos) {
+        return 1;
+    } else {
+        return 0;
     }
-}
+});
 
 $defaultAction = 'index';
 
-foreach($standardMenuItems as $key => $value){
-    if ($key === 'x2Activity' && !$isGuest) {
-        $menuItems[$key] = array(
-            'label' => Yii::t('app', $value), 
-            'itemOptions' => array ('class' => 'top-bar-module-link'),
-            'url' => array("/profile/activity"),
-            'active' => (strtolower($module) == strtolower($key)) ? true : null);
+foreach($modules as $moduleItem){
+    if($isGuest || !(($isAdmin || $moduleItem->adminOnly == 0) && $moduleItem->name != 'users')){
         continue;
     }
+    if ($moduleItem->name === 'document') { // legacy module type
+        $name = $moduleItem->title;
+        $title = $moduleItem->title;
+    } else {
+        $name = $moduleItem->name;
+        $title = $moduleItem->title;
+    }
+    if ($name === 'x2Activity' && !$isGuest) {
+        $menuItems[$name] = array(
+            'label' => Yii::t('app', $title), 
+            'itemOptions' => array ('class' => 'top-bar-module-link'),
+            'url' => array("/profile/activity"),
+            'active' => (strtolower($module) == strtolower($name)) ? true : null);
+        continue;
+    }  elseif ($name === 'charts') { 
+        if (!(Yii::app()->params->isAdmin || 
+            Yii::app()->user->checkAccess('ReportsChartDashboard'))) { 
 
+            continue;
+        }
 
-    $file = Yii::app()->file->set('protected/controllers/'.ucfirst($key).'Controller.php');
-    $action = ucfirst($key).ucfirst($defaultAction);
-    $authItem = $auth->getAuthItem($action);
-    $permission = Yii::app()->user->checkAccess($action) || is_null($authItem);
-    if($file->exists){
-        if($permission)
-            $menuItems[$key] = array(
-                'label' => Yii::t('app', $value), 
+        $menuItems[$name] = array(
+            'label' => Yii::t('app', $title), 
+            'itemOptions' => array ('class' => 'top-bar-module-link'),
+            'url' => array("/reports/chartDashboard"),
+            'active' => (strtolower($module) == 'reports' &&
+                Yii::app()->controller->getAction ()->getId () === 'chartDashboard') ? true : null);
+        continue;
+    } 
+
+    if ($moduleItem->moduleType === 'module') { 
+        $file = Yii::app()->file->set('protected/controllers/'.ucfirst($name).'Controller.php');
+        $action = ucfirst($name).ucfirst($defaultAction);
+        $authItem = $auth->getAuthItem($action);
+        $permission = Yii::app()->params->isAdmin ||
+            is_null($authItem) ||
+            Yii::app()->user->checkAccess($action);
+        if($file->exists){
+            if($permission){
+                $menuItems[] = array(
+                    'label' => Yii::t('app', $title), 
+                    'itemOptions' => array ('class' => 'top-bar-module-link'),
+                    'url' => array("/$name/$defaultAction"),
+                    'active' => (strtolower($module) == strtolower($name)) ? true : null);
+            }
+        }elseif(is_dir('protected/modules/'.$name)){
+            if(!is_null($this->getModule()))
+                $module = $this->getModule()->id;
+            if($permission){
+                $active = (strtolower($module) == strtolower($name) && 
+                    (!isset($_GET['static']) || $_GET['static'] != 'true')) ? true : null;
+                 
+                if ($module === 'reports' && 
+                    Yii::app()->controller->getAction ()->getId () === 'chartDashboard') {
+                    $active = false;
+                }
+                 
+                $menuItems[] = array(
+                    'label' => Yii::t('app', $title), 
+                    'url' => array("/$name/$defaultAction"),
+                    'itemOptions' => array ('class' => 'top-bar-module-link'),
+                    'active' => $active,
+                );
+            }
+        } else {
+            $page = Docs::model()->findByAttributes(
+                array('name' => ucfirst(mb_ereg_replace('&#58;', ':', $title))));
+            if(isset($page) && Yii::app()->user->checkAccess('DocsView')){
+                $id = $page->id;
+                $menuItems[] = array(
+                    'label' => ucfirst($title), 
+                    'url' => array('/docs/'.$id.'?static=true'),
+                    'itemOptions' => array ('class' => 'top-bar-module-link'),
+                    'active' => Yii::app()->request->requestUri == 
+                        $scriptUrl.'/docs/'.$id.'?static=true' ? true : null);
+            }
+        }
+    } elseif ($moduleItem->moduleType === 'link') {
+        if (isset ($moduleItem->linkHref)) {
+            $menuItems[] = array (
+                'label' => $moduleItem->title,
+                'url' => $moduleItem->linkHref,
                 'itemOptions' => array ('class' => 'top-bar-module-link'),
-                'url' => array("/$key/$defaultAction"),
-                'active' => (strtolower($module) == strtolower($key)) ? true : null);
-    }elseif(is_dir('protected/modules/'.$key)){
-        if(!is_null($this->getModule()))
-            $module = $this->getModule()->id;
-        if($permission)
-            $menuItems[$key] = array(
-                'label' => Yii::t('app', $value), 
-                'url' => array("/$key/$defaultAction"),
+                'linkOptions' => $moduleItem->linkOpenInNewTab ? 
+                    array ('target' => '_blank') : array (),
+                'active' => AuxLib::getRequestUrl () === $moduleItem->linkHref,
+            );
+        }
+    } elseif ($moduleItem->moduleType === 'recordLink') {
+        if (isset ($moduleItem->linkRecordType) && isset ($moduleItem->linkRecordId) &&
+            ($model = X2Model::model2 ($moduleItem->linkRecordType)) && 
+            ($record = $model->findByPk ($moduleItem->linkRecordId)) &&
+            $record->asa ('LinkableBehavior') &&
+            $record->isVisibleTo (Yii::app()->params->profile->user)) {
+
+            $menuItems[] = array (
+                'label' => $record->name,
+                'url' => $record->getUrl (),
                 'itemOptions' => array ('class' => 'top-bar-module-link'),
-                'active' => (strtolower($module) == strtolower($key) && 
-                    (!isset($_GET['static']) || $_GET['static'] != 'true')) ? true : null);
-    } else{
-        $page = Docs::model()->findByAttributes(
-            array('name' => ucfirst(mb_ereg_replace('&#58;', ':', $value))));
-        if(isset($page) && Yii::app()->user->checkAccess('DocsView')){
-            $id = $page->id;
-            $menuItems[$key] = array(
-                'label' => ucfirst($value), 'url' => array('/docs/'.$id.'?static=true'),
-                'itemOptions' => array ('class' => 'top-bar-module-link'),
-                'active' => Yii::app()->request->requestUri == 
-                    $scriptUrl.'/docs/'.$id.'?static=true' ? true : null);
+                'linkOptions' => $moduleItem->linkOpenInNewTab ? 
+                    array ('target' => '_blank') : array (),
+                'active' => AuxLib::getRequestUrl () == $record->getUrl (),
+            );
         }
     }
 }
@@ -294,21 +356,6 @@ $menuItems[] = array(
             'id' => 'more-menu',
             'class' => 'dropdown'));
 }
-/*
-// commented out since default logo size is different than display size
-
-// find out the dimensions of the user-uploaded logo so the menu can do its layout calculations
-$logoOptions = array();
-if(is_file(Yii::app()->params->logo)){
-    $logoSize = @getimagesize(Yii::app()->params->logo);
-    if($logoSize)
-        $logoSize = array(min($logoSize[0], 200), min($logoSize[1], 30));
-    else
-        $logoSize = array(92, 30);
-
-    $logoOptions['width'] = $logoSize[0];
-    $logoOptions['height'] = $logoSize[1];
-}*/
 
 /* Construction of the user menu */
 $notifCount = X2Model::model('Notification')->countByAttributes(array('user' => Yii::app()->user->getName()), 'createDate < '.time());
@@ -324,10 +371,11 @@ $searchbarHtml = CHtml::beginForm(array('/search/search'), 'get')
             'autocomplete' => 'off'
         )).'</form>';
 
-if(!empty($profile->avatar) && file_exists($profile->avatar))
-    $avatar = Yii::app()->request->baseUrl.'/'.$profile->avatar;
-else
-    $avatar = Yii::app()->request->baseUrl.'/uploads/default.png';
+if(!empty($profile->avatar) && file_exists($profile->avatar)) {
+    $avatar = Profile::renderAvatarImage($profile->id, 25, 25);
+} else {
+    $avatar = X2Html::defaultAvatar (25);
+}
 
 $widgetsImageUrl = $themeUrl.'/images/admin_settings.png';
 if(!Yii::app()->user->isGuest){
@@ -335,6 +383,8 @@ if(!Yii::app()->user->isGuest){
 }else{
     $widgetMenu = "";
 }
+
+$usersIndexAccess = Yii::app()->user->checkAccess('UsersIndex');
 
 $userMenu = array(
     array(
@@ -349,7 +399,8 @@ $userMenu = array(
     array(
         'label' => Yii::t('app', 'Profile'), 
         'url' => array('/profile/view',
-            'id' => Yii::app()->user->getId()),
+            'id' => Yii::app()->user->getId(),
+            'publicProfile'=>1),
         'itemOptions' => array (
             'id' => 'profile-user-menu-link',
             'class' => 'user-menu-link ' . ($isAdmin ? '' : 'x2-first'),
@@ -358,7 +409,7 @@ $userMenu = array(
     array(
         'label' => Yii::t('app', 'Users'), 
         'url' => array('/users/users/admin'),
-        'visible' => $isAdmin,
+        'visible' => $isAdmin || $usersIndexAccess,
         'itemOptions' => array (
             'id' => 'admin-users-user-menu-link',
             'class' => 'user-menu-link',
@@ -367,7 +418,7 @@ $userMenu = array(
     array(
         'label' => Yii::t('app', 'Users'), 
         'url' => array('/profile/profiles'),
-        'visible' => !$isAdmin,
+        'visible' => !$isAdmin && !$usersIndexAccess,
         'itemOptions' => array (
             'id' => 'non-admin-users-user-menu-link',
             'class' => 'user-menu-link',
@@ -380,7 +431,7 @@ $userMenu = array(
 $userMenuItems = array(
     array(
         'label' => Yii::t('app', 'Profile'), 'url' => array('/profile/view',
-            'id' => Yii::app()->user->getId())),
+            'id' => Yii::app()->user->getId(), 'publicProfile'=>1)),
     array(
         'label' => Yii::t('app', 'Notifications'),
         'url' => array('/site/viewNotifications')),
@@ -395,14 +446,19 @@ $userMenuItems = array(
             'view' => 'iconreference')),
     array(
         'label' => Yii::t('help', 'Help'),
-        'url' => 'http://www.x2engine.com/reference_guide',
+        'url' => 
+         
+            Yii::app()->contEd ('pla') ? X2_PARTNER_HELP_LINK_URL :
+         
+            'http://www.x2crm.com/reference_guide',
         'linkOptions' => array('target' => '_blank')),
+    array(
+        'label' => Yii::t('app','About'),
+        'url' => array('/site/page','view'=>'about'),
+    ),
     array(
         'label' => Yii::t('app', 'Report A Bug'),
         'url' => array('/site/bugReport')),
-    array(
-        'label' => Yii::t('app', 'About X2Engine'),
-        'url' => array('/site/page', 'view' => 'about')),
     array(
         'label' => Yii::t('app', '---'),
         'itemOptions' => array('class' => 'divider')),
@@ -412,11 +468,21 @@ $userMenuItems = array(
             'submit' => array(
                 '/site/toggleVisibility', 'visible' => !Yii::app()->params->sessionStatus,
                 'redirect' => Yii::app()->request->requestUri),
+            'csrf' => true,
             'confirm' => 'Are you sure you want to toggle your session status?',)
     ),
     array('label' => Yii::t('app', 'Logout'), 'url' => array('/site/logout'))
 );
 
+
+if(X2_PARTNER_DISPLAY_BRANDING && Yii::app()->contEd('pla')){
+    $menuPt1 = array_slice($userMenuItems,0,7);
+    $menuPt2 = array_slice($userMenuItems,7);
+    $userMenuItems = array_merge($menuPt1,array(array(
+        'label' => Yii::t('app','About {product}',array('{product}'=>CHtml::encode(X2_PARTNER_PRODUCT_NAME))),
+        'url' => array('/site/page','view'=>'aboutPartner')
+    )),$menuPt2);
+}
 
 if(!$isGuest){
     $userMenu2 = array(
@@ -424,9 +490,12 @@ if(!$isGuest){
                     '<span>'.$notifCount.'</span>', '#', array('id' => 'main-menu-notif', 'style' => 'z-index:999;')),
             'itemOptions' => array('class' => 'special')),
         array('label' => CHtml::link(
-                    '<span>&nbsp;</span>', '#', array('class' => 'x2-button', 'id' => 'fullscreen-button')),
+                    '<i class="fa fa-lg fa-toggle-right"></i>', '#', array(
+                        'class' => 'x2-button', 
+                        'id' => 'fullscreen-button',
+                        'title'=> Yii::t('app', 'toggle widgets') )),
             'itemOptions' => array('class' => 'search-bar special')),
-        array('label' => CHtml::link('<div class="widget-icon"></div>', '#', array(
+        array('label' => CHtml::link('<div class="widget-icon"><i class="fa fa-lg fa-cog"></i></div>', '#', array(
                 'id' => 'widget-button',
                 'class' => 'x2-button',
                 'title' => 'hidden widgets'
@@ -434,8 +503,7 @@ if(!$isGuest){
             'itemOptions' => array('class' => 'search-bar special'
             )),
         array(
-            'label' => CHtml::image(
-                    $avatar, '', array('height' => 25, 'width' => 25)).Yii::app()->getSuModel()->getAlias(),
+            'label' => $avatar.Yii::app()->suModel->alias,
             'itemOptions' => array(
                 'id' => 'profile-dropdown', 'class' => 'dropdown'),
             'items' => $userMenuItems
@@ -446,7 +514,8 @@ if(!$isGuest){
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="<?php echo Yii::app()->language; ?>" lang="<?php echo Yii::app()->language; ?>">
 
 <head>
-<meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
 <link rel="icon" href="<?php echo Yii::app()->getFavIconUrl (); ?>" type="image/x-icon">
 <link rel="shortcut-icon" href="<?php echo Yii::app()->getFavIconUrl (); ?>" type="image/x-icon">
 <!--[if lt IE 8]>
@@ -457,64 +526,35 @@ if(!$isGuest){
 if(method_exists($this,'renderGaCode'))
     $this->renderGaCode('internal');
 
-if (RESPONSIVE_LAYOUT) {
+if (AuxLib::getLayoutType () === 'responsive') {
 ?>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <?php
 }
 ?>
 </head>
-<body style="<?php
-    $noBorders = false;
-    if ($preferences != null && $preferences['backgroundColor'])
-        echo 'background-color:#'.$preferences['backgroundColor'].';';
-
-    if ($preferences != null && $preferences['backgroundImg']) {
-
-        if(file_exists('uploads/'.$preferences['backgroundImg'])) {
-            echo 'background-image:url('.$baseUrl.'/uploads/'.$preferences['backgroundImg'].');';
-        } else {
-            echo 'background-image:url('.$baseUrl.'/uploads/media/'.Yii::app()->user->getName().
-                '/'.$preferences['backgroundImg'].');';
-        }
-
-        switch($bgTiling = $preferences['backgroundTiling']) {
-            case 'repeat-x':
-            case 'repeat-y':
-            case 'repeat':
-                echo 'background-repeat:'.$bgTiling.';';
-                break;
-            case 'center':
-                echo 'background-repeat:no-repeat;background-position:center center;';
-                break;
-            case 'stretch':
-            default:
-                echo 'background-attachment:fixed;background-size:cover;';
-                $noBorders = true;
-        }
-    }
-?>" class="enable-search-bar-modes <?php 
-    if($noBorders) echo 'no-borders'; 
-    if($fullscreen) echo ' no-widgets'; 
-    if(!RESPONSIVE_LAYOUT) echo ' disable-mobile-layout'; 
-?>">
+<?php
+echo X2Html::openBodyTag ($preferences);
+//if (YII_DEBUG && YII_UNIT_TESTING) {
+//    echo "<div id='qunit'></div>";
+//}
+?>
 
 <div id="page-container">
 <div id="page">
     <?php
     if(count($adminFlashes) > 0){
-        foreach($adminFlashes as $index => $message){
+        foreach($adminFlashes as $index => $flashInfo){
+            $classes = "admin-flash-message flash-message-$index ". $flashInfo['class'];
             echo CHtml::tag(
-                'div',array('class'=>"admin-flash-message flash-message-$index"),$message);
+                'div',array('class' => $classes),$flashInfo['message']);
         }
     } ?>
     <div id="header" <?php echo !$preferences['menuBgColor']? 'class="defaultBg"' : ''; ?>>
         <div id="header-inner">
             <div id="main-menu-bar">
                 <div id='show-left-menu-button'>
-                    <div class='x2-bar'></div>
-                    <div class='x2-bar'></div>
-                    <div class='x2-bar'></div>
+                    <i class='fa fa-bars'></i>
                 </div>
                 <a href="<?php echo $isGuest
                         ? $this->createUrl('/site/login')
@@ -523,12 +563,23 @@ if (RESPONSIVE_LAYOUT) {
                         )); ?>"
                  id='search-bar-title' class='special'>
                 <?php
-                echo CHtml::image(
-                    Yii::app()->request->baseUrl.'/'.Yii::app()->params->logo, Yii::app()->settings->appName,
-                    array (
+                $menuLogo = Media::getMenuLogo ();
+                if ($menuLogo && 
+                    $menuLogo->fileName !== 'uploads/protected/logos/yourlogohere.png') {
+
+                    echo CHtml::image(
+                        $menuLogo->getPublicUrl (),
+                        Yii::app()->settings->appName,
+                        array (
+                            'id' => 'your-logo',
+                            'class' => 'custom-logo'
+                        ));
+                } else { 
+                    echo X2Html::logo ('menu', array (
                         'id' => 'your-logo',
-                        'class' => Yii::app()->params->logo === 'uploads/logos/yourlogohere.png' ? '' : 'custom-logo'
+                        'class' => 'default-logo',
                     ));
+                } 
                 ?>
                 </a>
                 <div id='top-menus-container'>
@@ -595,25 +646,12 @@ if (RESPONSIVE_LAYOUT) {
     $this->renderPartial('//layouts/footer');
     if(Yii::app()->session['translate'])
         echo '<div class="yiiTranslationList"><b>Other translated messages</b><br></div>';
-
     if($preferences != null &&
-       ($preferences['loginSound'] || $preferences['notificationSound']) &&
+       $profile->loginSound &&
        isset($_SESSION['playLoginSound']) && $_SESSION['playLoginSound']){
 
         $_SESSION['playLoginSound'] = false;
-        $where = 'fileName=:loginSound';
-        $uploadedBy = Yii::app()->db->createCommand()
-            ->select('uploadedBy')
-            ->from('x2_media')
-            ->where($where, array (':loginSound'=> $preferences['loginSound']))
-            ->queryRow();
-        if(!empty($uploadedBy['uploadedBy'])){
-            $loginSound = Yii::app()->baseUrl.'/uploads/media/'.$uploadedBy['uploadedBy'].'/'.
-                $preferences['loginSound'];
-        }else{
-            $loginSound = Yii::app()->baseUrl.'/uploads/'.$preferences['loginSound'];
-        }
-        echo "";
+        $loginSound = Yii::app()->controller->createUrl('/media/media/getFile',array('id'=>$profile->loginSound));
         Yii::app()->clientScript->registerScript('playLoginSound', '
             $("#loginSound").attr("src","'.$loginSound.'");
 

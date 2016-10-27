@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // Yii::import('application.models.X2Model');
 
@@ -40,7 +41,9 @@
  * This is the model class for table "x2_workflows".
  * @package application.modules.workflow.models
  */
-class Workflow extends CActiveRecord {
+class Workflow extends X2ActiveRecord {
+
+    const DEFAULT_ALL_MODULES = '-1';
 
     /**
      * Returns the static model of the specified AR class.
@@ -53,16 +56,17 @@ class Workflow extends CActiveRecord {
      */
     public function tableName() { return 'x2_workflows'; }
 
+    private static $_workflowOptions;
     private $_stageNameAutoCompleteSource;
 
     public function behaviors() {
         return array_merge(parent::behaviors(),array(
-            'X2LinkableBehavior'=>array(
-                'class'=>'X2LinkableBehavior',
+            'LinkableBehavior'=>array(
+                'class'=>'LinkableBehavior',
                 'module'=>'workflow'
             ),
             'JSONFieldsDefaultValuesBehavior' => array(
-                'class' => 'application.components.JSONFieldsDefaultValuesBehavior',
+                'class' => 'application.components.behaviors.JSONFieldsDefaultValuesBehavior',
                 'transformAttributes' => array(
                     'colors' => array(
                         'first'=>'c4f455', // color of the first stage
@@ -70,6 +74,11 @@ class Workflow extends CActiveRecord {
                     ),
                 ),
                 'maintainCurrentFieldsOrder' => true
+            ),
+            'ERememberFiltersBehavior' => array(
+                'class' => 'application.components.behaviors.ERememberFiltersBehavior',
+                'defaults' => array(),
+                'defaultStickOnClear' => false
             ),
         ));
     }
@@ -83,11 +92,12 @@ class Workflow extends CActiveRecord {
         return array(
             array('name', 'required'),
             array('lastUpdated', 'numerical', 'integerOnly'=>true),
-            array('name', 'length', 'max'=>250),
-            array('isDefault', 'boolean'),
+            array('name, financialModel, financialField', 'length', 'max'=>250),
+            array('isDefault, financial', 'boolean'),
+            array('isDefaultFor', 'validateIsDefaultFor'),
             // The following rule is used by search().
             // Please remove those attributes that should not be searched.
-            array('id, name, lastUpdated', 'safe', 'on'=>'search'),
+            array('id, name, lastUpdated, financial, financialModel, financialField', 'safe', 'on'=>'search'),
         );
     }
 
@@ -106,8 +116,24 @@ class Workflow extends CActiveRecord {
      * @return array behaviors.
      */
     // public function behaviors(){
-        // return array('CSaveRelationsBehavior' => array('class' => 'application.components.CSaveRelationsBehavior'));
+        // return array('CSaveRelationsBehavior' => array('class' => 'application.components.behaviors.CSaveRelationsBehavior'));
     // }
+
+    /**
+     * isDefault should either be a boolean value or an array of module ids 
+     */
+    public function validateIsDefaultFor ($attr) {
+        $val = $this->$attr;
+        if (is_array ($val)) {
+            $moduleIds = Yii::app()->db->createCommand ()
+                ->select ('id')
+                ->from ('x2_modules')
+                ->queryColumn ();
+            if (array_diff ($val, array_merge (array (self::DEFAULT_ALL_MODULES), $moduleIds))) {
+                $this->addError ($attr, Yii::t('workflow', 'Invalid module'));
+            }
+        }
+    }
     
     /**
      * @return array customized attribute labels (name=>label)
@@ -117,22 +143,126 @@ class Workflow extends CActiveRecord {
             'id' => 'ID',
             'name' => Yii::t('workflow','Process Name'),
             'isDefault' => Yii::t('workflow','Default Process'),
+            'isDefaultFor' => Yii::t('workflow','Default Process'),
             'lastUpdated' => Yii::t('workflow','Last Updated'),
+            'financial' => Yii::t('workflow','Show Financial Data'),
+            'financialModel' => Yii::t('workflow','Financial Data Model'),
+            'financialField' => Yii::t('workflow','Financial Data Field'),
         );
     }
-    
+
+    private $_isDefaultFor;
+    public function setIsDefaultFor ($isDefaultFor) {
+        if (!is_array ($isDefaultFor)) $isDefaultFor = array ();
+        $this->_isDefaultFor = $isDefaultFor;
+        if (in_array (self::DEFAULT_ALL_MODULES, $this->_isDefaultFor)) {
+            $this->isDefault = true;
+            $this->_isDefaultFor = array (self::DEFAULT_ALL_MODULES);
+        } else {
+            $this->isDefault = false;
+        }
+    }
+
+    public function getIsDefaultFor () {
+        if (!isset ($this->_isDefaultFor)) {
+            if ($this->isDefault) {
+                $this->_isDefaultFor = array (self::DEFAULT_ALL_MODULES);
+            } else {
+                $this->_isDefaultFor = Yii::app()->db->createCommand ("
+                    select id
+                    from x2_modules
+                    where defaultWorkflow=:id
+                ")->queryColumn (array (':id' => $this->id));
+            }
+        }
+        return $this->_isDefaultFor;
+    }
+
+    public function renderAttribute (
+            $fieldName, $makeLinks = true, $textOnly = true, $encode = true) {
+        switch ($fieldName) {
+            case 'isDefaultFor':
+                $isDefaultFor = $this->getIsDefaultFor ();
+                if (in_array (self::DEFAULT_ALL_MODULES, $isDefaultFor)) {
+                    return Yii::t('workflow', 'All modules');
+                } elseif ($isDefaultFor) {
+                    $qpg = new QueryParamGenerator;
+                    $moduleNames = Yii::app()->db->createCommand ()
+                        ->select ('name')
+                        ->from ('x2_modules')
+                        ->where ('id in '.$qpg->bindArray ($isDefaultFor, true))
+                        ->queryColumn ($qpg->getParams ());
+                    return implode (', ', ArrayUtil::asorti (array_map (function ($name) {
+                        return Modules::displayName (true, $name);
+                    }, $moduleNames)));
+                }
+                break;
+            default:
+                return $this->$fieldName;
+        }
+    }
+
     /**
      * If this workflow is the default, unset isDefault flag on all other workflows
      */
     public function afterSave() {
-        if($this->isDefault) {
-            Yii::app()->db->createCommand('UPDATE x2_workflows SET isDefault=0 WHERE id != ?')
-                ->execute(array($this->id));
+        if (in_array (self::DEFAULT_ALL_MODULES, $this->isDefaultFor)) {
+            // this workflow is default for all modules, so remove all defaults
+            Yii::app()->db->createCommand("
+                update x2_modules
+                set defaultWorkflow=NULL
+                where true
+            ")->execute (array (':id' => $this->id));
+            // remove old global default
+            Yii::app()->db->createCommand("
+                update x2_workflows
+                set isDefault=0
+                where id!=:id
+            ")->execute (array (':id' => $this->id));
+        } else {
+            // set default on a per-module basis
+
+            // add new values
+            if ($this->isDefaultFor) {
+                $qpg = new QueryParamGenerator;
+                Yii::app()->db->createCommand("
+                    update x2_modules
+                    set defaultWorkflow=:id
+                    where id in ".$qpg->bindArray ($this->isDefaultFor, true)."
+                ")->execute ($qpg->mergeParams (array (':id' => $this->id))->getParams ());
+            }
+
+            // clear old values
+            if ($this->isDefaultFor) {
+                $qpg = new QueryParamGenerator;
+                Yii::app()->db->createCommand("
+                    update x2_modules
+                    set defaultWorkflow=NULL
+                    where id not in ".$qpg->bindArray ($this->isDefaultFor, true)." and
+                        defaultWorkflow=:id
+                ")->execute ($qpg->mergeParams (array (':id' => $this->id))->getParams ());
+            } else {
+                Yii::app()->db->createCommand("
+                    update x2_modules
+                    set defaultWorkflow=NULL
+                    where defaultWorkflow=:id
+                ")->execute (array (':id' => $this->id));
+            }
+
+            // if there's a global default, remove it
+            Yii::app()->db->createCommand("
+                update x2_workflows
+                set isDefault=0
+                where true
+            ")->execute ();
         }
         
         parent::afterSave();
     }
 
+    /**
+     * @return array workflow names indexed by id 
+     */
     public static function getList($enableNone=true) {
         $workflows = X2Model::model('Workflow')->findAll();
         $list = array();
@@ -141,6 +271,13 @@ class Workflow extends CActiveRecord {
         foreach ($workflows as $model)
             $list[$model->id] = $model->name;
         return $list;
+    }
+
+    public static function getWorkflowOptions () {
+        if (!isset (self::$_workflowOptions)) {
+            self::$_workflowOptions = self::getList (false);
+        }
+        return self::$_workflowOptions;
     }
 
     /**
@@ -152,7 +289,8 @@ class Workflow extends CActiveRecord {
         /* can only uncomplete if there is no restriction on backdating, or we're 
            still within the edit time window */
         return Yii::app()->params->isAdmin ||
-            Yii::app()->settings->workflowBackdateWindow < 0 || 
+            Yii::app()->settings->workflowBackdateWindow < 0 ||
+            $workflowStatus['stages'][$stage]['completeDate'] == 0 ||
             (time() - $workflowStatus['stages'][$stage]['completeDate']) < 
                  Yii::app()->settings->workflowBackdateWindow;
     }
@@ -351,6 +489,13 @@ class Workflow extends CActiveRecord {
         $action, $workflowStatus, $stage, $comment='', &$message='') {
 
         assert (in_array ($action, array ('complete', 'start', 'revert')));
+
+        if (!isset ($workflowStatus['stages'][$stage])) {
+            $message = Yii::t(
+                'workflow', 'Stage {stage} does not exist', 
+                array ('{stage}' => $stage));
+            return false;
+        }
 
         // ensure that the stage is in a valid state
         switch ($action) {
@@ -560,6 +705,13 @@ class Workflow extends CActiveRecord {
             'completed'=>true
         );
         
+        $workflow = Workflow::model()->findByPk($workflowId);
+        if($workflow){
+            $workflowStatus['financial'] = $workflow->financial;
+            $workflowStatus['financialModel'] = $workflow->financialModel;
+            $workflowStatus['financialField'] = $workflow->financialField;
+        }
+        
         $workflowStages = X2Model::model('WorkflowStage')
             ->findAllByAttributes(
                 array('workflowId'=>$workflowId),
@@ -568,6 +720,7 @@ class Workflow extends CActiveRecord {
         // load all WorkflowStage names into workflowStatus
         foreach($workflowStages as &$stage) {    
             $workflowStatus['stages'][$stage->stageNumber] = array(
+                'id'=>$stage->id,
                 'name'=>$stage->name,
                 'requirePrevious'=>$stage->requirePrevious,
                 'roles'=>$stage->roles,
@@ -592,46 +745,28 @@ class Workflow extends CActiveRecord {
                 ),
                 new CDbCriteria(array('order'=>'createDate ASC'))
             );
-        }/* else if (!empty ($modelType)) {
-            AuxLib::coerceToArray ($modelType);
-            $params = AuxLib::bindArray ($modelType);
-            $workflowActions = X2Model::model('Actions')->findAllByAttributes(
-                array(
-                    'type'=>'workflow',
-                    'workflowId'=>$workflowId
-                ),
-                new CDbCriteria(array(
-                    'order'=>'createDate ASC',
-                    'condition' => 'associationType in ('.implode (',', array_keys ($params)).')',
-                    'params' => $params
-                ))
-            );
-        }*/
+        }
         
         foreach($workflowActions as &$action) {
             
-            // action has an invalid stage number, delete it
-            if($action->stageNumber < 1 || $action->stageNumber > count($workflowStages)) {
-                $action->delete();
-                continue;
-            }
             
             $workflowStatus['started'] = true; // clearly there's at least one stage up in here
-        
-            $stage = $action->stageNumber;
-            
-            // decode workflowActions into a funnel list
-            // Note: multiple actions with the same stage will overwrite each other
-            $workflowStatus['stages'][$stage]['createDate'] = $action->createDate;        
-            $workflowStatus['stages'][$stage]['completeDate'] = $action->completeDate;
+            if(isset($action->workflowStage)){
+                $stage = $action->workflowStage->stageNumber;
 
-             /* A stage is considered complete if either its complete attribute is true or if it 
-             has a valid complete date. */
-            $workflowStatus['stages'][$stage]['complete'] = 
-                ($action->complete == 'Yes') || 
-                (!empty($action->completeDate) && $action->completeDate < time());    
+                // decode workflowActions into a funnel list
+                // Note: multiple actions with the same stage will overwrite each other
+                $workflowStatus['stages'][$stage]['createDate'] = $action->createDate;        
+                $workflowStatus['stages'][$stage]['completeDate'] = $action->completeDate;
 
-            $workflowStatus['stages'][$stage]['description'] = $action->actionDescription; 
+                 /* A stage is considered complete if either its complete attribute is true or if it 
+                 has a valid complete date. */
+                $workflowStatus['stages'][$stage]['complete'] = 
+                    ($action->complete == 'Yes') || 
+                    (!empty($action->completeDate) && $action->completeDate < time());    
+
+                $workflowStatus['stages'][$stage]['description'] = $action->actionDescription; 
+            }
         }
         
         // now scan through and see if there are any incomplete stages
@@ -641,7 +776,6 @@ class Workflow extends CActiveRecord {
                 break;
             }
         }
-        
         return $workflowStatus;
     }
     
@@ -700,7 +834,6 @@ class Workflow extends CActiveRecord {
         $stageCount = count($workflowStatus['stages']);
 
         $stageNames = array ();
-
         for($stage=1; $stage<=$stageCount;$stage++) {
             $stageNames[] = $workflowStatus['stages'][$stage]['name'];
         }
@@ -754,151 +887,6 @@ class Workflow extends CActiveRecord {
     }
 
     /**
-     * Renders the inline workflow widget funnel. Complete/revert buttons are displayed in 
-     * accordance with user stage permissions
-     * @param array Return value of getWorkflowStatus
-     */
-    /*public static function renderWorkflow(&$workflowStatus) {
-        $workflowId = $workflowStatus['id'];
-        $stageCount = count($workflowStatus['stages']);
-        
-        if($stageCount < 1) 
-            return '';
-
-        $colors = $model->getWorkflowStageColors ($stageCount);
-        $startingWidth = 160;
-        $endingWidth = 100;
-        $widthDifference = $endingWidth - $startingWidth;
-        $widthStep = $widthDifference / $stageCount;
-        $statusStr = '';
-        $editPermissions = self::getStagePermissions ($workflowStatus);
-        
-        // $started = false;
-        for($stage=1; $stage<=$stageCount;$stage++) {
-
-            $editPermission = $editPermissions[$stage - 1];
-                
-            $color = $colors[$stage - 1];
-            $width = round($startingWidth + $widthStep*$stage);
-            
-            $statusStr .= 
-                '<div class="row">'.
-                    '<div class="workflow-funnel-box" style="width:'.($startingWidth+10).'px">'.
-                    '<div class="workflow-funnel-stage" '.
-                     'style="width:'.$width.'px;background:'.$color.';">'.
-                         '<b>'.$workflowStatus['stages'][$stage]['name'].'</b>'.
-                     '</div>'.
-                '</div>';
-
-            $previousCheck = self::checkStageRequirement ($stage, $workflowStatus);
-                
-            // if the stage is started
-            if(isset($workflowStatus['stages'][$stage]['createDate'])) {
-                
-                // check if this is the last stage to be started or completed
-                $latestStage = true;
-                if($stage < $stageCount) {
-                    for($i=$stage+1; $i<=$stageCount; $i++) {
-                        if(!empty($workflowStatus['stages'][$i]['createDate'])) {
-                            $latestStage = false;
-                            break;
-                        }
-                    }
-                }
-                $statusStr .= '<div class="workflow-status">';
-                // if($editPermission)
-                $statusStr .= 
-                    ' <a href="javascript:void(0)" class="right" '.
-                      'onclick="x2.workflowManager.workflowStageDetails('.
-                       $workflowId.','.$stage.');">'.'['.Yii::t('workflow','Details').']</a> ';
-                
-                $revertText = 
-                    '<img title="'.Yii::t('app', 'Revert Stage').'" 
-                      src="'.Yii::app()->theme->getBaseUrl ().'/images/icons/Uncomplete.png'.'">';
-                
-                if($workflowStatus['stages'][$stage]['complete']) {
-                    $statusStr .= '<span class="workflow-status-string">'.
-                        Yii::t('workflow','Completed').' '.
-                        date("Y-m-d",$workflowStatus['stages'][$stage]['completeDate']).
-                        '</span>';
-                    // X2Date::dateBox($workflowStatus['stages'][$stage]['completeDate']);
-
-                    if($editPermission && self::canUncomplete ($workflowStatus, $stage)) {
-                        $statusStr .= 
-                            '<a href="javascript:void(0)" class="right" 
-                               onclick="x2.workflowManager.revertWorkflowStage('.
-                                $workflowId.','.$stage.');">
-                               '.$revertText.'
-                            </a>';
-                    }
-                } else {
-                    // $started = true;
-                    $statusStr .= 
-                        '<span class="workflow-status-string">
-                            <b>'.Yii::t('workflow','Started').' '.
-                                date("Y-m-d",$workflowStatus['stages'][$stage]['createDate']).
-                            '</b>
-                        </span>';
-                    // if(!$latestStage)
-                    
-                    if($editPermission){
-                        $statusStr .= 
-                            '<a href="javascript:void(0)" class="right" 
-                              onclick="x2.workflowManager.revertWorkflowStage('.
-                                $workflowId.','.$stage.');">
-                                '.$revertText.'
-                            </a>';
-                    }else{
-                        $statusStr.=
-                            '<span class="right workflow-hint" style="color:gray;" 
-                              title="You do not have permission to revert this stage.">
-                                '.$revertText.'
-                            </span>';
-                    }
-
-                    $completeText = 
-                        '<img title="'.Yii::t('app', 'Complete Stage').'" 
-                          src="'.Yii::app()->theme->getBaseUrl (). 
-                            '/images/icons/Complete.png'.'">';
-                    if($previousCheck && $editPermission) {
-                        $statusStr .= 
-                            '<a href="javascript:void(0)" class="right" 
-                              onclick="'.(($workflowStatus['stages'][$stage]['requireComment']) ? 
-                                  "x2.workflowManager.workflowCommentDialog($workflowId,$stage);" : 
-                                  "x2.workflowManager.completeWorkflowStage($workflowId,$stage);").
-                                    '">
-                                  '.$completeText.'
-                            </a> ';
-                    }elseif($previousCheck && !$editPermission){
-                        $statusStr.=
-                            '<span class="right workflow-hint" style="color:gray;" 
-                              title="You do not have permission to complete this stage.">
-                              '.$completeText.'
-                            </span>';
-                    }
-                }
-                $statusStr .= '</div>';
-            } else {
-                // if(!$started) {
-                    // $started = true;
-                    if($editPermission && $previousCheck) {
-                        $statusStr .= 
-                           '<div class="workflow-status">'.
-                                '<a href="javascript:void(0)" class="right" '.
-                                 'onclick="x2.workflowManager.startWorkflowStage('.
-                                    $workflowId.','.$stage.');">'.
-                                     '['.Yii::t('workflow','Start').']'.
-                                '</a>'.
-                           '</div>';
-                     }
-                // }
-            }
-            $statusStr .= "</div>\n";
-        }
-        return $statusStr."<script>$('.workflow-hint').qtip();</script>";
-    }*/
-
-    /**
       * get hex codes for each stage
       * @param int $stageCount number of stages
       * @return array array of hex codes, one for each stage
@@ -917,22 +905,28 @@ class Workflow extends CActiveRecord {
             $endingRgb[2] - $startingRgb[2],
         );
         
-        $rgbSteps = array(
-            $rgbDifference[0] / $stageCount,
-            $rgbDifference[1] / $stageCount,
-            $rgbDifference[2] / $stageCount,
-        );
+        if ($stageCount === 1) {
+            $rgbSteps = array (0, 0, 0);
+        } else {
+            $steps = $stageCount - 1;
+            // 1 step for each stage other than the first
+            $rgbSteps = array(
+                $rgbDifference[0] / $steps,
+                $rgbDifference[1] / $steps,
+                $rgbDifference[2] / $steps,
+            );
+        }
 
         $colors = array ();
-        for($i=1; $i<=$stageCount;$i++) {
+        for($i=0; $i<$stageCount;$i++) {
             $colors[] = X2Color::rgb2hex2(
                  $startingRgb[0] + ($rgbSteps[0]*$i),
                  $startingRgb[1] + ($rgbSteps[1]*$i),
                  $startingRgb[2] + ($rgbSteps[2]*$i)
             );
             if ($getShaded) {
-                $colors[$i - 1] = array ($colors[$i - 1]);
-                $colors[$i - 1][] = X2Color::rgb2hex2 (array_map (function ($a) {
+                $colors[$i] = array ($colors[$i]);
+                $colors[$i][] = X2Color::rgb2hex2 (array_map (function ($a) {
                     return $a > 255 ? 255 : $a;
                 }, array (
                      0.93 * ($startingRgb[0] + ($rgbSteps[0]*$i)),
@@ -947,6 +941,7 @@ class Workflow extends CActiveRecord {
 
      
     /**
+     * Get number of records at each stage
      * @param array $workflowStatus
      * @param array $dateRange return value of WorkflowController::getDateRange ()
      * @param string $users users filter
@@ -954,8 +949,7 @@ class Workflow extends CActiveRecord {
      * @return array number of records at each stage subject to specified filters
      */
     public static function getStageCounts (
-        &$workflowStatus, $dateRange, $expectedCloseDateDateRange, $users='', $modelType='') {
-
+        &$workflowStatus, $dateRange, $users='', $modelType='contacts') {
 
         $stageCount = count($workflowStatus['stages']);
 
@@ -971,22 +965,78 @@ class Workflow extends CActiveRecord {
             ':workflowId' => $workflowStatus['id'],
         );
 
-        if ($expectedCloseDateDateRange['range'] !== 'all') {
-            $params = array_merge ($params, array (
-                ':expectedCloseDateStart' => $expectedCloseDateDateRange['end'],
-                ':expectedCloseDateEnd' => $expectedCloseDateDateRange['end'],
-            ));
-        }
-
         $stageCounts = array ();
-        $models = self::getModelsFromTypesArr ($modelType);
-        for ($i = 1; $i <= $stageCount; $i++) {
-            
-            $recordsAtStage = 0;
-            foreach($models as $modelName => $model){
+        $modelName = X2Model::getModelName ($modelType);
+        if(!$modelName){
+            $modelType = 'contacts';
+            $modelName = 'Contacts';
+        }
+        $model = X2Model::model($modelName);
+        $tableName = $model->tableName();
+        list ($accessCondition, $accessConditionParams) = 
+            $modelName::model ()->getAccessSQLCondition ($tableName);
+
+        $allParams = array_merge ($params, $accessConditionParams);
+        $recordsAtStages = Yii::app()->db->createCommand()
+            ->select("stageNumber, COUNT(*)")
+            ->from($tableName)
+            ->join(
+                'x2_actions',
+                'x2_actions.associationId='.$tableName.'.id')
+            ->where(
+                "x2_actions.complete != 'Yes' $userString AND 
+                (x2_actions.completeDate IS NULL OR x2_actions.completeDate = 0) AND 
+                x2_actions.createDate BETWEEN :start AND :end AND
+                x2_actions.type='workflow' AND workflowId=:workflowId AND 
+                 associationType='".$modelType."' AND ".$accessCondition,
+                $allParams)
+            ->group('stageNumber')
+            ->queryAll();
+        foreach($recordsAtStages as $row){
+            $stage = WorkflowStage::model()->findByPk($row['stageNumber']);
+            if($stage){
+                $stageCounts[$stage->stageNumber - 1] = $row['COUNT(*)'];
+            }
+        }
+        for($i = 0; $i < $stageCount; $i++){
+            if(!isset($stageCounts[$i])){
+                $stageCounts[$i] = 0;
+            }
+        }
+        ksort($stageCounts);
+        return $stageCounts;
+    }
+    
+    public static function getStageValues(
+    &$workflowStatus, $dateRange, $users = '', $modelType = 'contacts') {
+        $stageValues = array();
+        $stageCount = count($workflowStatus['stages']);
+        if ($workflowStatus['financial'] && $modelType === $workflowStatus['financialModel']
+                && !empty($workflowStatus['financialField'])) {
+            $financialField = Fields::model()->findByAttributes(array(
+                'modelName' => X2Model::getModelName($workflowStatus['financialModel']),
+                'fieldName' => $workflowStatus['financialField']
+            ));
+            if($financialField){
+                $params = array(
+                    ':start' => $dateRange['start'],
+                    ':end' => $dateRange['end'],
+                    ':workflowId' => $workflowStatus['id'],
+                );
+                if (!empty($users)) {
+                    $userString = " AND x2_actions.assignedTo=:user ";
+                    $params[':user'] = $users;
+                } else {
+                    $userString = "";
+                }
+                $modelName = X2Model::getModelName($modelType);
+                $model = X2Model::model($modelName);
                 $tableName = $model->tableName();
-                $recordsAtStage += Yii::app()->db->createCommand()
-                    ->select("COUNT(*)")
+                list ($accessCondition, $accessConditionParams) = $modelName::model()->getAccessSQLCondition($tableName);
+
+                $allParams = array_merge($params, $accessConditionParams);
+                $vals = Yii::app()->db->createCommand()
+                    ->select('stageNumber, SUM(' . $workflowStatus['financialField'] . ') as total')
                     ->from($tableName)
                     ->join(
                         'x2_actions',
@@ -996,16 +1046,31 @@ class Workflow extends CActiveRecord {
                         (x2_actions.completeDate IS NULL OR x2_actions.completeDate = 0) AND 
                         x2_actions.createDate BETWEEN :start AND :end AND
                         x2_actions.type='workflow' AND workflowId=:workflowId AND 
-                        stageNumber=".$i." AND associationType='".$modelName."'".
-                        ($expectedCloseDateDateRange['range'] !== 'all' ? 
-                        (' AND '.$tableName . '.expectedCloseDate 
-                            BETWEEN :expectedCloseDateStart AND :expectedCloseDateEnd') : ''),
-                        $params)
-                    ->queryScalar();
+                         associationType='".$modelType."' AND ".$accessCondition,
+                        $allParams)
+                    ->group('stageNumber')
+                    ->queryAll();
+                foreach($vals as $row){
+                    $stage = WorkflowStage::model()->findByPk($row['stageNumber']);
+                    if($stage){
+                        $stageValues[$stage->stageNumber - 1] = $row['total'];
+                    }
+                }
+                for($i = 0; $i < $stageCount; $i++){
+                    if(!isset($stageValues[$i])){
+                        $stageValues[$i] = 0;
+                    }
+                }
             }
-            $stageCounts[] = $recordsAtStage;
         }
-        return $stageCounts;
+        for($i = 0; $i < $stageCount; $i++){
+            if(!isset($stageValues[$i])){
+                $stageValues[$i] = null;
+            }
+        }
+        
+        ksort($stageValues);
+        return $stageValues;
     }
 
     /**
@@ -1014,7 +1079,7 @@ class Workflow extends CActiveRecord {
      *  particular stage will be shown
      */
     public static function getStageNameLinks (
-        &$workflowStatus, $dateRange, $expectedCloseDateDateRange, $users) {
+        &$workflowStatus, $dateRange, $users) {
 
         $links = array ();
         $stageCount = count($workflowStatus['stages']);
@@ -1029,12 +1094,6 @@ class Workflow extends CActiveRecord {
                     'start'=>Formatter::formatDate($dateRange['start']),
                     'end'=>Formatter::formatDate($dateRange['end']),
                     'range'=>$dateRange['range'],
-                    'expectedCloseDateStart'=>Formatter::formatDate(
-                        $expectedCloseDateDateRange['start']),
-                    'expectedCloseDateEnd'=>Formatter::formatDate(
-                        $expectedCloseDateDateRange['end']),
-                    'expectedCloseDateEnd'=>Formatter::formatDate(
-                        $expectedCloseDateDateRange['range']),
                     $users
                 ),
                 array(
@@ -1045,84 +1104,42 @@ class Workflow extends CActiveRecord {
         }
         return $links;
     }
-
-    /**
-     * Renders workflow funnel for the workflow view page. Funnel is displayed with a record
-     * count for each stage.
-     */
-    /*public static function renderWorkflowStats(&$workflowStatus, $modelType='') {
-        $dateRange=WorkflowController::getDateRange();
-        $user=isset($_GET['users'])?$_GET['users']:''; 
-        if(!empty($user)){
-            $userString=" AND assignedTo='$user' ";
-        }else{
-            $userString="";
-        }
-        $stageCount = count($workflowStatus['stages']);
-        
-        if($stageCount < 1)
-            return '';
-        
-        $colors = self::getWorkflowStageColors ($stageCount);
-        
-        $startingWidth = 260;
-        $endingWidth = 150;
-
-
-        $widthDifference = $endingWidth - $startingWidth;
-        $widthStep = $widthDifference / $stageCount;
-        
-        $funnelStr = '';
-        $statusStr = '';
-
-        $stageCounts = self::getStageCounts ($workflowStatus, $dateRange, $user, $modelType);
-
-        for($i=1; $i<=$stageCount;$i++) {
-        
-            $color = $colors[$i - 1];
-            $width = round($startingWidth + $widthStep*$i);
-
-
-            $recordsAtStage = $stageCounts[$i - 1];
-            
-            // $opportunities = X2Model::model('Actions')->countByAttributes(
-                // array('type'=>'workflow','associationType'=>'opportunities','actionDescription'=>$workflowStatus['id'].':'.$i),
-                // new CDbCriteria(array('condition'=>"complete != 'Yes' OR completeDate IS NULL OR completeDate = 0"))
-            // );
-            
-            $funnelStr .= 
-                 '<div class="workflow-funnel-stage" '.
-                   'style="width:'.$width.'px;background:'.$color.';"><span class="name">';
-                
-            $funnelStr .= CHtml::link(
-                $workflowStatus['stages'][$i]['name'],
-                array(
-                    '/workflow/workflow/view','id'=>$workflowStatus['id'],'stage'=>$i,
-                    'start'=>Formatter::formatDate(
-                        $dateRange['start']),'end'=>Formatter::formatDate($dateRange['end']),
-                        'range'=>$dateRange['range'],$user
-                ),
-                array('onclick'=>'x2.WorkflowViewManager.getStageMembers('.$i.'); return false;')
-            );
-            
-            $funnelStr .= 
-                '</span><span class="contact-icon" title="'.Yii::t('workflow', 'Deals').'">'
-                    .Yii::app()->locale->numberFormatter->formatDecimal($recordsAtStage).
-                '</span></div>';
-                // <span class="sales-icon">'
-                // .Yii::app()->locale->numberFormatter->formatDecimal($opportunities).'</span>
-        }
-        $str = '<div class="row">'.
-                    '<div class="cell">'.
-                        '<div class="workflow-funnel-box" style="width:'.($startingWidth+10).'px">'.
-                         $funnelStr.'</div>'.
-                    '</div>'.
-                    '<div class="cell">'.$statusStr.'</div>'.
-                '</div>';
-        return $str;
-    }*/
     
-    
+    public function updateStages($newStages){
+        $oldIds = array();
+        foreach($this->stages as $stage){
+            $oldIds[] = $stage->id;
+        }
+        $newIds = array();
+        for ($i = 1; $i <= count($newStages); $i++) {
+            if(isset($newStages[$i]['stageId'])){
+                $newIds[$i] = $newStages[$i]['stageId'];
+            }else{
+                $newIds[$i] = '';
+            }
+        }
+        $forDeletion = array_diff($oldIds, $newIds);
+        $validStages = true;
+        $returnStages = array();
+        foreach($newIds as $number => $id){
+            $stage = WorkflowStage::model()->findByPk($id);
+            if(!$stage){
+                $stage = new WorkflowStage;
+            }
+            $stage->workflowId = $this->id;
+            $stage->stageNumber = $number;
+            $stage->attributes = $newStages[$number];
+            $stage->roles = $newStages[$number]['roles'];
+            if(empty($stage->roles) || in_array('',$stage->roles)){
+                $stage->roles = array();
+            }
+            $returnStages[] = $stage;
+            if(!$stage->validate()){
+                $validStages = false;
+            }
+        }
+        return array($validStages, $returnStages, $forDeletion);
+    }
     
     /**
      * Retrieves a list of models based on the current search/filter conditions.
@@ -1203,35 +1220,29 @@ class Workflow extends CActiveRecord {
                 Find the action associated with the stage and complete it
                 */
             
-                // find action for selected stage (and duplicates)
-                $actionModels = X2Model::model('Actions')->findAllByAttributes(
+                
+                $action = X2Model::model('Actions')->findByAttributes(
                     array(
                         'associationId'=>$modelId,'associationType'=>$type,'type'=>'workflow',
-                        'workflowId'=>$workflowId,'stageNumber'=>$stageNumber
-                    ),
-                    new CDbCriteria(array('order'=>'createDate DESC'))
+                        'workflowId'=>$workflowId,'stageNumber'=>$stage['id']
+                    )
                 );
-                
-                // if there is more than 1 action for this stage,
-                for($i=1;$i<count($actionModels);$i++) {
-                    $actionModels[$i]->delete(); // delete all but the most recent one
-                }
 
-                $actionModels[0]->setScenario('workflow');
+                $action->setScenario('workflow');
                 
                 // don't genererate normal action changelog/triggers/events
-                $actionModels[0]->disableBehavior('changelog');    
-                $actionModels[0]->disableBehavior('tags'); // no tags
-                $actionModels[0]->completeDate = time(); // set completeDate and save model
-                $actionModels[0]->dueDate=null;
-                $actionModels[0]->complete = 'Yes';
-                $actionModels[0]->completedBy = Yii::app()->user->getName();
-                $actionModels[0]->actionDescription = $comment;
-                $actionModels[0]->save();
+                $action->disableBehavior('changelog');    
+                $action->disableBehavior('TagBehavior'); // no tags
+                $action->completeDate = time(); // set completeDate and save model
+                $action->dueDate=null;
+                $action->complete = 'Yes';
+                $action->completedBy = Yii::app()->user->getName();
+                $action->actionDescription = $comment;
+                $action->save();
                 
                 $model->updateLastActivity();
                 
-                self::updateWorkflowChangelog($actionModels[0],'complete',$model);
+                self::updateWorkflowChangelog($action,'complete',$model);
 
                 if ($autoStart) {
                 
@@ -1248,12 +1259,12 @@ class Workflow extends CActiveRecord {
                        }
                    
                        // start the next one (unless there is already one)
-                       if(empty($workflowStatus['stages'][$i]['createDate'])) {    
+                       if(empty($workflowStatus['stages'][$i]['createDate'])) {
                            $nextAction = new Actions('workflow');
                            
                            // don't genererate normal action changelog/triggers/events
                            $nextAction->disableBehavior('changelog');    
-                           $nextAction->disableBehavior('tags'); // no tags
+                           $nextAction->disableBehavior('TagBehavior'); // no tags
                            $nextAction->associationId = $modelId;
                            $nextAction->associationType = $type;
                            $nextAction->assignedTo = Yii::app()->user->getName();
@@ -1262,7 +1273,7 @@ class Workflow extends CActiveRecord {
                            $nextAction->visibility = 1;
                            $nextAction->createDate = time();
                            $nextAction->workflowId = $workflowId;
-                           $nextAction->stageNumber = $i;
+                           $nextAction->stageNumber = $workflowStatus['stages'][$i]['id'];
                            // $nextAction->actionDescription = $comment;
                            $nextAction->save();
    
@@ -1293,18 +1304,18 @@ class Workflow extends CActiveRecord {
                 $completed = true;
 
                 X2Flow::trigger('WorkflowCompleteStageTrigger',array(
-                    'workflow'=>$actionModels[0]->workflow,
+                    'workflow'=>$action->workflow,
                     'model'=>$model,
-                    'workflowId'=>$actionModels[0]->workflow->id,
+                    'workflowId'=>$action->workflow->id,
                     'stageNumber'=>$stageNumber,
                 ));
                 
                 
                 if($workflowStatus['completed'])
                     X2Flow::trigger('WorkflowCompleteTrigger',array(
-                        'workflow'=>$actionModels[0]->workflow,
+                        'workflow'=>$action->workflow,
                         'model'=>$model,
-                        'workflowId'=>$actionModels[0]->workflow->id
+                        'workflowId'=>$action->workflow->id
                     ));
 
             }
@@ -1331,7 +1342,7 @@ class Workflow extends CActiveRecord {
         if (!$workflowStatus) 
             $workflowStatus = Workflow::getWorkflowStatus($workflowId,$modelId,$type);
 
-
+        $stage = $workflowStatus['stages'][$stageNumber];
         //AuxLib::debugLogR ($workflowStatus);
         //assert ($model !== null);
 
@@ -1346,7 +1357,7 @@ class Workflow extends CActiveRecord {
 
             // don't genererate normal action changelog/triggers/events
             $action->disableBehavior('changelog');    
-            $action->disableBehavior('tags'); // no tags up in here
+            $action->disableBehavior('TagBehavior'); // no tags up in here
             $action->associationId = $modelId;
             $action->associationType = $type;
             $action->assignedTo = Yii::app()->user->getName();
@@ -1357,7 +1368,7 @@ class Workflow extends CActiveRecord {
             $action->createDate = time();
             $action->lastUpdated = time();
             $action->workflowId = (int)$workflowId;
-            $action->stageNumber = (int)$stageNumber;
+            $action->stageNumber = (int)$stage['id'];
             $action->save();
             
             $model->updateLastActivity();
@@ -1399,55 +1410,45 @@ class Workflow extends CActiveRecord {
         
         if (!$workflowStatus)
             $workflowStatus = Workflow::getWorkflowStatus($workflowId,$modelId,$type);
-        $stageCount = count($workflowStatus['stages']);
-
+        
+        $stage = $workflowStatus['stages'][$stageNumber];
         $reverted = false;
         
         // if stage has been started or completed
         if($model !== null &&
             self::isStarted ($workflowStatus, $stageNumber)) {
 
-            // find selected stage (and duplicates)
-            $actions = X2Model::model('Actions')->findAllByAttributes(
+            $action = X2Model::model('Actions')->findByAttributes(
                 array(
                     'associationId'=>$modelId,'associationType'=>$type,'type'=>'workflow',
-                    'workflowId'=>$workflowId,'stageNumber'=>$stageNumber
-                ),
-                new CDbCriteria(array('order'=>'createDate DESC'))
+                    'workflowId'=>$workflowId,'stageNumber'=>$stage['id']
+                )
             );
-
-            // if there is more than 1 action for this stage,
-            if(count($actions) > 1) {
-                // delete all but the most recent one
-                for($i=1;$i<count($actions);$i++) {
-                    $actions[$i]->delete();
-                }
-            }
 
             // the stage is complete, so just set it to 'started'
             if(self::isCompleted ($workflowStatus, $stageNumber) && 
                self::canUncomplete ($workflowStatus, $stageNumber)) {
 
                 //AuxLib::debugLogR ('uncompleting stage '.$stageNumber);
-                $actions[0]->setScenario('workflow');
+                $action->setScenario('workflow');
                 
                 // don't genererate normal action changelog/triggers/events
-                $actions[0]->disableBehavior('changelog');    
-                $actions[0]->disableBehavior('tags'); // no tags up in here
-                $actions[0]->complete = 'No';
-                $actions[0]->completeDate = null;
-                $actions[0]->completedBy = '';
+                $action->disableBehavior('changelog');    
+                $action->disableBehavior('TagBehavior'); // no tags up in here
+                $action->complete = 'No';
+                $action->completeDate = null;
+                $action->completedBy = '';
 
                 // original completion note no longer applies
-                $actions[0]->actionDescription = '';    
-                $actions[0]->save();
+                $action->actionDescription = '';    
+                $action->save();
                 
-                self::updateWorkflowChangelog($actions[0],'revert',$model);
+                self::updateWorkflowChangelog($action,'revert',$model);
 
                 X2Flow::trigger('WorkflowRevertStageTrigger',array(
-                    'workflow'=>$actions[0]->workflow,
+                    'workflow'=>$action->workflow,
                     'model'=>$model,
-                    'workflowId'=>$actions[0]->workflow->id,
+                    'workflowId'=>$action->workflow->id,
                     'stageNumber'=>$stageNumber,
                 ));
                 
@@ -1465,7 +1466,7 @@ class Workflow extends CActiveRecord {
                         'condition' => 
                             "associationId=$modelId AND associationType='$type' ".
                                 "AND type='workflow' AND workflowId=$workflowId ".
-                                "AND stageNumber >= $stageNumber"
+                                "AND stageNumber >= {$stage['id']}"
                     )
                 ));
                 foreach($subsequentActions as &$action) {
@@ -1549,155 +1550,6 @@ class Workflow extends CActiveRecord {
         $changelog->save();
     }
 
-    public static function getProjectedValue ($recordType, $attrs) {
-        switch ($recordType) {
-            case 'contacts':
-            case 'accounts':
-                return $attrs['dealvalue'] * (($attrs['rating'] * 20) / 100);
-                break;
-            case 'opportunities':
-                return $attrs['quoteAmount'] * ($attrs['probability'] / 100);
-                break;
-            default:
-                if (YII_DEBUG) {
-                    AuxLib::printStackTrace ();
-                    throw new CException ('projectedValue: default on switch with '.$recordType); 
-                }
-        }
-    }
-
-    /**
-     * @param object $workflow 
-     * @param string $user user filter
-     * @param string $modelType 
-     * @param array $dateRange 
-     * @return array values of each stage in the workflow with the given id
-     */
-    public static function getStageValues (
-        $workflow, $users, $modelType, $dateRange, $expectedCloseDateDateRange) {
-
-        $stageValues = array ();
-        $stageCount = count ($workflow->stages);
-        for ($i = 1; $i <= $stageCount; $i++) {
-            $stageValues[] = Workflow::getStageValue (
-                $workflow->id, $i, $users, $modelType, $dateRange, $expectedCloseDateDateRange);
-        }
-        return $stageValues;
-    }
-
-    private static function getModelsFromTypesArr ($modelTypes) {
-        $models=array(
-            'contacts' => new Contacts,
-            'opportunities' => new Opportunity,
-            'accounts' => new Accounts
-        );
-        if (!empty($modelType)) {
-            if (!in_array ('contacts', $modelType)) {
-                unset ($models['contacts']);
-            }
-            if (!in_array ('opportunities', $modelType)) {
-                unset ($models['opportunities']);
-            }
-            if (!in_array ('accounts', $modelType)) {
-                unset ($models['accounts']);
-            }
-        }
-        return $models;
-    }
-
-    /**
-     * @param int $workflowId 
-     * @param int $stageNumber 
-     * @param string $user user filter
-     * @param string $modelType 
-     * @param array $dateRange 
-     * @return array (<totalValue>, <projectedValue>, <currentAmount>, <count>)
-     */
-    public static function getStageValue (
-        $workflowId, $stageNumber, $user, $modelType, $dateRange, $expectedCloseDateDateRange) {
-
-        $models = self::getModelsFromTypesArr ($modelType);
-
-        $totalValue=0;
-        $projectedValue=0;
-        $currentAmount=0;
-        $count=0;
-        foreach($models as $modelName => $model){
-            $attributeParams = array ();
-            if(!empty($user)){
-                $userString=" AND x2_actions.assignedTo=:user ";
-                $attributeParams[':user'] = $user;
-            }else{
-                $userString="";
-            }
-            $tableName = $model->tableName();
-            $attributeConditions=
-                ($expectedCloseDateDateRange['range'] !== 'all' ? 
-                ($tableName . '.expectedCloseDate 
-                    BETWEEN :expectedCloseDateStart AND :expectedCloseDateEnd AND ') : '').
-                'x2_actions.createDate BETWEEN :date1 AND :date2
-                AND x2_actions.type="workflow" AND x2_actions.workflowId=:workflowId
-                AND x2_actions.associationType=:associationType
-                AND x2_actions.stageNumber=:stageNumber '.$userString.'
-                AND x2_actions.complete!="Yes" 
-                AND (x2_actions.completeDate IS NULL OR x2_actions.completeDate=0)';
-            $attributeParams=array_merge ($attributeParams, array(
-                ':date1'=>$dateRange['start'],
-                ':date2'=>$dateRange['end'],
-                ':stageNumber'=>$stageNumber,
-                ':workflowId'=>$workflowId,
-                ':associationType'=>$modelName,
-            ));
-            if ($expectedCloseDateDateRange['range'] !== 'all') {
-                $attributeParams = array_merge ($attributeParams, array (
-                    ':expectedCloseDateStart' => $expectedCloseDateDateRange['end'],
-                    ':expectedCloseDateEnd' => $expectedCloseDateDateRange['end'],
-                ));
-            }
-
-            if($model->hasAttribute('dealvalue')){
-                $valueField="dealvalue";
-            }elseif($model->hasAttribute('quoteAmount')){
-                $valueField='quoteAmount';
-            }
-
-            if($model->hasAttribute('rating')){
-                $probability='((rating*20)/100)';
-            }elseif($model->hasAttribute('probability')){
-                $probability='probability/100';
-            }
-            $valueString="";
-            if(isset($valueField)){
-                $valueString.=", SUM($valueField), SUM($valueField*$probability)";
-            }
-            $totalRecords=Yii::app()->db->createCommand()
-                    ->select("COUNT(*)".$valueString)
-                    ->from($model->tableName())
-                    ->join('x2_actions','x2_actions.associationId='.$model->tableName().'.id')
-                    ->where($attributeConditions,$attributeParams)
-                    ->queryRow();
-            if($model->hasAttribute('dealstatus')){
-                $status='dealstatus';
-            }elseif($model->hasAttribute('salesStage')){
-                $status='salesStage';
-            }
-
-            if(isset($valueField)){
-                $currentValue=Yii::app()->db->createCommand()
-                        ->select('SUM('.$valueField.')')
-                        ->from($model->tableName())
-                        ->join('x2_actions','x2_actions.associationId='.$model->tableName().'.id')
-                        ->where($attributeConditions.' AND '.$status.'="Won"',$attributeParams)
-                        ->queryRow();
-                $totalValue+=$totalRecords["SUM($valueField)"];
-                $projectedValue+=$totalRecords["SUM($valueField*$probability)"];
-                $currentAmount+=$currentValue["SUM($valueField)"];
-                $count+=$totalRecords['COUNT(*)'];
-            }
-        }
-        return array ($totalValue, $projectedValue, $currentAmount, $count);
-    }
-
     public function getStageNameAutoCompleteSource() {
         if (!isset ($this->_stageNameAutoCompleteSource)) {
             $this->_stageNameAutoCompleteSource = Yii::app()->controller->createUrl (
@@ -1719,6 +1571,27 @@ class Workflow extends CActiveRecord {
             $listItemColors[$i - 1][] = "rgba($r, $g, $b, 0.12)";
         }
         return $listItemColors;
+    }
+
+    public function getDisplayName ($plural=true, $ofModule=true) {
+        return Yii::t('workflow', '{process}', array(
+            '{process}' => Modules::displayName($plural, 'Process'),
+        ));
+    }
+    
+    public static function getCurrencyFields($model='contacts'){
+        $ret = array();
+        if(X2Model::getModelName($model)){
+            $financialFields = Fields::model()->findAllByAttributes(array(
+                'modelName'=>X2Model::getModelName($model),
+                'type' => 'currency'
+            ));
+            foreach($financialFields as $field){
+                $ret[$field->fieldName] = $field->attributeLabel;
+            }
+            asort($ret);
+        }
+        return $ret;
     }
 
 }

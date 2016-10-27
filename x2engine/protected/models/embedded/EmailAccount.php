@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.models.embedded.JSONEmbeddedModel');
 
@@ -46,13 +47,19 @@ Yii::import('application.models.embedded.JSONEmbeddedModel');
  */
 class EmailAccount extends JSONEmbeddedModel {
 
-    public $senderName = '';
     public $email = '';
+    public $imapNoValidate = false;
+    public $imapPort = 143;
+    public $imapSecurity = '';
+    public $imapServer = '';
+    public $password = '';
     public $port = 25;
     public $security = '';
+    public $senderName = '';
     public $server = '';
     public $user = '';
-    public $password = '';
+    public $enableVerification = true;
+    public $disableInbox = false;
 
     public function attributeLabels(){
         return array(
@@ -63,6 +70,11 @@ class EmailAccount extends JSONEmbeddedModel {
             'security' => Yii::t('app', 'Security type'),
             'user' => Yii::t('app', 'User name (if different from email address)'),
             'password' => Yii::t('app', 'Password'),
+            'imapPort' => Yii::t('app','IMAP Port'),
+            'imapServer' => Yii::t('app','IMAP Server'),
+            'imapSecurity' => Yii::t('app','IMAP Security'),
+            'imapNoValidate' => Yii::t('app','Disable SSL Validation'),
+            'disableInbox' => Yii::t('app','Disable Email Inbox'),
         );
     }
 
@@ -74,36 +86,80 @@ class EmailAccount extends JSONEmbeddedModel {
         return Yii::t('app','Email Account');
     }
 
+    public function renderInput ($attr) {
+        switch($attr){
+            case 'senderName':
+                echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'email':
+                echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'server':
+                echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'imapServer':
+                echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'port':
+                echo CHtml::activeNumberField($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'imapPort':
+                echo CHtml::activeNumberField($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'security':
+                echo CHtml::activeDropDownList($this, $attr,array(''=>'None','tls'=>'TLS','ssl'=>'SSL'), $this->htmlOptions($attr));
+                break;
+            case 'imapSecurity':
+                echo CHtml::activeDropDownList($this, $attr,array(''=>'None','tls'=>'TLS','ssl'=>'SSL'), $this->htmlOptions($attr));
+                break;
+            case 'imapNoValidate':
+                echo CHtml::activeCheckBox($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'disableInbox':
+                echo CHtml::activeCheckBox($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'user':
+                echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
+                break;
+            case 'password':
+                echo X2Html::x2ActivePasswordField ($this, $attr, $this->htmlOptions ($attr), true);
+                break;
+        }
+    }
+
     /**
      * Generate the form for the embedded model
      */
     public function renderInputs() {
-        foreach($this->attributeNames() as $attr){
-            echo CHtml::activeLabel($this, $attr,array('for'=>$this->resolveName($attr)));
-            switch($attr){
-                case 'senderName':
-                    echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
-                    break;
-                case 'email':
-                    echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
-                    break;
-                case 'server':
-                    echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
-                    break;
-                case 'port':
-                    echo CHtml::activeNumberField($this, $attr, $this->htmlOptions($attr));
-                    break;
-                case 'security':
-                    echo CHtml::activeDropDownList($this, $attr,array(''=>'None','tls'=>'TLS','ssl'=>'SSL'), $this->htmlOptions($attr));
-                    break;
-                case 'user':
-                    echo CHtml::activeTextField($this, $attr, $this->htmlOptions($attr));
-                    break;
-                case 'password':
-                    echo CHtml::activePasswordField($this, $attr, $this->htmlOptions($attr));
-                    break;
-            }
-        }
+        $this->password = null;
+        echo CHtml::activeLabel ($this, 'senderName');
+        $this->renderInput ('senderName');
+        echo CHtml::activeLabel ($this, 'email');
+        $this->renderInput ('email');
+        echo CHtml::activeLabel ($this, 'server');
+        $this->renderInput ('server');
+        echo CHtml::activeLabel ($this, 'port');
+        $this->renderInput ('port');
+        echo CHtml::activeLabel ($this, 'security');
+        $this->renderInput ('security');
+        echo CHtml::activeLabel ($this, 'user');
+        $this->renderInput ('user');
+        echo CHtml::activeLabel ($this, 'password');
+        $this->renderInput ('password');
+        echo '<br/>';
+        echo '<br/>';
+		echo CHtml::tag ('h3', array (), Yii::t('app', 'IMAP Configuration'));
+        echo '<hr/>';
+        echo CHtml::activeLabel($this, 'imapPort');
+        $this->renderInput ('imapPort');
+        echo CHtml::activeLabel($this, 'imapSecurity');
+        $this->renderInput ('imapSecurity');
+        echo CHtml::activeLabel($this, 'imapNoValidate');
+        $this->renderInput ('imapNoValidate');
+        echo CHtml::activeLabel($this, 'imapServer');
+        $this->renderInput ('imapServer');
+        echo CHtml::activeLabel($this, 'disableInbox');
+        $this->renderInput ('disableInbox');
         echo CHtml::errorSummary($this);
     }
 
@@ -124,7 +180,7 @@ class EmailAccount extends JSONEmbeddedModel {
             array('user','emailUser'),
             array('server,user,email','length','min'=>1,'max'=>500,'allowEmpty'=>0),
             array('password','required'),
-            array('senderName,server,port,security,user,email,password','safe'),
+            array('senderName,server,port,security,user,email,password,imapPort,imapServer,imapSecurity,imapNoValidate,disableInbox','safe'),
         );
     }
 

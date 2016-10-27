@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,28 +33,60 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-Yii::import('application.components.X2LinkableBehavior');
+Yii::import('application.components.behaviors.LinkableBehavior');
 Yii::import('application.modules.users.models.*');
-Yii::import('application.components.JSONFieldsBehavior');
-Yii::import('application.components.WidgetLayoutJSONFieldsBehavior');
-Yii::import('application.components.X2SmartSearchModelBehavior');
+Yii::import('application.components.behaviors.NormalizedJSONFieldsBehavior');
+Yii::import('application.components.behaviors.WidgetLayoutJSONFieldsBehavior');
+Yii::import('application.components.behaviors.SmartSearchModelBehavior');
+Yii::import('application.components.sortableWidget.SortableWidget');
 
 /**
  * This is the model class for table "x2_profile".
  * @package application.models
  */
-class Profile extends CActiveRecord {
+class Profile extends X2ActiveRecord {
+
+    /**
+     * username of guest profile record 
+     */
+    const GUEST_PROFILE_USERNAME = '__x2_guest_profile__';
 
     private $_isActive;
 
-    public function setIsActive ($isActive) {
-        if ($isActive === '0' || $isActive === 'false') {
-            $this->_isActive = 0;
-        } else if ($isActive === '1' || $isActive === 'true') {
-            $this->_isActive = 1;
+    public $photo; // used for avatar upload
+
+    /**
+     * @var string Used in the search scenario to uniquely identify this model. Allows filters
+     *  to be saved for each grid view.
+     */
+    public $uid;
+
+    /**
+     * @var bool If true, grid views displaying models of this type will have their filter and
+     *  sort settings saved in the database instead of in the session
+     */
+    public $dbPersistentGridSettings = false;
+
+    public function __construct(
+        $scenario = 'insert', $uid = null, $dbPersistentGridSettings = false){
+
+        if ($uid !== null) {
+            $this->uid = $uid;
         }
+        $this->dbPersistentGridSettings = $dbPersistentGridSettings;
+        parent::__construct ($scenario);
+    }
+
+
+    public function getName () {
+        return $this->fullName;
+    }
+
+
+    public function setIsActive ($isActive) {
+        $this->_isActive = $isActive;
     }
 
     public function getIsActive () {
@@ -79,67 +112,213 @@ class Profile extends CActiveRecord {
         return 'x2_profile';
     }
 
+
+    public function getLanguageOptions () {
+        $languageDirs = scandir('./protected/messages'); // scan for installed language folders
+        if(is_dir('./custom/protected/messages')){
+            $languageDirs += scandir('./custom/protected/messages');
+        }
+        sort($languageDirs);
+        $languages = array('en' => 'English');
+
+        foreach ($languageDirs as $code) {  // look for langauges name
+            $name = $this->getLanguageName($code, $languageDirs);  // in each item in $languageDirs
+            if ($name !== false)
+                $languages[$code] = $name; // add to $languages if name is found
+        }
+        return $languages;
+    }
+
+    /**
+     * Obtain the name of the language given its 2-5 letter code.
+     *
+     * If a language pack was found for the language code, return its full
+     * name. Otherwise, return false.
+     *
+     * @param string $code
+     * @param array $languageDirs
+     * @return mixed
+     */
+    public function getLanguageName($code, $languageDirs) { // lookup language name for the language code provided
+        if (in_array($code, $languageDirs)) { // is the language pack here?
+            if(file_exists("custom/protected/messages/$code/app.php")){
+                $appMessageFile = "custom/protected/messages/$code/app.php";
+            }else{
+                $appMessageFile = "protected/messages/$code/app.php";
+            }
+            if (file_exists($appMessageFile)) { // attempt to load 'app' messages in
+                $appMessages = include($appMessageFile);     // the chosen language
+                if (is_array($appMessages) and isset($appMessages['languageName']) && $appMessages['languageName'] != 'Template')
+                    return $appMessages['languageName'];       // return language name
+            }
+        }
+        return false; // false if languge pack wasn't there
+    }
+
     public function behaviors(){
+        Yii::import ('application.components.behaviors.ActiveRecordBehavior');
+        Yii::import ('application.components.behaviors.FileFieldBehavior');
+        // Skip loading theme settins if this request isn't associated with a session, eg API
+        $theme = (Yii::app()->params->noSession ? array() :
+            ThemeGenerator::getProfileKeys(true, true, false));
+
+        $that = $this;
         return array(
-            'X2LinkableBehavior' => array(
-                'class' => 'X2LinkableBehavior',
+            'StaticFieldsBehavior' => array(
+                'class' => 'application.components.behaviors.StaticFieldsBehavior',
+                'translationCategory' => 'profile',
+                'fields' => array (
+                    array (
+                        'fieldName' => 'fullName',
+                        'attributeLabel' => 'Full Name',
+                        'type' => 'varchar',
+                    ),
+                    array (
+                        'fieldName' => 'tagLine',
+                        'attributeLabel' => 'Tag Line',
+                        'type' => 'varchar',
+                    ),
+                    array (
+                        'fieldName' => 'username',
+                        'attributeLabel' => 'Username',
+                        'type' => 'varchar',
+                    ),
+                    array (
+                        'fieldName' => 'officePhone',
+                        'attributeLabel' => 'Office Phone',
+                        'type' => 'phone',
+                    ),
+                    array (
+                        'fieldName' => 'cellPhone',
+                        'attributeLabel' => 'Cell Phone',
+                        'type' => 'phone',
+                    ),
+                    array (
+                        'fieldName' => 'emailAddress',
+                        'attributeLabel' => 'Email Address',
+                        'type' => 'email',
+                    ),
+                    array (
+                        'fieldName' => 'language',
+                        'attributeLabel' => 'Language',
+                        'type' => 'dropdown',
+                        'includeEmpty' => false,
+                        'linkType' => function () use ($that) {
+                            return $that->getLanguageOptions ();
+                        },
+                    ),
+                    array (
+                        'fieldName' => 'googleId',
+                        'attributeLabel' => 'Google ID',
+                        'type' => 'email',
+                    ),
+                ),
+            ),
+            'FileFieldBehavior' => array(
+                'class' => 'application.components.behaviors.FileFieldBehavior',
+                'attribute' => 'avatar',
+                'fileAttribute' => 'photo',
+                'fileType' => FileFieldBehavior::IMAGE,
+                'getFilename' => function (CUploadedFile $file) {
+                    $time = time();
+                    $rand = chr(rand(65, 90));
+                    $salt = $time . $rand;
+                    $name = md5($salt . md5($salt) . $salt);
+                    return 'uploads/protected/'.$name.'.'.$file->getExtensionName ();
+                }
+            ),
+            'LinkableBehavior' => array(
+                'class' => 'LinkableBehavior',
                 'baseRoute' => '/profile',
                 'autoCompleteSource' => null,
                 'module' => 'profile'
             ),
             'ERememberFiltersBehavior' => array(
-                'class' => 'application.components.ERememberFiltersBehavior',
+                'class' => 'application.components.behaviors.ERememberFiltersBehavior',
                 'defaults' => array(),
                 'defaultStickOnClear' => false
             ),
-            'JSONFieldsBehavior' => array(
-                'class' => 'application.components.JSONFieldsBehavior',
+            'NormalizedJSONFieldsBehavior' => array(
+                'class' => 'application.components.behaviors.NormalizedJSONFieldsBehavior',
                 'transformAttributes' => array(
-                    'theme' => array(
+                    'theme' => array_merge($theme, array(
                         'backgroundColor', 'menuBgColor', 'menuTextColor', 'pageHeaderBgColor',
                         'pageHeaderTextColor', 'activityFeedWidgetBgColor',
                         'activityFeedWidgetTextColor', 'backgroundImg', 'backgroundTiling',
                         'pageOpacity', 'themeName', 'private', 'owner', 'loginSound',
-                        'notificationSound', 'gridViewRowColorOdd', 'gridViewRowColorEven'),
+                        'notificationSound', 'gridViewRowColorOdd', 'gridViewRowColorEven',
+                        'enableLoginBgImage')),
                 ),
             ),
             'JSONFieldsDefaultValuesBehavior' => array(
-                'class' => 'application.components.JSONFieldsDefaultValuesBehavior',
+                'class' => 'application.components.behaviors.JSONFieldsDefaultValuesBehavior',
                 'transformAttributes' => array(
                     'miscLayoutSettings' => array(
                         'themeSectionExpanded'=>true, // preferences theme sub section
                         'unhideTagsSectionExpanded'=>true, // preferences tag sub section
                         'x2flowShowLabels'=>true, // flow node labels
                         'profileInfoIsMinimized'=>false, // profile page profile info section
-                        'fullProfileInfo'=>false, // profile page profile info section
+                        // 'fullProfileInfo'=>false, // profile page profile info section
                         'perStageWorkflowView'=>true, // selected workflow view interface
+                        'columnWidth'=>50, // selected workflow view interface
+                        'recordViewColumnWidth'=>65, 
+                        'enableTransactionalView'=>false, 
+                        'enableJournalView'=>true, 
+                        'viewModeActionSubmenuOpen'=>true, 
                     ),
                 ),
                 'maintainCurrentFieldsOrder' => true
             ),
-            'WidgetLayoutJSONFieldsBehavior' => array(
-                'class' => 'application.components.WidgetLayoutJSONFieldsBehavior',
-                'transformAttributes' => array (
-                    'profileWidgetLayout' => array (
-                        'EventsChartProfileWidget',
-                        'UsersChartProfileWidget',
-                        'ProfilesGridViewProfileWidget',
-                        'ContactsGridViewProfileWidget',
-                        'AccountsGridViewProfileWidget',
-                        'ActionsGridViewProfileWidget',
-                        'OpportunitiesGridViewProfileWidget',
-                        'MarketingGridViewProfileWidget',
-                        'ServicesGridViewProfileWidget',
-                        'QuotesGridViewProfileWidget',
-                        'DocViewerProfileWidget',
-                    )
-                )
-            ),
-            'X2SmartSearchModelBehavior' => array (
-                'class' => 'application.components.X2SmartSearchModelBehavior',
+            'SmartSearchModelBehavior' => array (
+                'class' => 'application.components.behaviors.SmartSearchModelBehavior',
             )
         );
     }
+
+    /**
+     * Save default layouts 
+     */
+    public function afterSave () {
+        parent::afterSave ();
+        foreach ($this->_widgetLayouts as $name => $settings) {
+            if ($settings) $settings->save ();
+        }
+    }
+
+    public function getProfileWidgetLayout () {
+        return $this->getWidgetLayout ('ProfileWidgetLayout')->settings->attributes;
+    }
+
+    public function setProfileWidgetLayout ($layout) {
+        $this->getWidgetLayout ('ProfileWidgetLayout')->settings->attributes = $layout;
+    }
+
+    public function getTopicsWidgetLayout () {
+        return $this->getWidgetLayout ('TopicsWidgetLayout')->settings->attributes;
+    }
+
+    public function setTopicsWidgetLayout ($layout) {
+        $this->getWidgetLayout ('TopicsWidgetLayout')->settings->attributes = $layout;
+    }
+
+     
+    public function getDataWidgetLayout () {
+        return $this->getWidgetLayout ('DataWidgetLayout')->settings->attributes;
+    }
+
+    public function setDataWidgetLayout ($layout) {
+        $this->getWidgetLayout ('DataWidgetLayout')->settings->attributes = $layout;
+    }
+     
+
+    public function getRecordViewWidgetLayout () {
+        return $this->getWidgetLayout ('RecordViewWidgetLayout')->settings->attributes;
+    }
+
+    public function setRecordViewWidgetLayout ($layout) {
+        $this->getWidgetLayout ('RecordViewWidgetLayout')->settings->attributes = $layout;
+    }
+
 
     /**
      * @return array validation rules for model attributes.
@@ -149,11 +328,12 @@ class Profile extends CActiveRecord {
         // will receive user inputs.
         return array(
             array('fullName, username, status', 'required'),
-            array('status, lastUpdated, disableNotifPopup, allowPost, disableAutomaticRecordTagging, disablePhoneLinks, resultsPerPage', 'numerical', 'integerOnly' => true),
-            array('enableFullWidth,showSocialMedia,showDetailView,disableTimeInTitle', 'boolean'), //,showWorkflow
+            array('status, lastUpdated, disableNotifPopup, allowPost, defaultCalendar', 'numerical', 'integerOnly' => true),
+            array('enableFullWidth,showSocialMedia,showDetailView,disablePhoneLinks,disableTimeInTitle,showTours', 'boolean'), //,showWorkflow
             array('emailUseSignature', 'length', 'max' => 10),
             array('startPage', 'length', 'max' => 30),
             array('googleId', 'unique'),
+            array('isActive', 'numerical'),
             array('fullName', 'length', 'max' => 60),
             array('username, updatedBy', 'length', 'max' => 20),
             array('officePhone, extension, cellPhone, language', 'length', 'max' => 40),
@@ -164,7 +344,7 @@ class Profile extends CActiveRecord {
             array('notes, avatar, gridviewSettings, formSettings, widgetSettings', 'safe'),
             // The following rule is used by search().
             // Please remove those attributes that should not be searched.
-            array('id, fullName, username, officePhone, extension, cellPhone, emailAddress, lastUpdated, language', 'safe', 'on' => 'search')
+            array('id, fullName, username, officePhone, extension, cellPhone, emailAddress, lastUpdated, language', 'safe', 'on' => 'search'),
         );
     }
 
@@ -197,8 +377,6 @@ class Profile extends CActiveRecord {
             'avatar' => Yii::t('profile', 'Avatar'),
             'allowPost' => Yii::t('profile', 'Allow users to post on your profile?'),
             'disablePhoneLinks' => Yii::t('profile', 'Disable phone field links?'),
-            'disableAutomaticRecordTagging' => 
-                Yii::t('profile', 'Disable automatic record tagging?'),
             'disableTimeInTitle' => Yii::t('profile','Disable timer display in page title?'),
             'disableNotifPopup' => Yii::t('profile', 'Disable notifications pop-up?'),
             'language' => Yii::t('profile', 'Language'),
@@ -232,7 +410,7 @@ class Profile extends CActiveRecord {
     }
 
     /**
-     * Masks method in X2SmartSearchModelBehavior. Enables sorting by lastLogin and isActive.
+     * Masks method in SmartSearchModelBehavior. Enables sorting by lastLogin and isActive.
      */
     public function getSort () {
         $attributes = array();
@@ -279,32 +457,25 @@ class Profile extends CActiveRecord {
         $criteria->compare('id', $this->id);
         $criteria->compare('fullName', $this->fullName, true);
         $criteria->compare('username', $this->username, true);
+        $criteria->compare('username', '<>'.self::GUEST_PROFILE_USERNAME, true);
         $criteria->compare('officePhone', $this->officePhone, true);
         $criteria->compare('cellPhone', $this->cellPhone, true);
         $criteria->compare('emailAddress', $this->emailAddress, true);
         $criteria->compare('status', $this->status);
         $criteria->compare('tagLine',$this->tagLine,true);
 
-
-        /*
-        Filter on is active model property
-        */
-        if (isset ($_GET['Profile']) && is_array ($_GET['Profile']) &&
-            in_array ('isActive', array_keys ($_GET['Profile']))) {
-
-            $this->isActive = $_GET['Profile']['isActive'];
-            if (!isset ($this->isActive)) { // invalid isActive value
-            } else if ($this->isActive) { // select all users with new session records
-                $criteria->join = 
-                    'JOIN x2_sessions ON x2_sessions.user=username and '.
-                    'x2_sessions.lastUpdated > "'.(time () - 900).'"';
-            } else { // select all users with old session records or no session records
-                $criteria->join = 
-                    'JOIN x2_sessions ON (x2_sessions.user=username and '.
-                    'x2_sessions.lastUpdated <= "'.(time () - 900).'") OR '.
-                    'username not in (select x2_sessions.user from x2_sessions as x2_sessions)';
-            }
-        } 
+        // Filter on is active model property
+        if (!isset ($this->isActive)) { // invalid isActive value
+        } else if ($this->isActive) { // select all users with new session records
+            $criteria->join = 
+                'JOIN x2_sessions ON x2_sessions.user=username and '.
+                'x2_sessions.lastUpdated > "'.(time () - 900).'"';
+        } else { // select all users with old session records or no session records
+            $criteria->join = 
+                'JOIN x2_sessions ON (x2_sessions.user=username and '.
+                'x2_sessions.lastUpdated <= "'.(time () - 900).'") OR '.
+                'username not in (select x2_sessions.user from x2_sessions as x2_sessions)';
+        }
 
         if ($excludeAPI) {
             if ($criteria->condition !== '') {
@@ -314,7 +485,7 @@ class Profile extends CActiveRecord {
             }
         }
 
-        return $this->smartSearch ($criteria, $resultsPerPage, $uniqueId);
+        return $this->smartSearch ($criteria, $resultsPerPage);
     }
 
     /**
@@ -361,8 +532,16 @@ class Profile extends CActiveRecord {
     // return $model->showSocialMedia;
     // }
 
-    public function getSignature($html = false){
 
+    public function getAttribute($name, $renderFlag = false, $makeLinks = false) {
+        if ($name === 'signature') {
+            return $this->getSignature ($renderFlag);
+        } else {
+            return parent::getAttribute ($name);
+        }
+    }
+
+    public function getSignature($html = false){
         $adminRule = Yii::app()->settings->emailUseSignature;
         $userRule = $this->emailUseSignature;
         $signature = '';
@@ -431,13 +610,14 @@ class Profile extends CActiveRecord {
     }
 
     // lookup user's settings for a gridview (visible columns, column widths)
-    public static function getGridviewSettings($viewName = null){
+    public static function getGridviewSettings($gvSettingsName = null){
         if(!Yii::app()->user->isGuest)
-            $gvSettings = json_decode(Yii::app()->params->profile->gridviewSettings, true); // converts JSON string to assoc. array
-        if(isset($viewName)){
-            $viewName = strtolower($viewName);
-            if(isset($gvSettings[$viewName]))
-                return $gvSettings[$viewName];
+            // converts JSON string to assoc. array
+            $gvSettings = json_decode(Yii::app()->params->profile->gridviewSettings, true); 
+        if(isset($gvSettingsName)){
+            $gvSettingsName = strtolower($gvSettingsName);
+            if(isset($gvSettings[$gvSettingsName]))
+                return $gvSettings[$gvSettingsName];
             else
                 return null;
         } elseif(isset($gvSettings)){
@@ -448,14 +628,16 @@ class Profile extends CActiveRecord {
     }
 
     // add/update settings for a specific gridview, or save all at once
-    public static function setGridviewSettings($gvSettings, $viewName = null){
+    public static function setGridviewSettings($gvSettings, $gvSettingsName = null){
         if(!Yii::app()->user->isGuest){
-            if(isset($viewName)){
+            if(isset($gvSettingsName)){
                 $fullGvSettings = Profile::getGridviewSettings();
-                $fullGvSettings[strtolower($viewName)] = $gvSettings;
-                Yii::app()->params->profile->gridviewSettings = json_encode($fullGvSettings); // encode array in JSON
+                $fullGvSettings[strtolower($gvSettingsName)] = $gvSettings;
+                // encode array in JSON
+                Yii::app()->params->profile->gridviewSettings = json_encode($fullGvSettings); 
             }else{
-                Yii::app()->params->profile->gridviewSettings = json_encode($gvSettings); // encode array in JSON
+                // encode array in JSON
+                Yii::app()->params->profile->gridviewSettings = json_encode($gvSettings); 
             }
             return Yii::app()->params->profile->update(array('gridviewSettings'));
         }else{
@@ -509,7 +691,6 @@ class Profile extends CActiveRecord {
 
         $widgetNames = ($model->widgetOrder == '') ? array() : explode(":", $model->widgetOrder);
         $visibility = ($model->widgets == '') ? array() : explode(":", $model->widgets);
-
         $widgetList = array();
         $updateRecord = false;
 
@@ -521,7 +702,8 @@ class Profile extends CActiveRecord {
                 $updateRecord = true;
             }else{
                 $widgetList[$widgetNames[$i]] = array(
-                    'id' => 'widget_'.$widgetNames[$i], 'visibility' => $visibility[$i],
+                    'id' => 'widget_'.$widgetNames[$i], 
+                    'visibility' => isset ($visibility[$i]) ? $visibility[$i] : 1,
                     'params' => array());
             }
         }
@@ -553,7 +735,30 @@ class Profile extends CActiveRecord {
 
         // if widget settings haven't been set, give them default values
         if(Yii::app()->params->profile->widgetSettings == null){
-            $widgetSettings = array(
+            $widgetSettings = self::getDefaultWidgetSettings();
+
+            Yii::app()->params->profile->widgetSettings = json_encode($widgetSettings);
+            Yii::app()->params->profile->update(array('widgetSettings'));
+        }
+
+        $widgetSettings = json_decode(Yii::app()->params->profile->widgetSettings);
+
+        if(!isset($widgetSettings->MediaBox)){
+            $widgetSettings->MediaBox = array('mediaBoxHeight' => 150, 'hideUsers' => array());
+            Yii::app()->params->profile->widgetSettings = json_encode($widgetSettings);
+            Yii::app()->params->profile->update(array('widgetSettings'));
+        }
+
+        return json_decode(Yii::app()->params->profile->widgetSettings);
+    }
+
+    /**
+    * get an array of default widget values
+    * @return Array of default values for widgets
+    *
+    **/
+    public static function getDefaultWidgetSettings(){
+        return  array(
                 'ChatBox' => array(
                     'chatboxHeight' => 300,
                     'chatmessageHeight' => 50,
@@ -569,20 +774,78 @@ class Profile extends CActiveRecord {
                     'topsitesHeight' => 200,
                     'urltitleHeight' => 10,
                 ),
+                'MediaBox' => array(
+                    'mediaBoxHeight' => 150,
+                    'hideUsers' => array(),
+                ),
+                'TimeZone' => array(
+                    'clockType' => 'analog'
+                ),
+                'SmallCalendar' => array(
+                    'justMe' => 'false'
+                ),
+                'FilterControls' => array(
+                    'order' => array()
+                )
             );
+    }
 
-            Yii::app()->params->profile->widgetSettings = json_encode($widgetSettings);
+    /**
+    * Method to change a specific value in a widgets settings
+    * @param string    $widget Name of widget
+    * @param string    $setting Name of setting within the widget
+    * @param variable  $value to insert into the setting  
+    * @return boolean  false if profile did not exist
+    */
+    public static function changeWidgetSetting($widget, $setting, $value){
+        $profile = Yii::app()->params->profile;
+        if(isset($profile)){
+            $widgetSettings = self::getWidgetSettings();
+
+            if(!isset($widgetSettings->$widget))
+                self::getWidgetSetting($widget);
+
+
+            $widgetSettings->$widget->$setting = $value;
+            
+            Yii::app()->params->profile->widgetSettings = CJSON::encode($widgetSettings);
             Yii::app()->params->profile->update(array('widgetSettings'));
+            return true;
         }
 
-        $widgetSettings = json_decode(Yii::app()->params->profile->widgetSettings);
-        if(!isset($widgetSettings->MediaBox)){
-            $widgetSettings->MediaBox = array('mediaBoxHeight' => 150, 'hideUsers' => array());
+        return false;
+    }
+
+    /**
+    * Safely retrieves the settings of a widget, and pulls from the default if the setting does not exist
+    * @param string $widget The settings to return.
+    * @param string $setting Optional. 
+    * @return Object widget settings object
+    * @return String widget settings string (if $setting is set)
+    */
+    public static function getWidgetSetting($widget, $setting=null){
+        $widgetSettings = self::getWidgetSettings();
+
+        // Check if the widget setting exists
+        $defaultSettings = self::getDefaultWidgetSettings();
+        if(!isset($widgetSettings->$widget)){
+            $widgetSettings->$widget = $defaultSettings[$widget];
             Yii::app()->params->profile->widgetSettings = json_encode($widgetSettings);
             Yii::app()->params->profile->update(array('widgetSettings'));
+            $widgetSettings = self::getWidgetSettings();
+
+        // Check if the setting exists
+        } else if( isset($setting) && !isset($widgetSettings->$widget->$setting)){
+            $widgetSettings->$widget->$setting = $defaultSettings[$widget][$setting];
+            Yii::app()->params->profile->widgetSettings = json_encode($widgetSettings);
+            Yii::app()->params->profile->update(array('widgetSettings'));
+            $widgetSettings = self::getWidgetSettings();
         }
 
-        return json_decode(Yii::app()->params->profile->widgetSettings);
+        if( !isset($setting) )
+            return $widgetSettings->$widget;
+        else
+            return $widgetSettings->$widget->$setting;
     }
 
     public function getLink(){
@@ -595,205 +858,6 @@ class Profile extends CActiveRecord {
                 return CHtml::link(Yii::t('app', '{name}\'s feed', array('{name}' => $this->fullName)), array($this->baseRoute.'/'.$this->id));
         } else{
             return CHtml::link($this->fullName, Yii::app()->absoluteBaseUrl.'/index.php'.$this->baseRoute.'/'.$this->id);
-        }
-    }
-
-    public function syncActionToGoogleCalendar($action){
-        try{ // catch google exceptions so the whole app doesn't crash if google has a problem syncing
-            $admin = Yii::app()->settings;
-            if($admin->googleIntegration){
-                if(isset($this->syncGoogleCalendarId) && $this->syncGoogleCalendarId){
-//                    // Google Calendar Libraries
-//                    $timezone = date_default_timezone_get();
-//                    require_once "protected/extensions/google-api-php-client/src/Google_Client.php";
-//                    require_once "protected/extensions/google-api-php-client/src/contrib/Google_CalendarService.php";
-//                    date_default_timezone_set($timezone);
-//
-//                    $client = new Google_Client();
-//                    $client->setClientId($admin->googleClientId);
-//                    $client->setClientSecret($admin->googleClientSecret);
-//                    //$client->setDeveloperKey($admin->googleAPIKey);
-//                    $client->setAccessToken($this->syncGoogleCalendarAccessToken);
-//                    $googleCalendar = new Google_CalendarService($client);
-                    $auth = new GoogleAuthenticator();
-                    $googleCalendar = $auth->getCalendarService();
-
-                    // check if the access token needs to be refreshed
-                    // note that the google library automatically refreshes the access token if 
-                    // we need a new one,
-                    // we just need to check if this happend by calling a google api function that 
-                    // requires authorization,
-                    // and, if the access token has changed, save this new access token
-                    if(!$googleCalendar){
-                        Yii::app()->controller->redirect($auth->getAuthorizationUrl('calendar'));
-                    }
-//                    if($this->syncGoogleCalendarAccessToken != $client->getAccessToken()){
-//                        $this->syncGoogleCalendarAccessToken = $client->getAccessToken();
-//                        $this->update(array('syncGoogleCalendarAccessToken'));
-//                    }
-
-                    $summary = $action->actionDescription;
-                    if($action->associationType == 'contacts' || $action->associationType == 'contact')
-                        $summary = $action->associationName.' - '.$action->actionDescription;
-
-                    $event = new Google_Event();
-                    $event->setSummary($summary);
-                    if(empty($action->dueDate)){
-                        $action->dueDate = time();
-                    }
-                    if($action->allDay){
-                        $start = new Google_EventDateTime();
-                        $start->setDate(date('Y-m-d', $action->dueDate));
-                        $event->setStart($start);
-
-                        if(!$action->completeDate)
-                            $action->completeDate = $action->dueDate;
-                        $end = new Google_EventDateTime();
-                        $end->setDate(date('Y-m-d', $action->completeDate + 86400));
-                        $event->setEnd($end);
-                    } else{
-                        $start = new Google_EventDateTime();
-                        $start->setDateTime(date('c', $action->dueDate));
-                        $event->setStart($start);
-
-                        if(!$action->completeDate)
-                            $action->completeDate = $action->dueDate; // if no end time specified, make event 1 hour long
-                        $end = new Google_EventDateTime();
-                        $end->setDateTime(date('c', $action->completeDate));
-                        $event->setEnd($end);
-                    }
-
-                    if($action->color && $action->color != '#3366CC'){
-                        $colorTable = array(
-                            10 => 'Green',
-                            11 => 'Red',
-                            6 => 'Orange',
-                            8 => 'Black',
-                        );
-                        if(($key = array_search($action->color, $colorTable)) != false)
-                            $event->setColorId($key);
-                    }
-
-                    $newEvent = $googleCalendar->events->insert($this->syncGoogleCalendarId, $event);
-                    $action->syncGoogleCalendarEventId = $newEvent['id'];
-                    $action->save();
-                }
-            }
-        }catch(Exception $e){
-            if(isset($auth)){
-                $auth->flushCredentials();
-            }
-        }
-    }
-
-    public function updateGoogleCalendarEvent($action){
-        try{ // catch google exceptions so the whole app doesn't crash if google has a problem syncing
-            $admin = Yii::app()->settings;
-            if($admin->googleIntegration){
-                if(isset($this->syncGoogleCalendarId) && $this->syncGoogleCalendarId){
-//                    // Google Calendar Libraries
-//                    $timezone = date_default_timezone_get();
-//                    require_once "protected/extensions/google-api-php-client/src/Google_Client.php";
-//                    require_once "protected/extensions/google-api-php-client/src/contrib/Google_CalendarService.php";
-//                    date_default_timezone_set($timezone);
-//
-//                    $client = new Google_Client();
-//                    $client->setClientId($admin->googleClientId);
-//                    $client->setClientSecret($admin->googleClientSecret);
-//                    //$client->setDeveloperKey($admin->googleAPIKey);
-//                    $client->setAccessToken($this->syncGoogleCalendarAccessToken);
-//                    $client->setUseObjects(true); // return objects instead of arrays
-//                    $googleCalendar = new Google_CalendarService($client);
-                    $auth = new GoogleAuthenticator();
-                    $googleCalendar = $auth->getCalendarService();
-
-                    // check if the access token needs to be refreshed
-                    // note that the google library automatically refreshes the access token if we need a new one,
-                    // we just need to check if this happend by calling a google api function that requires authorization,
-                    // and, if the access token has changed, save this new access token
-                    $testCal = $googleCalendar->calendars->get($this->syncGoogleCalendarId);
-//                    if($this->syncGoogleCalendarAccessToken != $client->getAccessToken()){
-//                        $this->syncGoogleCalendarAccessToken = $client->getAccessToken();
-//                        $this->update(array('syncGoogleCalendarAccessToken'));
-//                    }
-
-                    $summary = $action->actionDescription;
-                    if($action->associationType == 'contacts' || $action->associationType == 'contact')
-                        $summary = $action->associationName.' - '.$action->actionDescription;
-
-                    $event = $googleCalendar->events->get($this->syncGoogleCalendarId, $action->syncGoogleCalendarEventId);
-                    if(is_array($event)){
-                        $event = new Google_Event($event);
-                    }
-                    $event->setSummary($summary);
-                    if(empty($action->dueDate)){
-                        $action->dueDate = time();
-                    }
-                    if($action->allDay){
-                        $start = new Google_EventDateTime();
-                        $start->setDate(date('Y-m-d', $action->dueDate));
-                        $event->setStart($start);
-
-                        if(!$action->completeDate)
-                            $action->completeDate = $action->dueDate;
-                        $end = new Google_EventDateTime();
-                        $end->setDate(date('Y-m-d', $action->completeDate + 86400));
-                        $event->setEnd($end);
-                    } else{
-                        $start = new Google_EventDateTime();
-                        $start->setDateTime(date('c', $action->dueDate));
-                        $event->setStart($start);
-
-                        if(!$action->completeDate)
-                            $action->completeDate = $action->dueDate; // if no end time specified, make event 1 hour long
-                        $end = new Google_EventDateTime();
-                        $end->setDateTime(date('c', $action->completeDate));
-                        $event->setEnd($end);
-                    }
-
-                    if($action->color && $action->color != '#3366CC'){
-                        $colorTable = array(
-                            10 => 'Green',
-                            11 => 'Red',
-                            6 => 'Orange',
-                            8 => 'Black',
-                        );
-                        if(($key = array_search($action->color, $colorTable)) != false)
-                            $event->setColorId($key);
-                    }
-
-                    $newEvent = $googleCalendar->events->update($this->syncGoogleCalendarId, $action->syncGoogleCalendarEventId, $event);
-                }
-            }
-        }catch(Exception $e){
-
-        }
-    }
-
-    public function deleteGoogleCalendarEvent($action){
-        try{ // catch google exceptions so the whole app doesn't crash if google has a problem syncing
-            $admin = Yii::app()->settings;
-            if($admin->googleIntegration){
-                if(isset($this->syncGoogleCalendarId) && $this->syncGoogleCalendarId){
-                    // Google Calendar Libraries
-                    $timezone = date_default_timezone_get();
-                    require_once "protected/extensions/google-api-php-client/src/Google_Client.php";
-                    require_once "protected/extensions/google-api-php-client/src/contrib/Google_CalendarService.php";
-                    date_default_timezone_set($timezone);
-
-                    $client = new Google_Client();
-                    $client->setClientId($admin->googleClientId);
-                    $client->setClientSecret($admin->googleClientSecret);
-                    //$client->setDeveloperKey($admin->googleAPIKey);
-                    $client->setAccessToken($this->syncGoogleCalendarAccessToken);
-                    $client->setUseObjects(true); // return objects instead of arrays
-                    $googleCalendar = new Google_CalendarService($client);
-
-                    $googleCalendar->events->delete($this->syncGoogleCalendarId, $action->syncGoogleCalendarEventId);
-                }
-            }
-        }catch(Exception $e){
-            // We may want to look into handling this better, or bugs will cause silent failures.
         }
     }
 
@@ -817,6 +881,14 @@ class Profile extends CActiveRecord {
     function initLayout(){
         $layout = array(
             'left' => array(
+                'ProfileInfo' => array(
+                    'title' => 'Profile Info',
+                    'minimize' => false,
+                ),
+                'EmailInboxMenu' => array(
+                    'title' => 'Inbox Menu',
+                    'minimize' => false,
+                ),
                 'ActionMenu' => array(
                     'title' => 'Actions',
                     'minimize' => false,
@@ -831,7 +903,7 @@ class Profile extends CActiveRecord {
                 ),
                 'ActionTimer' => array(
                     'title' => 'Action Timer',
-                    'minimize' => false,
+                    'minimize' => true,
                 ),
                 'UserCalendars' => array(
                     'title' => 'User Calendars',
@@ -854,27 +926,9 @@ class Profile extends CActiveRecord {
                     'minimize' => false,
                 ),
             ),
-            'center' => array(
-                'RecordViewChart' => array(
-                    'title' => 'Record View Chart',
-                    'minimize' => false,
-                ),
-                'InlineTags' => array(
-                    'title' => 'Tags',
-                    'minimize' => false,
-                ),
-                'WorkflowStageDetails' => array(
-                    'title' => 'Process',
-                    'minimize' => false,
-                ),
-                'InlineRelationships' => array(
-                    'title' => 'Relationships',
-                    'minimize' => false,
-                ),
-            ),
             'right' => array(
-                'ActionMenu' => array(
-                    'title' => 'My Actions',
+                'SmallCalendar' => array(
+                    'title' => 'Small Calendar',
                     'minimize' => false,
                 ),
                 'ChatBox' => array(
@@ -894,23 +948,33 @@ class Profile extends CActiveRecord {
                     'minimize' => false,
                 ),
                 'TimeZone' => array(
-                    'title' => 'Time Zone',
+                    'title' => 'Clock',
                     'minimize' => false,
                 ),
-                'MessageBox' => array(
-                    'title' => 'Message Board',
+                'SmallCalendar' => array(
+                    'title' => 'Calendar',
                     'minimize' => false,
                 ),
                 'QuickContact' => array(
                     'title' => 'Quick Contact',
                     'minimize' => false,
                 ),
-                'NoteBox' => array(
-                    'title' => 'Note Pad',
-                    'minimize' => false,
-                ),
                 'MediaBox' => array(
                     'title' => 'Files',
+                    'minimize' => false,
+                ),
+            ),
+            'hiddenRight' => array(
+                'ActionMenu' => array(
+                    'title' => 'My Actions',
+                    'minimize' => false,
+                ),
+                'MessageBox' => array(
+                    'title' => 'Message Board',
+                    'minimize' => false,
+                ),
+                'NoteBox' => array(
+                    'title' => 'Note Pad',
                     'minimize' => false,
                 ),
                 'DocViewer' => array(
@@ -921,18 +985,13 @@ class Profile extends CActiveRecord {
                     'title' => 'Top Sites',
                     'minimize' => false,
                 ),
-                'HelpfulTips' => array(
-                    'title' => 'Helpful Tips',
-                    'minimize' => false,
-                ),
             ),
-            'hidden' => array(),
-            'hiddenRight' => array(), // x2temp, should be merged into 'hidden' when widgets can be placed anywhere
         );
         if(Yii::app()->contEd('pro')){
             if(file_exists('protected/config/proWidgets.php')){
                 foreach(include('protected/config/proWidgets.php') as $loc=>$data){
-                    $layout[$loc] = array_merge($layout[$loc],$data);
+                    if (isset ($layout[$loc]))
+                        $layout[$loc] = array_merge($layout[$loc],$data);
                 }
             }
         }
@@ -945,22 +1004,41 @@ class Profile extends CActiveRecord {
      * elements specified in initLayout ().
      */
     private function addRemoveLayoutElements($position, &$layout, $initLayout){
-
         $changed = false;
+        if (!isset ($layout[$position])) {
+            $changed = true;
+            $layout[$position] = array ();
+        }
+        if (!isset ($layout['hiddenRight'])) {
+            $changed = true;
+            $layout['hiddenRight'] = array ();
+        }
 
-        $layoutWidgets = array_merge($layout[$position], $layout['hidden']);
-        if ($position === 'center') {
-            $initLayoutWidgets = array_merge($initLayout[$position], $initLayout['hidden']);
+        if ($position === 'right') {
+            $initLayoutWidgets = array_merge($initLayout[$position], $initLayout['hiddenRight']);
+            $layoutWidgets = array_merge($layout[$position], $layout['hiddenRight']);
+            $initLayoutWidgetsHidden = $initLayout['hiddenRight'];
+            $hiddenPostion = 'hiddenRight';
         } else {
             $initLayoutWidgets = $initLayout[$position];
+            $initLayoutWidgetsHidden = array ();
+            $hiddenPostion = $position;
+            $layoutWidgets = $layout[$position];
         }
 
         // add new widgets
         $arrayDiff =
                 array_diff(array_keys($initLayoutWidgets), array_keys($layoutWidgets));
+
         foreach($arrayDiff as $elem){
-            //$layout[$position][$elem] = $initLayout[$position][$elem];
-            $layout[$position] = array($elem => $initLayout[$position][$elem]) + $layout[$position]; // unshift key-value pair
+            if (isset ($initLayoutWidgetsHidden[$elem])) {
+                $insertAt = $hiddenPostion;
+            } else {
+                $insertAt = $position;
+            }
+            // unshift key-value pair
+            $layout[$insertAt] = array(
+                $elem => $initLayoutWidgets[$elem]) + $layout[$insertAt];
             $changed = true;
         }
 
@@ -971,27 +1049,31 @@ class Profile extends CActiveRecord {
             if(in_array ($elem, array_keys ($layout[$position]))) {
                 unset($layout[$position][$elem]);
                 $changed = true;
-            } else if($position === 'center' && in_array ($elem, array_keys ($layout['hidden']))) {
-                unset($layout['hidden'][$elem]);
+            } else if($position === 'right' && 
+                in_array ($elem, array_keys ($layout['hiddenRight']))) {
+
+                unset($layout['hiddenRight'][$elem]);
                 $changed = true;
             }
         }
 
         // ensure that widget properties are the same as those in the default layout
         foreach($layout[$position] as $name=>$arr){
-            if (in_array ($name, array_keys ($initLayout[$position])) &&
-                $initLayout[$position][$name]['title'] !== $arr['title']) {
+            if (in_array ($name, array_keys ($initLayoutWidgets)) &&
+                $initLayoutWidgets[$name]['title'] !== $arr['title']) {
 
-                $layout[$position][$name]['title'] = $initLayout[$position][$name]['title'];
+                $layout[$position][$name]['title'] = $initLayoutWidgets[$name]['title'];
                 $changed = true;
             }
         }
-        if ($position === 'center') {
-            foreach($layout['hidden'] as $name=>$arr){
-                if (in_array ($name, array_keys ($initLayout[$position])) &&
-                    $initLayout[$position][$name]['title'] !== $arr['title']) {
 
-                    $layout['hidden'][$name]['title'] = $initLayout[$position][$name]['title'];
+        if ($position === 'right') {
+            foreach($layout['hiddenRight'] as $name=>$arr){
+                if (in_array ($name, array_keys ($initLayoutWidgets)) &&
+                    $initLayoutWidgets[$name]['title'] !== $arr['title']) {
+
+                    $layout['hiddenRight'][$name]['title'] = 
+                        $initLayoutWidgets[$name]['title'];
                     $changed = true;
                 }
             }
@@ -1019,7 +1101,8 @@ class Profile extends CActiveRecord {
             $this->update(array('layout'));
         }else{
             $layout = json_decode($layout, true); // json to associative array
-            $this->addRemoveLayoutElements('center', $layout, $initLayout);
+            if (!is_array ($layout)) $layout = array ();
+
             $this->addRemoveLayoutElements('left', $layout, $initLayout);
             $this->addRemoveLayoutElements('right', $layout, $initLayout);
         }
@@ -1032,13 +1115,23 @@ class Profile extends CActiveRecord {
 
         $hiddenProfileWidgetsMenu = '';
         $hiddenProfile = false;
+        $hiddenWidgets = array ();
         foreach($profileWidgetLayout as $name => $widgetSettings){
             $hidden = $widgetSettings['hidden'];
-            if ($hidden) {
-                $hiddenProfileWidgetsMenu .= '<li><span class="x2-hidden-widgets-menu-item profile-widget" id="'.$name.'">'.
-                    $widgetSettings['label'].'</span></li>';
+            $softDeleted = $widgetSettings['softDeleted'];
+            if ($hidden && !$softDeleted) {
+                $hiddenWidgets[$name] = Yii::t('app',$widgetSettings['label']);
                 $hiddenProfile = true;
             }
+        }
+        $hiddenWidgets = ArrayUtil::asorti ($hiddenWidgets);
+        foreach ($hiddenWidgets as $name => $label) {
+            $hiddenProfileWidgetsMenu .= 
+                '<li>
+                    <span class="x2-hidden-widgets-menu-item profile-widget" id="'.$name.'">'.
+                        CHtml::encode ($label).
+                    '</span>
+                </li>';
         }
         $menu = '<div id="x2-hidden-profile-widgets-menu-container" style="display:none;">';
         $menu .= '<ul id="x2-hidden-profile-widgets-menu" class="x2-hidden-widgets-menu-section">';
@@ -1057,34 +1150,39 @@ class Profile extends CActiveRecord {
      */
     public function getWidgetMenu(){
         $layout = $this->getLayout();
+        $widgetType = Yii::app()->controller instanceof TopicsController ?
+            'topics' : 'recordView';
+        $layoutName = $widgetType.'WidgetLayout';
+        $recordViewWidgetLayout = $this->$layoutName;
 
-        /*$menu = '<ul id="widget-menu">';
-        foreach($layout['hidden'] as $name => $widget){
-            $menu .= '<li><span class="x2-widget-menu-item" id="'.$name.'">'.$widget['title'].'</span></li>';
+        $hiddenRecordViewWidgetMenu = '';
+        foreach ($recordViewWidgetLayout as $widgetClass => $settings) {
+            if ($settings['hidden']) {
+                $hiddenRecordViewWidgetMenu .=
+                    '<li>
+                        <span class="x2-hidden-widgets-menu-item '.$widgetType.'-widget" 
+                          id="'.$widgetClass.'">'.
+                            CHtml::encode ($settings['label']).
+                        '</span>
+                    </li>';
+            }
         }
-        if(!empty($layout['hidden']) && !empty($layout['hiddenRight'])){
-            $menu .= '<li class="x2widget-menu-divider"></li>';
-        }
-        foreach($layout['hiddenRight'] as $name => $widget){
-            $menu .= '<li><span class="x2-widget-menu-item widget-right" id="'.$name.'">'.$widget['title'].'</span></li>';
-        }
-        $menu .= '</ul>';*/
 
         // used to determine where section dividers should be placed
-        $hiddenCenter = !empty ($layout['hidden']);
+        $hiddenCenter = $hiddenRecordViewWidgetMenu !== '';
         $hiddenRight = !empty ($layout['hiddenRight']);
 
         $menu = '<div id="x2-hidden-widgets-menu">';
-        $menu .= '<ul id="x2-hidden-center-widgets-menu" class="x2-hidden-widgets-menu-section">';
-        foreach($layout['hidden'] as $name => $widget){
-            $menu .= '<li><span class="x2-hidden-widgets-menu-item widget-center" id="'.$name.'">'.$widget['title'].'</span></li>';
-        }
+        $menu .= '<ul id="x2-hidden-recordView-widgets-menu" 
+            class="x2-hidden-widgets-menu-section">';
+        $menu .= $hiddenRecordViewWidgetMenu;
         $menu .= '</ul>';
         $menu .= '<ul id="x2-hidden-right-widgets-menu" class="x2-hidden-widgets-menu-section">';
         $menu .= '<li '.(($hiddenCenter && $hiddenRight) ? '' : 'style="display: none;"').
             'class="x2-hidden-widgets-menu-divider"></li>';
         foreach($layout['hiddenRight'] as $name => $widget){
-            $menu .= '<li><span class="x2-hidden-widgets-menu-item widget-right" id="'.$name.'">'.$widget['title'].'</span></li>';
+            $menu .= '<li><span class="x2-hidden-widgets-menu-item widget-right" id="'.$name.'">'.
+                $widget['title'].'</span></li>';
         }
         $menu .= '</ul>';
         $menu .= '</div>';
@@ -1107,7 +1205,22 @@ class Profile extends CActiveRecord {
      * @param int $id the profile id 
      */
     public static function renderFullSizeAvatar ($id, $dimensionLimit=95) {
-        $model = Profile::model ()->findByPk ($id);
+        if ($id instanceof Profile) {
+            $model = $id;
+        } else {
+            $model = Profile::model ()->findByPk ($id);
+        }
+        if (isset($model->avatar) && $model->avatar != '' && !file_exists($model->avatar)
+                && strpos($model->avatar, 'uploads') !== false && strpos($model->avatar, 'protected') === false) {
+            $path = explode(DIRECTORY_SEPARATOR, $model->avatar);
+            $oldPathIndex = array_search('uploads',$path);
+            array_splice($path, $oldPathIndex+1, 0, 'protected');
+            $newPath = implode(DIRECTORY_SEPARATOR, $path);
+            if(file_exists($newPath)){
+                $model->avatar = $newPath;
+                $model->update(array('avatar'));
+            }
+        }
         if(isset($model->avatar) && $model->avatar!='' && file_exists($model->avatar)) {
             $imgSize = @getimagesize($model->avatar);
             if(!$imgSize)
@@ -1121,12 +1234,44 @@ class Profile extends CActiveRecord {
 
             $imgSize[0] = round($imgSize[0] * $scaleFactor);
             $imgSize[1] = round($imgSize[1] * $scaleFactor);
-            echo '<img id="avatar-image" width="'.$imgSize[0].'" height="'.$imgSize[1].
-                '" class="avatar-upload" '.
-                'src="'.Yii::app()->request->baseUrl.'/'.$model->avatar.'" />';
+            return Profile::renderAvatarImage($id, $imgSize[0], $imgSize[1], array (
+                'class' => 'avatar-image'
+            ));
         } else {
-            echo '<img id="avatar-image" width="'.$dimensionLimit.'" height="'.$dimensionLimit.'" src='.
-                Yii::app()->request->baseUrl."/uploads/default.png".'>';
+            return X2Html::fa ('user', array(
+                'class' => 'avatar-image default-avatar',
+                'style' => "font-size: ${dimensionLimit}px",
+            )); 
+            // echo '<img id="avatar-image" width="'.$dimensionLimit.'" height="'.$dimensionLimit.'" src='.
+                // Yii::app()->request->baseUrl."/uploads/default.png".'>';
+        }
+    }
+
+    /**
+     * Renders the avatar image with max dimension 95x95
+     * @param int $id the profile id 
+     */
+    public static function renderEditableAvatar ($id) {
+        $userId = Yii::app()->user->id;
+
+        Yii::app()->controller->renderPartial('editableAvatar',
+            array('id' => $id, 'editable' => $id == $userId)
+        );
+    }
+    
+    public static function renderAvatarImage($id, $width, $height, array $htmlOptions = array ()){
+        $model = Profile::model ()->findByPk ($id);
+        if(!empty($model->avatar)){
+            $file = Yii::app()->file->set($model->avatar);
+            if ($file->exists) {
+                return CHtml::tag ('img', X2Html::mergeHtmlOptions (array (
+                    'id'=>"avatar-image",
+                    'class'=>"avatar-upload", 
+                    'width'=>$width, 
+                    'height'=>$height,
+                    'src'=>"data:image/x-icon;base64,".base64_encode($file->getContents()),
+                ), $htmlOptions));
+            }
         }
     }
 
@@ -1135,6 +1280,33 @@ class Profile extends CActiveRecord {
     }
 
      
+    /**
+     * Checks for a valid enforced default theme and returns it if it exists. 
+     * @return mixed theme array or null if no valid default theme exists
+     */
+    public function getDefaultTheme () {
+        $admin = Yii::app()->settings;
+        $theme = Media::model()->findByPk ($admin->defaultTheme);
+        if ($theme) {
+            $themeDecoded = CJSON::decode ($theme->description);
+            if (is_array ($themeDecoded)) {
+                /*
+                This is a dependency on the internal behavior of NormalizedJSONFieldsBehavior. To eliminate
+                this dependency, profile's theme attribute and the media model's description
+                attribute should be refactored to use JSONEmbeddedModelBehavior so that they
+                share the same JSON structure.
+                */
+                $behaviors = $this->behaviors ();
+                return ArrayUtil::normalizeToArrayR (array_map (function ($a) {
+                        return null;
+                    }, array_flip (
+                        $behaviors['NormalizedJSONFieldsBehavior']['transformAttributes']['theme'])),
+                    $themeDecoded);
+            }
+        } 
+        return null;
+    }
+     
 
     /**
      * Return theme after checking for an enforced default 
@@ -1142,7 +1314,20 @@ class Profile extends CActiveRecord {
     public function getTheme () {
         $admin = Yii::app()->settings;
          
+        if ($admin->enforceDefaultTheme && $admin->defaultTheme !== null) {
+            $theme = $this->getDefaultTheme ();
+            if ($theme) return $theme;
+        } 
+         
         return $this->theme;
+    }
+    
+    public function setLoginSound($soundId){
+        $this->theme = array_merge($this->theme, array('loginSound'=>$soundId));
+    }
+    
+    public function setNotificationSound($soundId){
+        $this->theme = array_merge($this->theme, array('notificationSound'=>$soundId));
     }
 
     /**
@@ -1172,5 +1357,84 @@ class Profile extends CActiveRecord {
         ")->queryAll ());
     }
 
+    
+    /**
+     * Retrieve email inboxes that this user has selected to have displayed
+     * @return array email inbox models indexed by name
+     */
+    public function getEmailInboxes () {
+        if (!(Yii::app()->controller instanceof EmailInboxesController)) {
+            return array ();
+        }
+        if (!isset ($this->emailInboxes)) 
+            return array ();
+        $emailInboxIds = CJSON::decode ($this->emailInboxes);
+        if (!is_array ($emailInboxIds)) 
+            return array();
+        $emailInboxes = array ();
+        $newEmailInboxIds = array ();
+        foreach ($emailInboxIds as $id) {
+            $emailInbox = EmailInboxes::Model ()->findByPk ($id);
+            if ($emailInbox && 
+                Yii::app()->controller->checkPermissions ($emailInbox, 'view')) {
+
+                $emailInboxes[$emailInbox->name] = $emailInbox;
+                $newEmailInboxIds[] = $id;
+            } 
+        }
+        // remove ids for nonexistent inboxes and inboxes for which the user lacks view permissions
+        if (count (array_diff ($emailInboxIds, $newEmailInboxIds))) {
+            $this->emailInboxes = CJSON::encode ($newEmailInboxIds);
+            $this->update ('emailInboxes');
+        }
+        return $emailInboxes;
+    }
+
+    /**
+     * @param array $inboxIds ids of EmailInboxes records
+     */
+    public function setEmailInboxes (array $inboxIds) {
+        $this->emailInboxes = CJSON::encode ($inboxIds);
+    }
+    
+
+    /**
+     * @return Profile 
+     */
+    public function getGuestProfile () {
+        return $this->findByAttributes (array ('username' => self::GUEST_PROFILE_USERNAME)); 
+    }
+
+    /**
+     * @param string $name name of settings class
+     * @return Settings 
+     */
+    private $_widgetLayouts = array (
+        'ProfileWidgetLayout' => null,
+         
+        'DataWidgetLayout' => null,
+         
+        'RecordViewWidgetLayout' => null,
+        'TopicsWidgetLayout' => null,
+    );
+    public function getWidgetLayout ($name) {
+        if (!$this->_widgetLayouts[$name]) {
+            $attributes = array ( 
+                'recordType' => 'Profile',
+                'recordId' => $this->id,
+                'isDefault' => 1,
+                'embeddedModelName' => $name,
+            );
+            $model = Settings::model ()->findByAttributes ($attributes);
+            if (!$model) {
+                $model = new Settings;
+                $model->setAttributes ($attributes, false);
+                $model->unpackAll ();
+                $model->save ();
+            }
+            $this->_widgetLayouts[$name] = $model;
+        }
+        return $this->_widgetLayouts[$name];
+    }
 
 }

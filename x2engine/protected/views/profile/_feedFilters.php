@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,68 +33,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-Yii::app()->clientScript->registerCss('feedFiltersCSs',"
-#feed-filters .x2-multiselect-dropdown-menu {
-    margin-right: 3px;
-    margin-bottom: 4px;
-}
+ **********************************************************************************/
 
-
-#feed-filters-button {
-    opacity: 0.5;
-    width: 42px;
-}
-#feed-filters-button > span {
-    height: 29px;
-    display: block;
-}
-#feed-filters-button:hover {
-    opacity: 0.7;
-}
-
-a#toggle-filters-link {
-    margin-bottom: 4px;
-}
-
-
-#full-controls-button-container {
-    margin-top: 5px;
-}
-
-#full-controls-button-container > a {
-    margin-right: 3px;
-}
-
-#full-controls,
-#simple-controls {
-    padding-left: 5px;
-}
-
-#execute-feed-filters-button {
-    margin-left: 11px;
-    height: 18px;
-    line-height: 18px;
-}
-
-#filter-default {
-    margin-top: 6px;
-    margin-left: 8px;
-}
-
-#feed-filters .x2-button-group {
-    margin-top: 8px;
-}
-
-#filter-controls > .portlet-content {
-    padding: 5px 0px !important;
-}
-
-#filter-controls > .portlet-content > .x2-button-group {
-    margin-bottom: 5px;
-}
-
-");
+Yii::app()->clientScript->registerCssFile(Yii::app()->theme->baseUrl.'/css/views/profile/feedFilters.css');
 ?>
 <div id='feed-filters' style='display: none;'>
 <?php
@@ -113,7 +55,7 @@ $visibility=array(
     '1'=>'Public',
     '0'=>'Private',
 );
-$socialSubtypes=json_decode(Dropdowns::model()->findByPk(113)->options,true);
+$socialSubtypes = Dropdowns::getSocialSubtypes ();
 $users=User::getNames();
 $eventTypeList=Yii::app()->db->createCommand()
         ->select('type')
@@ -206,7 +148,12 @@ echo CHtml::checkBox('setDefault', false,
         'id'=>'filter-default'
     )
 );
-echo "<label for='setDefault'>".Yii::t('app','Set Default')."</label>";
+echo "<label for='filter-default'>".Yii::t('app','Set Default')."</label>";
+
+echo CHtml::link(
+        Yii::t('app','Create Report'),'#',
+        array('class'=>'x2-button x2-hint','style'=>'color:#000;margin-left:5px;','id'=>'create-activity-report',
+            'title'=>Yii::t('app','Create an email report using the selected filters which will be mailed to you periodically.')));
 
 echo "</div>";
 echo "</div>";

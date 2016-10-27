@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,17 +33,20 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('zii.widgets.grid.CGridView');
 Yii::import('X2GridViewBase');
 
 /**
- * Custom grid view display function.
- *
- * @package application.components
+ * @package application.components.X2GridView
  */
 class X2GridViewGeneric extends X2GridViewBase {
+
+    /**
+     * @var bool $rememberColumnSort whether or not to preserve order of columns in gvSettings
+     */
+    public $rememberColumnSort = true;  
 
     /**
      * Used to populate allFieldNames property with attribute labels indexed by
@@ -58,16 +62,38 @@ class X2GridViewGeneric extends X2GridViewBase {
 
     protected function generateColumns () {
         $unsortedColumns = array ();
+
         foreach ($this->columns as &$column) {
             $name = (isset ($column['name'])) ? $column['name'] : '';
+            if (!isset ($column['id'])) {
+                if (isset ($column['class']) && 
+                    is_subclass_of ($column['class'], 'CCheckboxColumn')) {
+
+                    $column['id'] = $this->namespacePrefix.'C_gvCheckbox'.$name;
+                } else {
+                    $column['id'] = $this->namespacePrefix.'C_'.$name;
+                }
+            } else {
+                $column['id'] = $this->namespacePrefix.$column['id'];
+            }
             if (!isset ($this->gvSettings[$name])) {
+                if ($name === 'gvCheckbox') {
+                    $column = $this->getGvCheckboxColumn (null, $column);
+                }
                 $unsortedColumns[] = $column;
                 continue;
             }
             $width = $this->gvSettings[$name];
-            $width = (!empty($width) && is_numeric($width))? $width : null;
-            $column['headerHtmlOptions'] = array('style'=>'width:'.$width.'px;');
-            $column['id'] = $this->namespacePrefix.'C_'.$name;
+            $width = $this->formatWidth ($width);
+            if ($width) {
+                $column['headerHtmlOptions'] = array_merge (
+                    isset ($column['headerHtmlOptions']) ? $column['headerHtmlOptions'] : array (),
+                    array('style'=>'width:'.$width.';')
+                );
+                $column['htmlOptions'] = X2Html::mergeHtmlOptions (
+                    isset ($column['htmlOptions']) ? 
+                        $column['htmlOptions'] : array (), array ('width' => $width));
+            }
         }
         unset ($column); // unset lingering reference
 
@@ -82,28 +108,36 @@ class X2GridViewGeneric extends X2GridViewBase {
             $this->columns[] =  $this->getGvCheckboxColumn ($width);
         }
 
-        $sortedColumns = array ();
-        foreach ($this->gvSettings as $columnName => $width) {
-            foreach ($this->columns as $column) {
-                $name = (isset ($column['name'])) ? $column['name'] : '';
-                if ($name === $columnName) {
-                    $sortedColumns[] = $column;
-                    break;
-                } 
+        if ($this->rememberColumnSort) {
+            $sortedColumns = array ();
+            foreach ($this->gvSettings as $columnName => $width) {
+                foreach ($this->columns as $column) {
+                    $name = (isset ($column['name'])) ? $column['name'] : '';
+                    if ($name === $columnName) {
+                        $sortedColumns[] = $column;
+                        break;
+                    } 
+                }
             }
-        }
-        $this->columns = array_merge ($sortedColumns, $unsortedColumns);
+            $this->columns = array_merge ($sortedColumns, $unsortedColumns);
+        } 
     }
 
 
     public function setSummaryText () {
+        if ($this->asa ('GridViewSortableWidgetsBehavior')) {
+            $this->setSummaryTextForSortableWidgets ();
+            return;
+        }
 
         /* add a dropdown to the summary text that let's user set how many rows to show on each 
            page */
         $this->summaryText =  Yii::t('app', '<b>{start}&ndash;{end}</b> of <b>{count}</b>')
         .'<div class="form no-border" style="display:inline;"> '
         .CHtml::dropDownList(
-            'resultsPerPage', Profile::getResultsPerPage(), Profile::getPossibleResultsPerPage(),
+            'resultsPerPage', 
+            $this->getResultsPerPage (), 
+            $this->getPossibleResultsPerPageFormatted(),
             array(
                 'ajax' => array(
                     'url' => Yii::app()->controller->createUrl('/profile/setResultsPerPage'),
@@ -112,8 +146,9 @@ class X2GridViewGeneric extends X2GridViewBase {
                         $.fn.yiiGridView.update("'.$this->id.'"); 
                     }',
                 ),
+                'id' => 'resultsPerPage'.$this->id,
                 'style' => 'margin: 0;',
-                'class' => 'x2-select',
+                'class' => 'x2-select resultsPerPage',
             )
         ).'</div>';
     }

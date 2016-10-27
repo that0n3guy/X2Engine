@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,13 +34,16 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.modules.actions.models.*');
 Yii::import('application.modules.contacts.models.*');
 Yii::import('application.modules.docs.models.*');
 Yii::import('application.modules.marketing.models.*');
+Yii::import('application.modules.marketing.controllers.*');
+Yii::import('application.modules.marketing.*');
 Yii::import('application.modules.marketing.components.*');
+Yii::import('application.components.util.StringUtil', true);
 
 /**
  * 
@@ -48,13 +52,15 @@ Yii::import('application.modules.marketing.components.*');
  */
 class CampaignMailingBehaviorTest extends X2DbTestCase {
 
+
     public static function referenceFixtures() {
         return array(
-            'campaign' => 'Campaign',
+            'campaign' => array ('Campaign', '.CampaignMailingBehaviorTest'),
             'lists' => 'X2List',
             'credentials' => 'Credentials',
             'users' => 'User',
-            'profile' => array('Profile','.marketing')
+            'profile' => array('Profile','.marketing'),
+            'actions' => 'Actions'
         );
     }
 
@@ -63,6 +69,32 @@ class CampaignMailingBehaviorTest extends X2DbTestCase {
         'contacts' => 'Contacts'
     );
 
+    private static $_savedIniSettings = array (
+        'pcre.backtrack_limit' => null,
+        'pcre.recursion_limit' => null,
+    );
+
+    public static function setUpBeforeClass () {
+        // save relevant ini settings
+        foreach (self::$_savedIniSettings as $setting => $val) { 
+            self::$_savedIniSettings[$setting] = ini_get ($setting);
+        }
+        return parent::setUpBeforeClass ();
+    }
+
+    public function tearDown () {
+        TestingAuxLib::restoreController();
+        self::restoreIniSettings ();
+        return parent::tearDown ();
+    }
+
+    private static function restoreIniSettings () {
+        foreach (self::$_savedIniSettings as $setting => $val) { 
+            if ($val !== null) { 
+                assert (ini_set ($setting, $val) !== false);
+            }
+        }
+    }
 
     public function instantiate($config = array()) {
         $obj = new CComponent;
@@ -102,37 +134,118 @@ class CampaignMailingBehaviorTest extends X2DbTestCase {
         $this->assertEquals(null,$cmb->listItem->uniqueId);
     }
 
+    public function testRedirectLinkGeneration () {
+        TestingAuxLib::loadControllerMock ('localhost', '/index-test.php');
+        $cmb = $this->instantiate();
+        $contact = $this->contacts('testUser_unsent');
+        $campaign = $this->campaign('redirectLinkGeneration');
+        $url = preg_replace ('/^[^"]*"([^"]*)".*$/', '$1', $campaign->content);
+        list($subject,$message,$uniqueId) = $cmb->prepareEmail(
+            $this->campaign('redirectLinkGeneration'),
+            $contact);
+        $this->assertRegExp ('/'.preg_quote (urlencode ($url)).'/', $message);
+
+    }
+
+    public function testUnsubTokenReplacement () {
+        $admin = Yii::app()->settings;
+        TestingAuxLib::loadControllerMock ('examplecrm.com', '/X2Engine/index-test.php');
+        $admin->externalBaseUrl = 'http://examplecrm.com';
+        $admin->externalBaseUri = '/X2Engine';
+        $cmb = $this->instantiate();
+        $contact = $this->contacts('testUser_unsent');
+        $campaign = $this->campaign('unsubToken');
+        list($subject,$message,$uniqueId) = $cmb->prepareEmail($campaign,$contact);
+
+        $unsubUrl = Yii::app()->createExternalUrl('/marketing/marketing/click', array(
+            'uid' => $uniqueId,
+            'type' => 'unsub',
+            'email' => $contact->email
+        ));
+        $unsubLinkText = Yii::app()->settings->getDoNotEmailLinkText ();
+        $expectedLink = 
+            '<a href="'.$unsubUrl.'">'.Yii::t('marketing', $unsubLinkText).'</a>';
+
+        $this->assertRegExp(
+            '/'.preg_quote($expectedLink, '/').'/', $message, 'Unsubscribe link not inserted');
+    }
+
+    /**
+     * Cause preg_replace_callback to fail and ensure that exception is thrown
+     */
+    public function testRedirectLinkGenerationException () {
+        $this->setExpectedException (
+            'StringUtilException', '',
+            StringUtilException::PREG_REPLACE_CALLBACK_ERROR);
+        TestingAuxLib::loadControllerMock ('localhost', '/index-test.php');
+
+        // set this high enough to cause a redirect link replacement error, but not a CUrlRule error
+        ini_set('pcre.backtrack_limit', '10');
+        ini_set('pcre.recursion_limit', '10');
+        
+        $cmb = $this->instantiate();
+        $contact = $this->contacts('testUser_unsent');
+        list($subject,$message,$uniqueId) = $cmb->prepareEmail(
+            $this->campaign('redirectLinkGeneration'), $contact, false);
+    }
+
+     
     public function testPrepareEmail() {
-	if(!Yii::app()->contEd('pro')) {
-            $this->markTestSkipped();
-	}
+
+        // get app config behavior to generate generate links correctly
+        TestingAuxLib::loadControllerMock ('examplecrm.com', '/X2Engine/index-test.php');
+
         $cmb = $this->instantiate();
         $contact = $this->contacts('testUser_unsent');
         $recipientAddress = $contact->email;
         $admin = Yii::app()->settings;
+        $admin->doNotEmailLinkText = 'unsubscribe';
         // Set URL/URI to verify proper link generation:
         $admin->externalBaseUrl = 'http://examplecrm.com';
         $admin->externalBaseUri = '/X2Engine';
-        list($subject,$message,$uniqueId) = $cmb->prepareEmail($this->campaign('testUser'),$contact,$this->listItem('testUser_unsent')->emailAddress);
+        list($subject,$message,$uniqueId) = $cmb->prepareEmail(
+            $this->campaign('testUser'),$contact);
         $email = $cmb->recipient->email;
         
         $this->assertEquals($recipientAddress,$email);
-        $this->assertEquals(str_replace('{firstName}',$contact->firstName,$this->campaign('testUser')->subject),$subject);
+        $this->assertEquals(
+            str_replace('{firstName}',$contact->firstName,$this->campaign('testUser')->subject),
+            $subject);
         // Find the contact's name and tracking key:
         $replaceVars = array(
             '{firstName}' => $contact->firstName,
             '{signature}' => $this->users('testUser')->profile->signature,
             '{trackingKey}' => $uniqueId
         );
-        $this->assertRegExp('/'.preg_quote(strtr($this->campaign('testUser')->content,$replaceVars),'/').'/',$message,'Variable replacement didn\'t take place');
+        $this->assertRegExp(
+            '/'.preg_quote(strtr($this->campaign('testUser')->content,$replaceVars),'/').'/',
+            $message,'Variable replacement didn\'t take place');
         // Find the tracking image:
-        $this->assertRegExp('/'.preg_quote('<img src="'.$admin->externalBaseUrl.$admin->externalBaseUri.'/index.php/marketing/marketing/click?uid='.$uniqueId,'/').'/',$message,'Tracking image not inserted');
+        $trackImgUrl = Yii::app()->createExternalUrl('/marketing/marketing/click', array(
+            'uid' => $uniqueId
+        ));
+        $this->assertRegExp(
+            '/'.preg_quote(
+                '<img src="'.$trackImgUrl,'/').'/',
+            $message,'Tracking image not inserted');
         // Find the unsubscribe link:
-        $this->assertRegExp('/'.preg_quote('To stop receiving these messages, click here: <a href="http://examplecrm.com/X2Engine/index.php/marketing/marketing/click?uid='.$uniqueId.'&type=unsub&email='.rawurlencode($recipientAddress).'">unsubscribe</a>','/').'/',$message,'Unsubscribe link not inserted');
+        $unsubUrl = Yii::app()->createExternalUrl('/marketing/marketing/click', array(
+            'uid' => $uniqueId,
+            'type' => 'unsub',
+            'email' => $recipientAddress
+        ));
+        $this->assertRegExp(
+            '/'.preg_quote(
+                'To stop receiving these messages, click here: '.
+                '<a href="'.$unsubUrl.'">'.
+                'unsubscribe</a>','/').'/',
+            $message,'Unsubscribe link not inserted');
         // Find the tracking key:
-        $this->assertRegExp('/'.preg_quote('visit http://example.com/?x2_key=','/').$uniqueId.'/',$message,'Tracking key not inserted!');
+        $this->assertRegExp(
+            '/'.preg_quote('visit http://example.com/?x2_key=','/').$uniqueId.'/',
+            $message,'Tracking key not inserted!');
     }
-
+     
 
     public function testRecordEmailSent() {
         $contact = $this->contacts('testUser');
@@ -150,7 +263,8 @@ class CampaignMailingBehaviorTest extends X2DbTestCase {
     }
 
     public function testDeliverableItems() {
-        $listItems = CampaignMailingBehavior::deliverableItems($this->lists('launchedEmailCampaign')->id);
+        $listItems = CampaignMailingBehavior::deliverableItems(
+            $this->lists('launchedEmailCampaign')->id);
         $this->assertEquals(array(
             array(
                 'id' => '252',
@@ -183,7 +297,8 @@ class CampaignMailingBehaviorTest extends X2DbTestCase {
         Yii::app()->settings->emailStartTime = time();
         Yii::app()->settings->emailInterval = 1000;
         $can = $cmb->mailIsStillDeliverable();
-//        print_r($cmb->status); // This should be human-readable and make sense (it's the waiting message)
+        // This should be human-readable and make sense (it's the waiting message)
+        //        print_r($cmb->status); 
         $this->assertFalse($can);
         $this->assertEquals(CampaignMailingBehavior::STATE_BULKLIMIT,$cmb->stateChangeType);
         $cmb->stateChange = false;
@@ -245,6 +360,52 @@ class CampaignMailingBehaviorTest extends X2DbTestCase {
         $can = $cmb->mailIsStillDeliverable();
         $this->assertTrue($can);
     }
+
+    /**
+     * Cause line break replacement to fail and ensure that exception is thrown
+     */
+    public function testLineBreakReplacementError () {
+        // Fails to trigger exception in php7
+        $this->markTestIncomplete ();
+
+        $this->setExpectedException (
+            'StringUtilException', '',
+            StringUtilException::PREG_REPLACE_ERROR);
+
+        ini_set('pcre.backtrack_limit', '0');
+        ini_set('pcre.recursion_limit', '0');
+
+        TestingAuxLib::loadControllerMock ('localhost', '/index-test.php');
+        $cmb = $this->instantiate();
+        $contact = $this->contacts('testUser_unsent');
+        list($subject,$message,$uniqueId) = $cmb->prepareEmail(
+            $this->campaign('redirectLinkGeneration'), $contact);
+    }
+
+    /**
+     * Cause line break replacement to fail and ensure that exception is thrown
+     */
+    public function testUnsubTokenReplacementError () {
+        // error can't be triggered using current method of reducing the backtrack_limit and 
+        // recursion_limit since there's a call to createExternalUrl directly preceeding the
+        // code which does the token replacement
+        $this->markTestIncomplete ();
+
+        $this->setExpectedException (
+            'StringUtilException', '',
+            StringUtilException::PREG_REPLACE_ERROR);
+
+        ini_set('pcre.backtrack_limit', '0');
+        ini_set('pcre.recursion_limit', '0');
+
+        TestingAuxLib::loadControllerMock ('localhost', '/index-test.php');
+        $cmb = $this->instantiate();
+        $contact = $this->contacts('testUser_unsent');
+        list($subject,$message,$uniqueId) = $cmb->prepareEmail(
+            $this->campaign('testUser'), $contact, false);
+    }
+
+
 }
 
 ?>

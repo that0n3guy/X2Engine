@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * @package application.modules.users.controllers
@@ -40,6 +41,16 @@
 class UsersController extends x2base {
 
     public $modelClass = 'User';
+
+//    public function behaviors() {
+//        return array_merge(parent::behaviors(), array(
+//            'MobileControllerBehavior' => array(
+//                'class' => 
+//                    'application.modules.mobile.components.behaviors.MobileControllerBehavior'
+//            ),
+//        ));
+//    }
+
     /**
      * Specifies the access control rules.
      * This method is used by the 'accessControl' filter.
@@ -75,10 +86,18 @@ class UsersController extends x2base {
      */
     public function actionView($id) {
         $user=User::model()->findByPk($id);
+
+        // Only load the Google Maps widget if we're on a User with an address
+        if(isset($this->portlets['GoogleMaps']) && Yii::app()->settings->googleIntegration) {
+            $this->portlets['GoogleMaps']['params']['location'] = $user->address;
+            $this->portlets['GoogleMaps']['params']['activityLocations'] = $user->getMapLocations();
+            $this->portlets['GoogleMaps']['params']['defaultFilter'] = Locations::getDefaultUserTypes();
+            $this->portlets['GoogleMaps']['params']['modelParam'] = 'userId';
+        }
         $dataProvider=new CActiveDataProvider('Actions', array(
             'criteria'=>array(
-                'order'=>'complete DESC',
-                'condition'=>'assignedTo=\''.$user->username.'\'',
+                'order'=>'createDate DESC',
+                'condition'=>'assignedTo=\''.$user->username.'\' OR completedBy = \''.$user->username.'\'',
         )));
         $actionHistory=$dataProvider->getData();
         $this->render('view',array(
@@ -95,11 +114,11 @@ class UsersController extends x2base {
         $model=new User;
         $groups=array();
         foreach(Groups::model()->findAll() as $group){
-            $groups[$group->id]=$group->name;
+            $groups[$group->id]=CHtml::encode($group->name);
         }
         $roles=array();
         foreach(Roles::model()->findAll() as $role){
-            $roles[$role->id]=$role->name;
+            $roles[$role->id]=CHtml::encode($role->name);
         }
 
         // Uncomment the following line if AJAX validation is needed
@@ -108,9 +127,12 @@ class UsersController extends x2base {
         $unhashedPassword = '';
         if(isset($_POST['User'])) {
             $model->attributes=$_POST['User'];
-            //$this->updateChangelog($model);
+            //Temporarily maintain unhashed in case of validation error
             $unhashedPassword = $model->password;
-            $model->password = md5($model->password);
+            
+            if ($model->validate (array('password')))
+            
+                $model->password = PasswordUtil::createHash($model->password);
             $model->userKey=substr(str_shuffle(str_repeat(
                 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 32)), 0, 32);
             $profile=new Profile;
@@ -121,9 +143,23 @@ class UsersController extends x2base {
             $profile->status=$model->status;
 
              
+            // set a default theme if there is one
+            $admin = Yii::app()->settings;
+            if ($admin->defaultTheme) {
+                $profile->theme = $profile->getDefaultTheme ();
+            }
+             
 
             if($model->save()){
+                $calendar = new X2Calendar();
+                $calendar->createdBy = $model->username;
+                $calendar->updatedBy = $model->username;
+                $calendar->createDate = time();
+                $calendar->lastUpdated = time();
+                $calendar->name = $profile->fullName."'s Calendar";
+                $calendar->save();
                 $profile->id=$model->id;
+                $profile->defaultCalendar = $calendar->id;
                 $profile->save();
                 if(isset($_POST['roles'])){
                     $roles=$_POST['roles'];
@@ -160,6 +196,7 @@ class UsersController extends x2base {
     }
 
     public function actionCreateAccount(){
+        Yii::import('application.components.ThemeGenerator.LoginThemeHelper');
         $this->layout='//layouts/login';
         if(isset($_GET['key'])){
             $key=$_GET['key'];
@@ -172,7 +209,10 @@ class UsersController extends x2base {
                         $model->attributes=$_POST['User'];
                         $model->status=1;
                         //$this->updateChangelog($model);
-                        $model->password = md5($model->password);
+                        
+                        if ($model->validate (array('password')))
+                        
+                            $model->password = PasswordUtil::createHash($model->password);
                         $model->userKey=substr(str_shuffle(str_repeat('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 32)), 0, 32);
                         $profile=new Profile;
                         $profile->fullName=$model->firstName." ".$model->lastName;
@@ -213,7 +253,7 @@ class UsersController extends x2base {
         $model=$this->loadModel($id);
         $groups=array();
         foreach(Groups::model()->findAll() as $group){
-            $groups[$group->id]=$group->name;
+            $groups[$group->id]=CHtml::encode($group->name);
         }
         $selectedGroups=array();
         foreach(GroupToUser::model()->findAllByAttributes(array('userId'=>$model->id)) as $link){
@@ -221,7 +261,7 @@ class UsersController extends x2base {
         }
         $roles=array();
         foreach(Roles::model()->findAll() as $role){
-            $roles[$role->id]=$role->name;
+            $roles[$role->id]=CHtml::encode($role->name);
         }
         $selectedRoles=array();
         foreach(RoleToUser::model()->findAllByAttributes(array('userId'=>$model->id)) as $link){
@@ -239,10 +279,14 @@ class UsersController extends x2base {
             $temp=$model->password;
             $model->attributes=$_POST['User'];
 
-            if($model->password!="")
-                $model->password = md5($model->password);
-            else
+            if($model->password!="") {
+                
+                if ($model->validate (array('password')))
+                
+                    $model->password = PasswordUtil::createHash($model->password);
+            } else {
                 $model->password=$temp;
+            }
             if(empty($model->userKey)){
                 $model->userKey=substr(str_shuffle(str_repeat('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 32)), 0, 32);
             }
@@ -348,27 +392,34 @@ Please click on the link below to create an account at X2Engine!
             $list=trim($list);
             $emails=explode(',',$list);
             foreach($emails as &$email){
-                $key=substr(str_shuffle(str_repeat('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',16)),0,16);
+                $key=substr(str_shuffle(str_repeat(
+                    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',16)),0, 16);
                 $user=new User('invite');
                 $email=trim($email);
                 $user->inviteKey=$key;
                 $user->temporary=1;
                 $user->emailAddress=$email;
                 $user->status=0;
-                $userList=User::model()->findAllByAttributes(array('emailAddress'=>$email,'temporary'=>1));
+                $userList=User::model()->findAllByAttributes(
+                    array('emailAddress'=>$email,'temporary'=>1));
                 foreach($userList as $userRecord){
                     if(isset($userRecord)){
                         $userRecord->delete();
                     }
                 }
                 $user->save();
-                $link=CHtml::link('Create Account',(@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . $this->createUrl('/users/users/createAccount',array('key'=>$key)));
+                $link=CHtml::link(
+                    'Create Account',
+                    (@$_SERVER['HTTPS'] == 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . 
+                    $this->createUrl('/users/users/createAccount',array('key'=>$key)));
                 $mail=new InlineEmail;
                 $mail->to=$email;
                 // Get email password
-                $cred = Credentials::model()->getDefaultUserAccount(Credentials::$sysUseId['systemResponseEmail'],'email');
+                $cred = Credentials::model()->getDefaultUserAccount(
+                    Credentials::$sysUseId['systemResponseEmail'],'email');
                 if($cred==Credentials::LEGACY_ID)
-                    $cred = Credentials::model()->getDefaultUserAccount(Yii::app()->user->id,'email');
+                    $cred = Credentials::model()->getDefaultUserAccount(
+                        Yii::app()->user->id,'email');
                 if($cred != Credentials::LEGACY_ID)
                     $mail->credId = $cred;
                 $mail->subject=$subject;
@@ -418,53 +469,156 @@ Please click on the link below to create an account at X2Engine!
         }
     }
 
-    public function actionAddTopContact() {
-        if(isset($_GET['contactId']) && is_numeric($_GET['contactId'])) {
-
-            //$viewId = (isset($_GET['viewId']) && is_numeric($_GET['viewId'])) ? $_GET['viewId'] : null;
-
-            $id = Yii::app()->user->getId();
-            $model=$this->loadModel($id);
-
-            $topContacts = empty($model->topContacts)? array() : explode(',',$model->topContacts);
-
-            if(!in_array($_GET['contactId'],$topContacts)) {        // only add to list if it isn't already in there
-                array_unshift($topContacts,$_GET['contactId']);
-                $model->topContacts = implode(',',$topContacts);
-            }
-            if ($model->save())
-                $this->renderTopContacts();
-            // else
-                // echo print_r($model->getErrors());
-
-        }
+    public function actionAddTopContact($recordId, $modelClass) {
+        Yii::import('application.components.leftWidget.TopContacts');
+        $model = $this->getModelFromTypeAndId ($modelClass, $recordId, false);
+        if (TopContacts::addBookmark ($model))
+            $this->renderTopContacts();
     }
 
-    public function actionRemoveTopContact() {
-        if(isset($_GET['contactId']) && is_numeric($_GET['contactId'])) {
-
-            //$viewId = (isset($_GET['viewId']) && is_numeric($_GET['viewId'])) ? $_GET['viewId'] : null;
-
-            $id = Yii::app()->user->getId();
-            $model=$this->loadModel($id);
-
-            $topContacts = empty($model->topContacts)? array() : explode(',',$model->topContacts);
-            $index = array_search($_GET['contactId'],$topContacts);
-
-            if($index!==false)
-                unset($topContacts[$index]);
-
-            $model->topContacts = implode(',',$topContacts);
-
-            if ($model->save())
-                $this->renderTopContacts();
+    public function actionRemoveTopContact($recordId, $modelClass) {
+        Yii::import('application.components.leftWidget.TopContacts');
+        $model = $this->getModelFromTypeAndId ($modelClass, $recordId, false);
+        if (TopContacts::removeBookmark ($model))
+            $this->renderTopContacts();
+    }
+    
+    public function actionUserMap(){
+        $users = User::getUserIds();
+        unset($users['']);
+        $selectedUsers = array_keys($users);
+        $filterParams = filter_input(INPUT_POST,'params',FILTER_DEFAULT,FILTER_REQUIRE_ARRAY);
+        $params = array();
+        if(isset($filterParams['users'])){
+            $selectedUsers = $filterParams['users'];
+            $userParams = AuxLib::bindArray($selectedUsers);
+            $userList = AuxLib::arrToStrList($userParams);
         }
+        $time = isset($filterParams['timestamp'])?$filterParams['timestamp']:Formatter::formatDateTime(time());
+        $locations = Yii::app()->db->createCommand(
+                "SELECT lat, lon AS lng, recordId, type, comment AS info, createDate AS time"
+                . " FROM ("
+                ."SELECT * FROM x2_locations"
+                ." WHERE recordType = 'User'"
+                .(isset($filterParams['users'])?" AND recordId IN ".$userList:'')
+                ." AND createDate < :time"
+                ." ORDER BY createDate DESC"
+                .") AS tmp GROUP BY recordId"
+        )->queryAll(true, array(':time'=>strtotime($time)));
+        if(!empty($locations)){
+            $center = $locations[0];
+        } else {
+            $center = array('lat' => 0, 'lng' => 0);;
+        }
+        $types = Locations::getLocationTypes();
+        foreach($locations as &$location){
+            $location['time'] = Formatter::formatLongDateTime($location['time']);
+            if(array_key_exists($location['type'],$types)){
+                $location['type'] = $types[$location['type']];
+            }
+        }
+        $this->render('userMap',array(
+            'users' => $users,
+            'selectedUsers'=>$selectedUsers,
+            'timestamp'=>$time,
+            'center'=>json_encode($center),
+            'locations'=>$locations,
+        ));
     }
 
     private function renderTopContacts() {
-        $this->renderPartial('application.components.views.topContacts',array(
-            'topContacts'=>User::getTopContacts(),
+        $this->renderPartial('application.components.leftWidget.views.topContacts',array(
+            'bookmarkRecords'=>User::getTopContacts(),
             //'viewId'=>$viewId
         ));
     }
+
+    /**
+     * Create a menu for Users
+     * @param array Menu options to remove
+     * @param X2Model Model object passed to the view
+     * @param array Additional menu parameters
+     */
+    public function insertMenu($selectOptions = array(), $model = null, $menuParams = null) {
+        $Users = Modules::displayName();
+        $User = Modules::displayName(false);
+        $modelId = isset($model) ? $model->id : 0;
+
+        /**
+         * To show all options:
+         * $menuOptions = array(
+         *     'feed', 'admin', 'create', 'invite', 'view', 'profile', 'edit', 'delete',
+         * );
+         */
+
+        $menuItems = array(
+            array(
+                'name'=>'feed',
+                'label'=>Yii::t('profile','Social Feed'),
+                'url'=>array('/profile/index')
+            ),
+            array(
+                'name'=>'admin',
+                'label' => Yii::t('users', 'Manage {users}', array(
+                    '{users}' => $Users,
+                )),
+                'url'=>array('admin')
+            ),
+            array(
+                'name'=>'map',
+                'label' => Yii::t('users', 'View {users} Map', array(
+                    '{users}' => $Users,
+                )),
+                'url'=>array('userMap')
+            ),
+            array(
+                'name'=>'create',
+                'label' => Yii::t('users', 'Create {user}', array(
+                    '{user}' => $User,
+                )),
+                'url' => array('create')
+            ),
+            array(
+                'name'=>'invite',
+                'label' => Yii::t('users', 'Invite {users}', array(
+                    '{users}' => $Users,
+                )),
+                'url' => array('inviteUsers')
+            ),
+            array(
+                'name'=>'view',
+                'label'=>Yii::t('users','View {user}', array(
+                    '{user}' => $User,
+                )),
+                'url'=>array('view', 'id'=>$modelId)
+            ),
+            array(
+                'name'=>'profile',
+                'label'=>Yii::t('profile','View Profile'),
+                'url'=>array('/profile/view','id'=>$modelId)
+            ),
+            array(
+                'name'=>'edit',
+                'label'=>Yii::t('users','Update {user}', array(
+                    '{user}' => $User,
+                )),
+                'url'=>array('update', 'id'=>$modelId)
+            ),
+            array(
+                'name'=>'delete',
+                'label'=>Yii::t('users','Delete {user}', array(
+                    '{user}' => $User,
+                )),
+                'url'=>'#',
+                'linkOptions'=>array(
+                    'submit'=>array('delete','id'=>$modelId),
+                    'confirm'=>Yii::t('app','Are you sure you want to delete this item?'))
+            ),
+        );
+
+        $this->prepareMenu($menuItems, $selectOptions);
+        $this->actionMenu = $this->formatMenu($menuItems, $menuParams);
+    }
+
+
 }

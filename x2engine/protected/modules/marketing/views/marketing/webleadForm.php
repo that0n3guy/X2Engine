@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,40 +33,28 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 $this->pageTitle = Yii::t('marketing','Web Lead Form');
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('marketing','All Campaigns'), 'url'=>array('index')),
-	array('label'=>Yii::t('marketing','Create Campaign'), 'url'=>array('create')),
-	array('label'=>Yii::t('contacts','Contact Lists'),'url'=>array('/contacts/contacts/lists')),
-	array(
-        'label'=>Yii::t('marketing','Newsletters'), 
-        'url'=>array('/marketing/weblist/index'),
-        'visible'=>(Yii::app()->contEd('pro'))
-    ),
-	array('label'=>Yii::t('marketing','Web Lead Form')),
-	array('label'=>Yii::t('marketing','Web Tracker'), 'url'=>array('webTracker'),'visible'=>(Yii::app()->contEd('pro'))),
-    
-	array('label'=>Yii::t('app','X2Flow'),'url'=>array('/studio/flowIndex'),'visible'=>(Yii::app()->contEd('pro'))),
-));
+$menuOptions = array(
+    'all', 'create', 'lists', 'newsletters', 'weblead', 'webtracker', 'x2flow',
+);
+
+$plaOptions = array(
+    'anoncontacts', 'fingerprints'
+);
+$menuOptions = array_merge($menuOptions, $plaOptions);
+
+$this->insertMenu($menuOptions);
+
 ?>
 <div id='content-tray'>
-<div class="page-title icon marketing"><h2><?php echo Yii::t('marketing','Web Lead Form'); ?></h2></div>
-<div class="form">
-<?php echo Yii::t('marketing','Create a public form to receive new contacts.'),'<br>',
-	Yii::t('marketing','If no lead routing has been configured, all new contacts will be assigned to "Anyone".'); ?>
-</div>
-<div class="form">
-    <?php echo Yii::t('marketing','If you want to keep your current HTML forms but still get web leads into X2, please see the wiki article located here: {link}',array(
-        '{link}' => CHtml::link(Yii::t('marketing','Web Lead API'),'http://wiki.x2engine.com/wiki/Web_Lead_API_(new)', array('target'=>'_blank')),
-    )) ?>
+<div class="page-title icon marketing"><h2><?php echo Yii::t('marketing','Web Lead Form'); ?></h2>
 </div>
 <?php
-$this->renderPartial ('application.components.views._createWebForm',
+$this->widget('application.components.WebFormDesigner.WebLeadFormDesigner', 
     array(
         'forms'=>$forms,
-        'webFormType'=>'weblead'
     )
 );
 ?>

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,34 +33,226 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-// remove the following lines when in production mode
-defined('YII_DEBUG') or define('YII_DEBUG', true);
-// specify how many levels of call stack should be shown in each log message
-defined('YII_TRACE_LEVEL') or define('YII_TRACE_LEVEL', 3);
+Yii::import ('application.modules.mobile.components.*');
+Yii::import ('application.modules.mobile.controllers.MobileController');
+
+/**
+ * All CSS for the mobile module should be specified in this file. Corresponding sass files
+ * are automatically merged into combined.css. When new CSS assets are added, the console 
+ * command combinemobilecss must be run in order to regenerate the combined.scss file.
+ */
 
 /**
  * @package application.modules.mobile
  */
-class MobileModule extends CWebModule {
+class MobileModule extends X2WebModule {
+
+    public static $useMergedCss = true;
 
     /**
      * @var string the path of the assets folder for this module. Defaults to 'assets'.
      */
     public $packages = array();
-    
-    private $_assetsUrl;
- 
-    public function getAssetsUrl()
-    {
-        if ($this->_assetsUrl === null)
-            $this->_assetsUrl = Yii::app()->getAssetManager()->publish(
-                Yii::getPathOfAlias('mobile.assets'), false, -1, true );
-        return $this->_assetsUrl;
+
+    public static function registerDefaultCss () {
+        $packages = self::getPackages (Yii::app()->controller->assetsUrl);
     }
 
+    public static function registerDefaultJs () {
+        $packages = self::getPackages (Yii::app()->controller->assetsUrl);
+    }
 
+    public static function getPlatform () {
+        //return 'iOS';
+        if (isset ($_COOKIE[MobileController::PLATFORM_COOKIE_NAME])) {
+            return $_COOKIE[MobileController::PLATFORM_COOKIE_NAME];
+        } 
+    }
+
+    public static function supportedModules (CDbCriteria $criteria = null) {
+        $basicModules = array (
+            'x2Activity',
+            'topics',
+            'contacts',
+            'charts',
+            'accounts',
+            'opportunities',
+            'x2Leads',
+            'quotes',
+            'products',
+            'services',
+            'bugReports',
+            'users',
+            //'groups',
+        );
+
+        $qpg = new QueryParamGenerator;
+        $newCriteria = new CDbCriteria;
+        $newCriteria->condition = 
+            '(name in '.$qpg->bindArray ($basicModules, true).' or custom) and visible and 
+             moduleType in ("module", "pseudoModule") and name != "document"';
+        $newCriteria->params = $qpg->getParams ();
+        // sort null values to the bottom by using max menuPosition
+        $newCriteria->order = '(CASE WHEN menuPosition IS NULL THEN '.pow(2,11).' ELSE menuPosition END) ASC';
+        if ($criteria) {
+            $newCriteria->mergeWith ($criteria);
+            $criteria = $newCriteria;
+        } else {
+            $criteria = $newCriteria;
+        }
+
+        $modules = Modules::model ()->findAll (
+            $criteria
+        );
+        return $modules;
+    }
+
+    public static function getPackages ($assetsUrl) {
+        return array(
+            'jquery-migrate' => array(
+                'baseUrl' => Yii::app()->baseUrl,
+                'js' => array(
+                    'js/lib/jquery-migrate-1.2.1.js',
+                ),
+                'depends' => array('jquery')
+            ),
+            'jqueryMobileCss' => array(
+                'baseUrl' => $assetsUrl,
+                'css' => (Yii::app()->params->isPhoneGap ? array () : array(
+                    'css/jquery.mobile.structure-1.4.5.css',
+                )),
+                'depends' => array('jquery', 'jquery-migrate'),
+            ),
+            'jqueryMobileJs' => array(
+                'baseUrl' => $assetsUrl,
+                'js' => array(
+                    'js/x2mobile-init.js',
+                    'js/lib/jquery.mobile-1.4.5.js',
+                ),
+                'depends' => array('jquery', 'jquery-migrate'),
+            ),
+            'x2TouchCss' => array (
+                'baseUrl' => $assetsUrl,
+                'css' => array_merge (
+                    array_merge (array (
+                        'js/lib/jqueryui/jquery-ui.structure.css',
+                        'js/lib/datepicker/jquery.mobile.datepicker.css',
+                         
+                        'js/lib/nano/nanoscroller.css',
+                         
+                    ), 
+                    Yii::app()->params->isPhoneGap ? array () : array ('css/shared.css')), 
+
+                    // enables inclusion of individual css files. Speeds up scss compilation which
+                    // is important when making iterative scss changes.
+                    YII_DEBUG && !self::$useMergedCss ? array_map (function ($path) {
+                            if (preg_match ('/\/debug\//', $path)) {
+                                return 
+                                    preg_replace ('/\.css$/', '', $path) .
+                                    (MobileModule::getPlatform () === 'iOS' ? 'IOS' : '') .
+                                    '.css';
+                            } else {
+                                return $path;
+                            }
+                        }, array_merge (array(
+                            'css/debug/main.css',
+                            'css/debug/forms.css',
+                            'css/jqueryMobileCssOverrides.css',
+                            'css/debug/login.css',
+                            'css/debug/passwordReset.css',
+                            'css/debug/recordIndex.css',
+                            'css/debug/topicsIndex.css',
+                            'css/debug/recordView.css',
+                            'css/debug/recordCreate.css',
+                            'css/debug/topicsCreate.css',
+                            'css/debug/topicsView.css',
+                            'css/debug/activityFeed.css',
+                            'css/debug/settings.css',
+                            'css/debug/about.css',
+                            'css/debug/license.css',
+                            'css/debug/recentItems.css',
+                             
+                            'css/debug/chartDashboard.css',
+                            
+                        ), self::getPlatform () === 'iOS' ? array (
+                            'css/iOS.css'
+                        ) : array ()
+                    )) : array (
+                        self::getPlatform () === 'iOS' ? 
+                            'css/zcombinediOS.css' : 
+                            'css/zcombined.css'
+                    )//,
+                ),
+                'depends' => array('jqueryMobileCss'),
+            ),
+            'x2TouchJs' => array (
+                'baseUrl' => $assetsUrl,
+                'js' => array(
+                    'js/jQueryOverrides.js',
+                    'js/x2touchJQueryOverrides.js',
+                    'js/MobileForm.js',
+                    'js/Controller.js',
+                    'js/CameraButton.js',
+                    'js/Main.js',
+                    'js/MobileAutocomplete.js',
+                    'js/lib/jqueryui/jquery-ui.js',
+                    'js/lib/datepicker/jquery.mobile.datepicker.js',
+                     
+                    'js/lib/nano/jquery.nanoscroller.js',
+                     
+                ),
+                'depends' => array('jqueryMobileJs', 'auxlib', 'bbq', 'X2Widget'),
+            ),
+             
+//            'phoneGapCss' => array (
+//                'baseUrl' => $assetsUrl,
+//                'css' => array (
+//                ), 
+//                'depends' => array('jqueryMobileCss'),
+//            ),
+//            'phoneGapJs' => array (
+//                'baseUrl' => $assetsUrl,
+//                'js' => array(
+//                ),
+//                'depends' => array('jqueryMobileJs'),
+//            ),
+             
+            'x2TouchSupplementalCss' => array (
+                'baseUrl' => Yii::app()->baseUrl,
+                'css' => array_merge (
+                    array (
+                        'themes/x2engine/css/fontAwesome/css/font-awesome.css',
+                        'themes/x2engine/css/css-loaders/load8.css',
+                        //'themes/x2engine/css/x2IconsStandalone.css',
+                        'themes/x2engine/css/x2touchIcons.css',
+                         
+                        'themes/x2engine/css/components/DataWidget/DataWidget.css',
+                        'js/c3/c3.css'
+                         
+                    ), 
+                    YII_DEBUG && !self::$useMergedCss ? array(
+                    ) : array ()),
+            ),
+            'x2TouchSupplementalJs' => array (
+                'baseUrl' => Yii::app()->baseUrl,
+                'js' => array(
+                    'js/jQueryOverrides.js',
+                    'js/webtoolkit.sha256.js',
+                    'js/auxlib.js',
+                    'js/jstorage.min.js',
+                    'js/notifications.js',
+                    'js/Attachments.js',
+                ),
+            ),
+            'yiiactiveform' => array(
+                'js' => array('jquery.yiiactiveform.js'),
+                'depends' => array('jqueryMobileJs'),
+            )
+        );
+    }
+    
     public function init() {
         // this method is called when the module is being created
         // you may place code here to customize the module or the application
@@ -69,27 +262,7 @@ class MobileModule extends CWebModule {
             'mobile.components.*',
         ));
 
-        // Set module specific javascript packages
-        $this->packages = array(
-            'jquerymobile' => array(
-                'basePath' => $this->getBasePath(),
-                'baseUrl' => $this->assetsUrl,
-                'css' => array(
-                    'css/x2MobileTheme.css',
-                    'css/jquery.mobile.structure-1.3.2.css'
-                ),
-                'js' => array(
-                    'js/x2mobile-init.js',
-                    'js/jquery.mobile-1.3.2.js'
-                ),
-                'depends' => array('jquery'),
-            ),
-            'yiiactiveform' => array(
-                'js' => array('jquery.yiiactiveform.js'),
-                'depends' => array('jquerymobile'),
-            )
-        );
-        Yii::app()->clientScript->packages = $this->packages;
+        Yii::app()->clientScript->packages = self::getPackages ($this->assetsUrl);
 
         // set module layout
         $this->layout = 'main';

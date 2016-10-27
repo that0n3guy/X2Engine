@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,43 +33,70 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-$this->setPageTitle(Yii::t('workflow', 'Process'));
+Yii::app()->clientScript->registerCss('workflowIndexCss',"
 
+#workflow-grid .page-title.workflow .x2-grid-view-controls-buttons {
+    position: relative;
+    top: -4px;
+}
 
-$isAdmin = (Yii::app()->params->isAdmin);
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('workflow','All Processes')),
-	array('label'=>Yii::t('app','Create'), 'url'=>array('create'), 'visible'=>$isAdmin),
-));
+");
+
+$this->setPageTitle(Yii::t('workflow', '{process}', array(
+    '{process}' => Modules::displayName(false)
+)));
+
+$menuOptions = array(
+    'index', 'create',
+);
+$this->insertMenu($menuOptions);
 
 ?>
 <div class='flush-grid-view'>
 <?php
 
-$this->widget('zii.widgets.grid.CGridView', array(
-	'dataProvider'=>$dataProvider,
-	'baseScriptUrl'=>Yii::app()->theme->getBaseUrl().'/css/gridview',
-	'template'=> '<div class="page-title icon workflow"><h2>'.Yii::t('workflow','Processes').'</h2><div class="title-bar">{summary}</div></div>{items}',
+$this->widget('X2ActiveGridView', array(
+    'id' => 'workflow-grid',
+    'modelName' => 'Workflow',
+	'dataProvider'=>$model->search(),
+	'filter'=>$model,
+    'baseScriptUrl'=>  
+        Yii::app()->request->baseUrl.'/themes/'.Yii::app()->theme->name.'/css/gridview',
+    'title'=>Yii::t('workflow','{processes}', array(
+        '{processes}' => Modules::displayName())),
+    'template'=> '<div class="page-title icon workflow">{title}'.
+        '{buttons}{summary}</div>{items}{pager}',
 	'summaryText' => Yii::t('app','<b>{start}&ndash;{end}</b> of <b>{count}</b>'),
-	'enableSorting'=>false,
-	'columns'=>array(
-		array(
+    'buttons' => array ('clearFilters','autoResize'),
+	'gvSettingsName'=>'workflowIndex',
+    'defaultGvSettings' => array (
+        'name' => 240,
+        'isDefaultFor' => 100,
+        'stages' => 100,
+    ),
+	'pager'=>array('class'=>'CLinkPager','maxButtonCount'=>10),
+	'specialColumns'=>array(
+		'name' => array(
+			'header'=>Yii::t('workflow','Name'),
 			'name'=>'name',
-			'value'=>'CHtml::link($data->name,array("view","id"=>$data->id))',
-			'type'=>'raw',
-			'headerHtmlOptions'=>array('style'=>'width:65%;'),
-		),
-		array(
-			'name'=>'isDefault',
-			'value'=>'$data->isDefault? Yii::t("app","Yes") : ""',
+			'value'=>'CHtml::link(CHtml::encode($data->name),array("view","id"=>$data->id))',
 			'type'=>'raw',
 		),
-		array(
-			'name'=>Yii::t('workflow','Stages'),
+		'isDefaultFor' => array(
+			'name'=>'isDefaultFor',
+			'header'=>Yii::t('workflow', 'Default For'),
+			'value'=>'$data->renderAttribute ("isDefaultFor")',
+			'type'=>'raw',
+			'filter'=>false,
+		),
+		'stages' => array(
+			'header'=>Yii::t('workflow','Stages'),
+			'name'=>'stages',
 			'value'=>'X2Model::model("WorkflowStage")->countByAttributes(array("workflowId"=>$data->id))',
 			'type'=>'raw',
+			'filter'=>false,
 		),
 	),
 )); ?>

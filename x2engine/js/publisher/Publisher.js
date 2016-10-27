@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Manages behavior of publisher widget
@@ -53,23 +54,83 @@ function Publisher (argsDict) {
         translations: {}, 
         tabs: [], // PublisherTab objects
         initTabId: null, // id of initially active tab 
-        publisherCreateUrl: '' // url of action to call when publisher form is submitted
+        publisherCreateUrl: '', // url of action to call when publisher form is submitted
+        isCalendar: false,
+        renderTabs: true
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
 
-    this._selectedTab; // id of currently selected tab
+    this._selectedTabId; // id of currently selected tab
 
     this._tabs = {}; // dictionary of tabs indexed by tab id
     for (var i = 0; i < this.tabs.length; ++i) {
         this._tabs[this.tabs[i].id] = this.tabs[i];
     }
 
+    x2.Widget.call (this, argsDict);
     this._init ();
 }
+
+Publisher.prototype = auxlib.create (x2.Widget.prototype);
 
 /*
 Public static methods
 */
+
+Publisher.translations = { 'View History Item': 'View History Item' };
+Publisher.loadFrame = function (id,type){
+    if(type !== 'Action' && type !== 'QuotePrint') {
+        var frame=
+            '<iframe style=\"width:99%;height:99%\" ' +
+              'src=\"' + yii.scriptUrl + '/actions/actions/viewEmail' + '?id='+id+'\"></iframe>';
+    }else if(type=='Action'){
+        var frame=
+            '<iframe style=\"width:99%;height:99%\" ' +
+              'src=\"' + yii.scriptUrl + '/actions/actions/viewAction' +
+                '?id='+id+'&publisher=true&loadAssociated=false\"></iframe>';
+    } else if(type=='QuotePrint'){
+        var frame=
+            '<iframe style=\"width:99%;height:99%\" ' +
+              'src=\"' + yii.scriptUrl + '/quotes/quotes/print' +
+                '?id='+id+'&inline=1\"></iframe>';
+    }
+    if(typeof x2.actionFrames.viewEmailDialog != 'undefined') {
+        if($(x2.actionFrames.viewEmailDialog).is(':hidden')){
+            $(x2.actionFrames.viewEmailDialog).remove();
+        }else{
+            return;
+        }
+    }
+
+    x2.actionFrames.viewEmailDialog = $('<div></div>', {id: 'x2-view-email-dialog'});
+
+    x2.actionFrames.viewEmailDialog.dialog({
+        title: Publisher.translations['View History Item'],
+        autoOpen: false,
+        resizable: true,
+        width: '650px',
+        show: 'fade'
+    });
+    $('body')
+        .bind('click', function(e) {
+            if($('#x2-view-email-dialog').dialog('isOpen')
+                && !$(e.target).is('.ui-dialog, a')
+                && !$(e.target).closest('.ui-dialog').length
+            ) {
+                $('#x2-view-email-dialog').dialog('close');
+            }
+        });
+
+    x2.actionFrames.viewEmailDialog.data('inactive', true);
+    if(x2.actionFrames.viewEmailDialog.data('inactive')) {
+        x2.actionFrames.viewEmailDialog.append(frame);
+        x2.actionFrames.viewEmailDialog.dialog('open').height('400px');
+        x2.actionFrames.viewEmailDialog.data('inactive', false);
+    } else {
+        x2.actionFrames.viewEmailDialog.dialog('open');
+    }
+};
+
 
 /*
 Private static methods
@@ -79,23 +140,14 @@ Private static methods
 Public instance methods
 */
 
-Publisher.prototype.addTab = function (tab) {
-    this._tabs[tab.id] = tab;
-    this.tabs.push (tab);
-};
-
 Publisher.prototype.getForm = function () {
-    return this._form;
+    return this.getSelectedTab ().getFormObj ().element$;
 };
 
-/**
- * "Magic getter" method which caches jQuery objects so they don't have to be
- * looked up a second time from the DOM
- */
-Publisher.prototype.getElement = function (selector) {
-    if(typeof this._elements[selector] == 'undefined')
-        this._elements[selector] = this._form.find(selector);
-    return this._elements[selector];
+Publisher.prototype.addTab = function (tab) {
+    tab.publisher = this;
+    this._tabs[tab.tabId] = tab;
+    this.tabs.push (tab);
 };
 
 /**
@@ -103,13 +155,11 @@ Publisher.prototype.getElement = function (selector) {
  */
 Publisher.prototype.reset = function () {
     var that = this;
+    this.getSelectedTab ().reset ();
+};
 
-    this._selectedTab.reset ();
-    
-    // reset save button
-    auxlib.getElement('#save-publisher').removeClass('highlight');
-
-    this.blur ();
+Publisher.prototype.getSelectedTab = function () {
+    return this._tabs[this._selectedTabId];
 };
 
 /**
@@ -126,25 +176,7 @@ Publisher.prototype.switchToTab = function (selectedTabId) {
 
     that.DEBUG && console.log ('selectedTabId = ');
     that.DEBUG && console.log (selectedTabId);
-
-    // set field SelectedTab for use in POST request
-    auxlib.getElement('#SelectedTab').val(selectedTabId);
-    this._selectedTab = this._tabs[selectedTabId];
-
-    that.DEBUG && console.log (this._selectedTab);
-    // enable current tab for elements, disable inactive tab form elements
-    that.DEBUG && console.log ($.extend ({}, this.tabs));
-    for (var tabId in this.tabs) {
-        var tab = this.tabs[tabId];
-        if (this._selectedTab !== tab) {
-            that.DEBUG && console.log ('disabling:');
-            that.DEBUG && console.log (tab);
-            tab.disable ();
-            tab.blur ();
-        } else {
-            tab.enable ();
-        }
-    }
+    this._selectedTabId = selectedTabId;
 }
 
 /**
@@ -160,94 +192,70 @@ Publisher.prototype.tabSelected = function (event, ui) {
 /**
  * Updates to perform after publisher form gets submitted
  */
-Publisher.prototype.updates = function () {
-    if($('#calendar').length !== 0) // if we are in calendar module
-        $('#calendar').fullCalendar('refetchEvents'); // refresh calendar
+Publisher.prototype.updates = function (suppressTransactionalViewUpdate) {
+    suppressTransactionalViewUpdate = typeof suppressTransactionalViewUpdate === 'undefined' ? 
+        false : suppressTransactionalViewUpdate; 
+    if($(this.resolveId ('calendar')).length !== 0) // if we are in calendar module
+        $(this.resolveId ('calendar')).fullCalendar('refetchEvents'); // refresh calendar
 
-    if($('.list-view').length !== 0)
+    if($('.list-view').length !== 0) {
         $.fn.yiiListView.update($('.list-view').attr('id'));
+        if (!suppressTransactionalViewUpdate)
+            this.updateTransactionalView ();
+    }
 
      // event detected by x2chart.js
     $(document).trigger ('newlyPublishedAction');
 };
 
-/**
- * Ad-hoc quasi-validation for the publisher
- */
-Publisher.prototype.beforeSubmit = function() {
-    if (!this._selectedTab.validate ()) {
-        return false;
+Publisher.prototype.updateTransactionalView = function () {
+    switch (this._selectedTabId) {
+        case 'new-action':     
+            x2.TransactionalViewWidget.refresh ('ActionsWidget'); 
+            break;
+        case 'log-a-call':     
+            x2.TransactionalViewWidget.refresh ('CallsWidget'); 
+            break;
+        case 'new-event':     
+            x2.TransactionalViewWidget.refresh ('EventsWidget'); 
+            break;
+        case 'new-comment':     
+            x2.TransactionalViewWidget.refresh ('CommentsWidget'); 
+            break;
+        case 'products':     
+            x2.TransactionalViewWidget.refresh ('ProductsWidget'); 
+            break;
+        case 'log-time-spent':     
+            x2.TransactionalViewWidget.refresh ('LoggedTimeWidget'); 
+            break;
     }
-    return true; // form is sane: submit!
-};
-
-/**
- * Removes focus from publisher
- */
-Publisher.prototype.blur = function () {
-    $("#save-publisher").removeClass("highlight");
-    this._selectedTab.blur ();
 };
 
 /*
 Private instance methods
 */
 
-Publisher.prototype._setUpSaveButtonBehavior = function () {
-    var that = this;
-
-    // Highlight save button when something is edited in the publisher
-    $("#publisher-form input, #publisher-form select, #publisher-form textarea, #publisher").
-        bind("focus.compose", function(){
-
-        $("#save-publisher").addClass("highlight");
-
-        // close on click outside
-        $(document).unbind("click.publisher").bind("click.publisher",function(e) {
-            if(!$(e.target).closest ("#publisher-form, .ui-datepicker, .fc-day").length && 
-               $("#publisher-form textarea").val() === "") {
-                
-                that.blur ();
-            }
-        });
-
-        return false;
-    });
-
-    /**
-     * Submit button click handler
-     */
-    $('#save-publisher').click (function (evt) {
-        evt.preventDefault ();
-        if (!that.beforeSubmit ()) {
-            return false;
-        }
-        that._selectedTab.submit (that, that._form);
-        return false;
-    });
-
-};
-
 Publisher.prototype._init = function () {
     var that = this;
 
     $(function () {
         for (var i in that.tabs) that.tabs[i].run ();
-        that._form = $('#publisher-form'); // publisher form element
-        that._setUpSaveButtonBehavior ();
+        if (that.renderTabs) {
+            $("#publisher").multiRowTabs({
+                activate: function(event, ui) { that.tabSelected(event, ui); },
+            });
+            
+            if ($('[aria-controls="'+that.initTabId+'"]').hasClass ('ui-state-active')) {
+                that.switchToTab (that.initTabId);
+            } else {
+                $('[href="#' + that.initTabId +'"]').click (); // switch to initial tab
+            }
 
-        $("#publisher").multiRowTabs({
-            activate: function(event, ui) { that.tabSelected(event, ui); },
-        });
-        
-        if ($('[aria-controls="'+that.initTabId+'"]').hasClass ('ui-state-active')) {
-            that.switchToTab (that.initTabId);
+            // show the tab rows now that we've instantiated the tab widget
+            $('#publisher' + ' > ul').show (); 
         } else {
-            $('[href="#' + that.initTabId +'"]').click (); // switch to initial tab
+            that._selectedTabId = that.initTabId;
         }
-
-        // show the tab rows now that we've instantiated the tab widget
-        $('#publisher > ul').show (); 
 
     });
 };

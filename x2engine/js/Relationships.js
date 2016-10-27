@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * RelationshipsManager prototype 
@@ -62,7 +63,8 @@ function RelationshipsManager (argsDict) {
         isViewPage: true, 
         
         // if set, updated after new record is created with new record's name
-        lookupFieldElement: null 
+        lookupFieldElement: null,
+        afterCreate: function () {}
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
 
@@ -200,9 +202,7 @@ RelationshipsManager.prototype._handleFormSubmission = function (form) {
             that._dialog.empty(); // clean up dialog
                 
             if(response['status'] == 'success') {
-                if($('#relationships-grid').length == 1) {
-                    $.fn.yiiGridView.update('relationships-grid');
-                }
+                that.afterCreate (response.attributes);
                 that._dialog.dialog ('close');
     
                 // indicate that we can append a create action page to this dialog
@@ -257,14 +257,21 @@ RelationshipsManager.prototype._setUpOpenDialogBehavior = function () {
     $(this.element).unbind ('click')
         .bind ('click', function() {
 
-        if (that._dialogInactive) {
-            $.post(
-                that.createRecordUrl, {
-                    x2ajax: true
-                }, 
-                function(response) {
+        var data = {
+            x2ajax: true
+        };
+        data[x2.Widget.NAMESPACE_KEY] = 'RelationshipsManager';
 
-                    that._dialog.append(response);
+        if (that._dialogInactive) {
+            $.ajax({
+                type: 'post',
+                url: that.createRecordUrl, 
+                data: data,
+                dataType: 'json',
+                success: function(response) {
+                    var page = response.page;
+
+                    that._dialog.append(page);
                     that._dialog.dialog('open');
                     /* indicate that a create-action page has been appended, don't do it until 
                        the old one is submitted or cleared. */
@@ -279,7 +286,8 @@ RelationshipsManager.prototype._setUpOpenDialogBehavior = function () {
                         return that._handleFormSubmission (form);
                     });
                     that._setDefaults ();
-                });
+                }
+            });
         } else {
             that._dialog.dialog('open');
         }

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,26 +33,27 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerScriptFile($this->module->getAssetsUrl ().'/js/chartManager.js',
     CClientScript::POS_BEGIN);
 
 require_once("protected/modules/charts/chartsConfig.php");
-$this->actionMenu = $this->formatMenu(array(
-    array('label' => Yii::t('charts', 'Lead Volume'), 'url' => array('leadVolume')),
-    // array('label' => Yii::t('charts', 'Lead Activity'), 'url' => array('leadActivity')),
-    // array('label' => Yii::t('charts', 'Lead Performance'), 'url' => array('leadPerformance')),
-    // array('label' => Yii::t('charts', 'Lead Sources'), 'url' => array('leadSources')),
-    // array('label' => Yii::t('charts', 'Workflow'), 'url' => array('workflow')),
-    array('label' => Yii::t('charts', 'Marketing')),
-    array('label' => Yii::t('charts', 'Pipeline'), 'url' => array('pipeline')),
-    array('label' => Yii::t('charts', 'Opportunities'), 'url' => array('sales'))
-));
+
+$menuOptions = array(
+    'leadVolume', 'marketing', 'pipeline', 'opportunities',
+);
+$this->insertMenu($menuOptions);
+
 ?>
 
 
-<div class="page-title icon charts"><h2><?php echo Yii::t('app', 'Marketing Dashboard'); ?>&nbsp;&nbsp;</h2></div>
+<div class="page-title icon charts"><h2>
+    <?php
+        echo Yii::t('app', '{marketing} Dashboard', array(
+            '{marketing}' => Modules::displayName(true, "Marketing"),
+        )); ?>
+&nbsp;&nbsp;</h2></div>
 <div class="form">
     <br>
 
@@ -71,7 +73,9 @@ $this->actionMenu = $this->formatMenu(array(
                 echo $form->label(
                     $model, 'dateRange', 
                     array(
-                        'label' => Yii::t('charts', 'Select leads received in the last').
+                        'label' => Yii::t('charts', 'Select {leads} received in the last', array(
+                            '{leads}' => strtolower(Modules::displayName(true, "X2Leads")),
+                        )).
                             ' &nbsp;&nbsp;&nbsp;&nbsp;'
                     )
                 ); 
@@ -100,7 +104,9 @@ $this->actionMenu = $this->formatMenu(array(
                 'x-axis' => array('column' => 'leadSource')),
             'filters' => $filters,
             'chartOptions' => array(
-                'title' => Yii::t('charts', 'Lead Source'),
+                'title' => Yii::t('charts', '{lead} Source', array(
+                    '{lead}' => Modules::displayName(false, "X2Leads"),
+                )),
                 'legend' => array('show' => true, 'location' => 'ne', 'placement' => 'insideGrid')
             )
                 ));
@@ -117,7 +123,9 @@ $this->actionMenu = $this->formatMenu(array(
             ),
             'filters' => $filters,
             'chartOptions' => array(
-                'title' => Yii::t('charts', 'Lead Type'),
+                'title' => Yii::t('charts', '{lead} Type', array(
+                    '{lead}' => Modules::displayName(false, "X2Leads"),
+                )),
                 'legend' => array('show' => true, 'location' => 'ne', 'placement' => 'insideGrid')
             )
         ));
@@ -135,7 +143,9 @@ $this->actionMenu = $this->formatMenu(array(
             ),
             'filters' => $filters,
             'chartOptions' => array(
-                'title' => Yii::t('charts', 'Lead Distribution and Status'),
+                'title' => Yii::t('charts', '{lead} Distribution and Status', array(
+                    '{lead}' => Modules::displayName(false, "X2Leads"),
+                )),
                 'axes' => array(
                     'xaxis' => array('label' => Yii::t('charts', 'Assigned To')),
                     'yaxis' => array('label' => Yii::t('charts', 'Count'))
@@ -157,9 +167,13 @@ $this->actionMenu = $this->formatMenu(array(
             ),
             'filters' => $filters,
             'chartOptions' => array(
-                'title' => Yii::t('charts', 'Lead Conversion'),
+                'title' => Yii::t('charts', '{lead} Conversion', array(
+                    '{lead}' => Modules::displayName(false, "X2Leads"),
+                )),
                 'axes' => array(
-                    'xaxis' => array('label' => Yii::t('charts', 'Lead Received')),
+                    'xaxis' => array('label' => Yii::t('charts', '{lead} Received', array(
+                        '{lead}' => Modules::displayName(false, "X2Leads"),
+                    ))),
                     'yaxis' => array('label' => Yii::t('charts', 'Count'))
                 )
             )

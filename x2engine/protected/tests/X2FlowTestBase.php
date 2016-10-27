@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,46 +34,51 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import ('application.modules.contacts.models.*');
 Yii::import ('application.modules.workflow.models.*');
 Yii::import ('application.components.*');
 Yii::import ('application.components.x2flow.*');
+Yii::import ('application.components.x2flow.actions.*');
 Yii::import ('application.components.x2flow.triggers.*');
 Yii::import ('application.components.permissions.*');
 
 /**
+ * Base class for X2Flow unit tests. These methods should probably be moved to a static utility
+ * class so that they can be used by non-descendants
  * @package application.tests.unit.components.x2flow.triggers
  */
 class X2FlowTestBase extends X2DbTestCase {
+
+    public function assertNoFlowError ($arr) {
+        if (!$arr[0]) {
+            X2_TEST_DEBUG_LEVEL > 1 && print_r ($arr[1]);
+        }
+        $this->assertTrue ($arr[0]);
+        return $arr;
+    }
+
+    public function assertFlowError ($arr) {
+        $this->assertFalse ($arr[0]);
+        return $arr;
+    }
+
     /**
      * Clears all trigger logs
+     * @deprecated Use X2FlowTestingAuxLib::clearLogs instead
      */
     public function clearLogs () {
-        Yii::app()->db->createCommand ('delete from x2_trigger_logs where 1=1')
-            ->execute ();
-        $count = Yii::app()->db->createCommand (
-            'select count(*) from x2_trigger_logs
-             where 1=1')
-             ->queryScalar ();
-        $this->assertTrue ($count === '0');
+        return X2FlowTestingAuxLib::clearLogs ();
     }
 
     /**
      * Returns trace of log for specified flow 
      * @return null|array
+     * @deprecated Use X2FlowTestingAuxLib::getTraceByFlowId instead
      */
     public function getTraceByFlowId ($flowId) {
-        $log = TriggerLog::model()->findByAttributes (array (
-            'flowId' => $flowId,
-        ));
-        if ($log) {
-            $decodedLog = CJSON::decode ($log->triggerLog);
-            return $decodedLog[1];
-        } else {
-            return $log;
-        }
+        return X2FlowTestingAuxLib::getTraceByFlowId ($flowId);
     }
 
     /**
@@ -93,35 +99,15 @@ class X2FlowTestBase extends X2DbTestCase {
     /**
      * Checks each entry in triggerLog looking for errors
      * @param array $trace One of the return value of executeFlow ()
-     * @return bool true if an error was found in the log, false otherwise
+     * @return bool false if an error was found in the log, true otherwise
+     * @deprecated Use X2FlowTestingAuxLib::checkTrace instead
      */
     public function checkTrace ($trace) {
-        if (!$trace[0]) return false;
-        $trace = $trace[1];
-        while (true) {
-            $complete = true;
-            foreach ($trace as $action) {
-                if ($action[0] === 'X2FlowSwitch') {
-                    $trace = $action[2];
-                    $complete = false;
-                    break;
-                }
-                if (!$action[1][0]) return false;
-            }
-            if ($complete) break;
-        }
-        return true;
+        return X2FlowTestingAuxLib::checkTrace ($trace);
     }
 
-    /**
-     * Flattens the X2Flow trace, making it much easier to read programmatically. 
-     * @param array $trace One of the return value of executeFlow ()
-     * @return array flattened trace
-     */
-    public function flattenTrace ($trace) {
-        if (!$trace[0]) return false;
-        $flattenedTrace = array (array ('action' => 'start', 'error' => $trace[0]));
-        $trace = $trace[1];
+    private function _flattenTrace ($trace) {
+        $flattenedTrace = array ();
         while (true) {
             $complete = true;
             foreach ($trace as $action) {
@@ -133,10 +119,17 @@ class X2FlowTestBase extends X2DbTestCase {
                     $trace = $action[2];
                     $complete = false;
                     break;
+                } elseif ($action[0] === 'X2FlowSplitter') {
+                    array_push ($flattenedTrace, array (
+                        'action' => $action[0],
+                        'branch' => $action[1],
+                    ));
+                    $flattenedTrace = array_merge (
+                        $flattenedTrace, $this->_flattenTrace ($action[2]));
                 } else {
                     array_push ($flattenedTrace, array (
                         'action' => $action[0],
-                        'error' => $action[1][0],
+                        'error' => !$action[1][0],
                         'message' => $action[1][1],
                     ));
                 }
@@ -147,13 +140,42 @@ class X2FlowTestBase extends X2DbTestCase {
     }
 
     /**
+     * Flattens the X2Flow trace, making it much easier to read programmatically. 
+     * @param array $trace One of the return value of executeFlow ()
+     * @return array flattened trace
+     */
+    public function flattenTrace ($trace) {
+        $that = $this;
+        if (!is_array ($trace[0])) $trace = array ($trace);
+        $flattened = array ();
+
+        foreach ($trace as $segment) {
+            $flattened = array_merge (
+                $flattened, 
+                !$segment[0] ? false : array_merge (
+                        array (
+                            array (
+                                'action' => 'start',
+                                'error' => !$segment[0],
+                            ),  
+                        ),
+                        $this->_flattenTrace ($segment[1])
+                    )
+            );
+        }
+        return $flattened;
+    }
+
+    /**
      * Returns array of decoded flows from fixture records
      * @param X2FlowTestBase $context A test case for which to obtain data
      * @param string $fixtureName The name of the fixture to pull from
      * @return <array of arrays> decoded flow JSON strings
      */
     public function getFlows ($context,$fixtureName = 'x2flow') {
-         return array_map (function ($a) { return CJSON::decode ($a['flow']); }, $context->{$fixtureName});
+         return array_map (function ($a) { 
+            return CJSON::decode ($a['flow']); 
+        }, $context->{$fixtureName});
     }
 
     /**
@@ -165,8 +187,20 @@ class X2FlowTestBase extends X2DbTestCase {
         $_triggerDepth = $X2Flow->getProperty ('_triggerDepth');
         $_triggerDepth->setAccessible (TRUE);
         $_triggerDepth->setValue (1);
-        $fn = TestingAuxLib::setPublic ('X2Flow', 'executeFlow');
-        $returnVal = $fn (array (&$flow, &$params));
+
+        $fn = TestingAuxLib::setPublic (
+            'X2Flow', '_executeFlow', false, function ($method, $class) {
+
+                return function () use ($method, $class) {
+                    $args = func_get_args ();
+                    $args = array (
+                        &$args[0],
+                        &$args[1],
+                    );
+                    return $method->invokeArgs ($class, $args);
+                };
+            });
+        $returnVal = $fn ($flow, $params);
         $_triggerDepth->setValue (0);
         return $returnVal;
     }
@@ -194,6 +228,10 @@ class X2FlowTestBase extends X2DbTestCase {
             array(),$classesShouldBeLoaded,'Some classes were not instantiated.');
     }
 
+    public static function tearDownAfterClass() {
+        X2FlowTestingAuxLib::clearLogs();
+        parent::tearDownAfterClass();
+    }
 }
 
 ?>

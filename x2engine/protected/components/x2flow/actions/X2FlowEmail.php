@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Create Record action
@@ -49,7 +50,11 @@ class X2FlowEmail extends BaseX2FlowEmail {
         $parentRules['options'] = array_merge (
             $parentRules['options'],
             array (
-                array('name'=>'to','label'=>Yii::t('studio','To:'),'type'=>'email'),
+                array(
+                    'name'=>'to',
+                    'label'=>Yii::t( 'studio','To:'),
+                    'type'=>'email'
+                ),
                 array(
                     'name' => 'template',
                     'label' => Yii::t('studio', 'Template'),
@@ -76,6 +81,17 @@ class X2FlowEmail extends BaseX2FlowEmail {
                     'type' => 'email'
                 ),
                 array(
+                    'name' => 'logEmail', 
+                    'label' => 
+                        Yii::t('studio', 'Log email?').'&nbsp;'.
+                        X2Html::hint2 (
+                        Yii::t('studio', 'Checking this box will cause the email to be attached '.
+                            'to the record associated with this flow, if it exists.')),
+                    'optional' => 1,
+                    'defaultVal' => 1,
+                    'type' => 'boolean',
+                ),
+                array(
                     'name' => 'body', 
                     'label' => Yii::t('studio', 'Message'),
                     'optional' => 1,
@@ -87,53 +103,77 @@ class X2FlowEmail extends BaseX2FlowEmail {
         return $parentRules;
     }
 
-	public function execute(&$params) {
-		$eml = new InlineEmail;
-		$options = &$this->config['options'];
-		$eml->to = Formatter::replaceVariables ($this->parseOption('to',$params), $params['model']);
-        
+    public function execute(&$params) {
+        $eml = new InlineEmail;
+
+        // make subject optional in order to support legacy flows  
+        $eml->requireSubjectOnCustom = false;
+        $id = $this->config['id'];
+        $options = &$this->config['options'];
+        $eml->to = $this->parseOption('to', $params);
+
         $historyFlag = false;
-        if(isset($params['model'])){
-            $historyFlag = true;
-            $eml->targetModel=$params['model'];
+        if (isset($params['model'])) {
+            $historyFlag = $options['logEmail']['value'];
+            $eml->targetModel = $params['model'];
         }
-		if(isset($options['cc']['value']))
-			$eml->cc = $this->parseOption('cc',$params);
-		if(isset($options['bcc']['value'])){
-			$eml->bcc = $this->parseOption('bcc',$params);
+        if (isset($options['cc']['value']))
+                $eml->cc = $this->parseOption('cc', $params);
+        if (isset($options['bcc']['value'])) {
+            $eml->bcc = $this->parseOption('bcc', $params);
         }
 
-		//$eml->from = array('address'=>$this->parseOption('from',$params),'name'=>'');
-        $eml->credId = $this->parseOption('from',$params);
+        //$eml->from = array('address'=>$this->parseOption('from',$params),'name'=>'');
+        $eml->credId = $this->parseOption('from', $params);
+        if ($eml->credentials && $eml->credentials->user)
+                $eml->setUserProfile($eml->credentials->user->profile);
+
         //printR ($eml->from, true);
-		$eml->subject = Formatter::replaceVariables($this->parseOption('subject',$params),$params['model']);
+        $eml->subject = $this->parseOption('subject', $params);
 
         // "body" option (deliberately-entered content) takes precedence over template
-		if(isset($options['body']['value']) && !empty($options['body']['value'])) {	
+        if (isset($options['body']['value']) && !empty($options['body']['value'])) {
             $eml->scenario = 'custom';
-			$eml->message = InlineEmail::emptyBody(Formatter::replaceVariables($this->parseOption('body',$params),$params['model']));
-			$eml->prepareBody();
-			// $eml->insertSignature(array('<br /><br /><span style="font-family:Arial,Helvetica,sans-serif; font-size:0.8em">','</span>'));
-		} elseif(!empty($options['template']['value'])) {
-			$eml->scenario = 'template';
-			$eml->template = $this->parseOption('template',$params);
-			$eml->prepareBody();
-		}
+            $eml->message = InlineEmail::emptyBody($this->parseOption('body',
+                                    $params));
+            $prepared = $eml->prepareBody();
 
-        list ($success, $message) = $this->checkDoNotEmailFields ($eml);
-        if (!$success) {
-            return array ($success, $message);
+//            $prepared = Docs::replaceVariables(
+//                $prepared, $eml->targetModel, 
+//                array('{signature}' => self::insertedPattern('signature', $eml->signature)));
+            // $eml->insertSignature(array('<br /><br /><span style="font-family:Arial,Helvetica,sans-serif; font-size:0.8em">','</span>'));
+        } elseif (!empty($options['template']['value'])) {
+            $eml->scenario = 'template';
+            $eml->template = $this->parseOption('template', $params);
+            $prepared = $eml->prepareBody();
+        } else {
+            $prepared = true; // no email body
         }
 
-		$result = $eml->send($historyFlag);
-		if (isset($result['code']) && $result['code'] == 200) {
-            if (YII_DEBUG && YII_UNIT_TESTING) {
+        if (!$prepared) { // InlineEmail failed validation
+            $errors = $eml->getErrors();
+            return array(false, array_shift($errors));
+        }
+
+        list ($success, $message) = $this->checkDoNotEmailFields($eml);
+        if (!$success) {
+            return array($success, $message);
+        }
+
+        $result = $eml->send($historyFlag);
+        if (isset($result['code']) && $result['code'] == 200) {
+            if (!isset($params['sentEmails'])) {
+                $params['sentEmails'] = array();
+            }
+            $params['sentEmails'][$id] = $eml->uniqueId;
+            if (YII_UNIT_TESTING) {
                 return array(true, $eml->message);
             } else {
                 return array(true, "");
             }
         } else {
-            return array (false, Yii::t('app', "Email could not be sent"));
+            return array(false, Yii::t('app', "Email could not be sent"));
         }
-	}
+    }
+
 }

@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,14 +34,108 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-class X2FlowTestingAuxLibTest extends CDbTestCase {
+class TestingAuxLibTest extends X2DbTestCase {
+
+    public $fixtures = array (
+        'media' => 'Media',
+        'authItems' => array (':x2_auth_item', '.MassDeleteTest'),
+        'authItemChildren' => array (':x2_auth_item_child', '.MassDeleteTest'),
+        'users' => 'User',
+        'profiles' => 'Profile',
+    );
 
     public function testSetPublic () {
         $fn = TestingAuxLib::setPublic ('TestingAuxLib', 'privateMethod');
-        $this->assertTrue ($fn (array (1, 2)) === array (1, 2));
+        $this->assertTrue ($fn (1, 2) === array (1, 2));
     }
+
+    /**
+     * Attempt to login with curlLogin and ensure that a page which requires login can be viewed.
+     * Commented out because CURL login is broken after introduction of CSRF token validation
+     */
+//    public function testCurlLogin () {
+//        // ensure that page which should require login can't be viewed before logging in
+//        $sessionId = uniqid ();
+//        $cookies = "PHPSESSID=$sessionId; path=/;";
+//        $curlHandle = curl_init (TEST_BASE_URL.'profile/settings');
+//        curl_setopt ($curlHandle, CURLOPT_HTTPGET, 1);
+//        curl_setopt ($curlHandle, CURLOPT_RETURNTRANSFER, 1);
+//        curl_setopt ($curlHandle, CURLOPT_COOKIE, $cookies);
+//        ob_start ();
+//        $result = curl_exec ($curlHandle);
+//        ob_clean ();
+//        $this->assertFalse ((bool) preg_match ('/Change Personal Settings/', $result));
+//
+//        // log in and then request the same page 
+//        $sessionId = TestingAuxLib::curlLogin ('testuser', 'password');
+//        $cookies = "PHPSESSID=$sessionId;";
+//        $curlHandle = curl_init (TEST_BASE_URL.'profile/settings');
+//        curl_setopt ($curlHandle, CURLOPT_HTTPGET, 1);
+//        curl_setopt ($curlHandle, CURLOPT_HEADER, 1);
+//        curl_setopt ($curlHandle, CURLOPT_RETURNTRANSFER, 1);
+//        curl_setopt ($curlHandle, CURLOPT_COOKIE, $cookies);
+//        ob_start ();
+//        $result = curl_exec ($curlHandle);
+//        ob_clean ();
+//        //print_r ("document.cookie = 'PHPSESSID=$sessionId; path=/;';\n");
+//        //print_r ($result);
+//        $this->assertTrue ((bool) preg_match ('/Change Personal Settings/', $result));
+//    }
+
+//    public function testControllerMock () {
+//        TestingAuxLib::loadControllerMock ('localhost', '/index-test.php');
+//        $uniqueId = '12345';
+//        $email = 'test@example.com';
+//        $media = $this->media ('bg');
+//        $oldPcreSettings = array (
+//            'pcre.backtrack_limit' => ini_get('pcre.backtrack_limit'),
+//            'pcre.recursion_limit' => ini_get('pcre.recursion_limit')
+//        );
+//        ini_set('pcre.backtrack_limit', '10');
+//        ini_set('pcre.recursion_limit', '10');
+//        println (CHtml::link ($media->fileName, $media->fullUrl));
+//        println ($media->getPath ());
+//        println (Yii::app()->controller->createAbsoluteUrl (
+//            'click', array ('uid' => $uniqueId, 'type' => 'click')));
+//        println (Yii::app()->createExternalUrl('/marketing/marketing/click', array(
+//            'uid' => $uniqueId,
+//            'type' => 'unsub',
+//            'email' => $email
+//        )));
+//        println (Yii::app()->createExternalUrl(
+//            '/marketing/marketing/click', array('uid' => $uniqueId, 'type' => 'open')));
+//        foreach ($oldPcreSettings as $setting => $val) {
+//            ini_set ($setting, $val);
+//        }
+//    }
+
+//    public function testControllerMock2 () {
+//        $media = $this->media ('bg');
+//        $uniqueId = '12345';
+//        $email = 'test@example.com';
+//        TestingAuxLib::loadControllerMock ('examplecrm.com', '/X2Engine/index-test.php');
+//        $admin = Yii::app()->settings;
+//        $admin->doNotEmailLinkText = 'unsubscribe';
+//        $admin->externalBaseUrl = 'http://examplecrm.com';
+//        $admin->externalBaseUri = '/X2Engine';
+//        println (CHtml::link ($media->fileName, $media->fullUrl));
+//        println ($media->getPath ());
+//        println (Yii::app()->controller->createAbsoluteUrl (
+//            'click', array ('uid' => $uniqueId, 'type' => 'click')));
+//        println (Yii::app()->createExternalUrl('/marketing/marketing/click', array(
+//            'uid' => $uniqueId,
+//            'type' => 'unsub',
+//            'email' => $email
+//        )));
+//        println (Yii::app()->createExternalUrl(
+//            '/marketing/marketing/click', array('uid' => $uniqueId, 'type' => 'open')));
+//    }
+
+//    public function testSetConstant () {
+//        TestingAuxLib::setConstant ('X2_DEBUG_EMAIL', 'true');
+//    }
 }
 
 ?>

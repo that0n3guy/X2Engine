@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // Yii::import('application.models.X2Model');
 
@@ -52,11 +53,40 @@ class User extends CActiveRecord {
     const STATUS_ACTIVE = 1;
     const STATUS_INACTIVE = 0;
 
+    public static $recentItemTypes = array(
+        'a' => 'Accounts',
+        'b' => 'BugReports',
+        'c' => 'Contacts',
+        'd' => 'Docs',
+          
+        'f' => 'X2Flow',
+         
+        'g' => 'Groups',
+        'l' => 'X2Leads',
+        'm' => 'Media', 
+        'o' => 'Opportunity', 
+        'p' => 'Campaign',
+        'q' => 'Quote',
+        'r' => 'Product',
+        's' => 'Services',
+        't' => 'Actions',
+         
+        'u' => 'Reports',
+         
+        'w' => 'Workflow',
+    );
+
     /**
      * Full name (cached value)
      * @var type
      */
     private $_fullName;
+
+    /**
+     * @var bool If true, grid views displaying models of this type will have their filter and
+     *  sort settings saved in the database instead of in the session
+     */
+    public $dbPersistentGridSettings = false;
 
     /**
      * Returns the static model of the specified AR class.
@@ -74,18 +104,25 @@ class User extends CActiveRecord {
     }
 
     public function behaviors(){
+        $viewRoute = '/profile';
+        if (!Yii::app()->params->isMobileApp) {
+            $viewRoute = '/profile/view';
+        }
         return array_merge(parent::behaviors(), array(
-                    'X2LinkableBehavior' => array(
-                        'class' => 'X2LinkableBehavior',
-                        'module' => 'users',
-                        'viewRoute' => '/profile',
-                    ),
-                    'ERememberFiltersBehavior' => array(
-                        'class' => 'application.components.ERememberFiltersBehavior',
-                        'defaults' => array(),
-                        'defaultStickOnClear' => false
-                    )
-                ));
+            'LinkableBehavior' => array(
+                'class' => 'LinkableBehavior',
+                'module' => 'users',
+                'viewRoute' => $viewRoute,
+            ),
+            'ERememberFiltersBehavior' => array(
+                'class' => 'application.components.behaviors.ERememberFiltersBehavior',
+                'defaults' => array(),
+                'defaultStickOnClear' => false
+            ),
+            'MappableBehavior' => array(
+                'class' => 'application.components.behaviors.MappableBehavior',
+            ),
+        ));
     }
 
     /**
@@ -105,11 +142,11 @@ class User extends CActiveRecord {
     public function rules(){
         // NOTE: you should only define rules for those attributes that
         // will receive user inputs.
-        return array(
+        $userRules = array(
             array('status', 'required'),
             array('password', 'required', 'on' => 'insert'),
-            array('firstName, lastName, username', 'required'),
-            array('userAlias', 'required'),
+            array('firstName, lastName, username', 'required', 'except' => 'invite'),
+            array('userAlias', 'required', 'except' => 'invite'),
             array('status, lastLogin, login', 'numerical', 'integerOnly' => true),
             array('firstName, username, userAlias, title, updatedBy', 'length', 'max' => 20),
             array('lastName, department, officePhone, cellPhone, homePhone', 'length', 'max' => 40),
@@ -117,7 +154,8 @@ class User extends CActiveRecord {
             array('lastUpdated', 'length', 'max' => 30),
             array('userKey', 'length', 'max' => 32, 'min' => 3),
             array('backgroundInfo', 'safe'),
-            array('username','in','not'=>true,'range'=>array('Guest','Anyone'),'message'=>Yii::t('users','The specified username is reserved for system usage.')),
+            array('status', 'validateUserDisable'),
+            array('username','in','not'=>true,'range'=>array('Guest','Anyone',Profile::GUEST_PROFILE_USERNAME),'message'=>Yii::t('users','The specified username is reserved for system usage.')),
             array('username', 'unique', 'allowEmpty' => false),
             array('userAlias', 'unique', 'allowEmpty' => false),
             array('userAlias', 'match', 'pattern' => '/^\s+$/', 'not' => true),
@@ -136,6 +174,17 @@ class User extends CActiveRecord {
             // Please remove those attributes that should not be searched.
             array('id, firstName, lastName, username, password, title, department, officePhone, cellPhone, homePhone, address, backgroundInfo, emailAddress, status, lastUpdated, updatedBy, recentItems, topContacts, lastLogin, login', 'safe', 'on' => 'search'),
         );
+        
+        $passwordRule = array('password', 'application.components.X2PasswordValidator', 'on' => 'insert,update');
+        $passwordRequirements = Yii::app()->settings->passwordRequirements;
+        $passwordRule['min'] = $passwordRequirements['minLength'];
+        $passwordRule['requireNumeric'] = $passwordRequirements['requireNumeric'];
+        $passwordRule['requireMixedCase'] = $passwordRequirements['requireMixedCase'];
+        $passwordRule['requireSpecial'] = $passwordRequirements['requireSpecial'];
+        $passwordRule['requireCharClasses'] = $passwordRequirements['requireCharClasses'];
+        $userRules[] = $passwordRule;
+        
+        return $userRules;
     }
 
     /**
@@ -146,6 +195,15 @@ class User extends CActiveRecord {
         // class name for the relations automatically generated below.
         return array(
             'profile' => array(self::HAS_ONE, 'Profile', 'id'),
+        );
+    }
+
+    public function scopes () {
+        return array (
+            'active' => array (
+                'condition' => 'status=1',
+                'order' => 'lastName ASC',
+            ),
         );
     }
 
@@ -210,11 +268,16 @@ class User extends CActiveRecord {
         foreach($social as $socialItem){
             $socialItem->delete();
         }
+        
+        X2Calendar::model()->deleteAllByAttributes(array('createdBy'=>$this->username));
+
+        X2CalendarPermissions::model()->deleteAllByAttributes (
+            array(), 'userId=:userId', array (':userId' => $this->id)
+        );
 
         // delete profile
         $prof=Profile::model()->findByAttributes(array('username'=>$this->username));
-        if ($prof)
-            $prof->delete();
+        if ($prof) $prof->delete();
 
         // delete associated events
         Yii::app()->db->createCommand()
@@ -229,6 +292,12 @@ class User extends CActiveRecord {
         parent::afterDelete ();
     }
 
+    public function beforeSave () {
+        if ($this->isNewRecord) {
+            $this->createDate = time();
+        }
+        return parent::beforeSave ();
+    }
 
     public static function hasRole($user, $role){
         if(is_numeric($role)){
@@ -270,12 +339,32 @@ class User extends CActiveRecord {
 
     public static function getUsersDataProvider () {
         $usersDataProvider = new CActiveDataProvider('User', array(
-                    'criteria' => array(
-                        'condition' => 'status=1',
-                        'order' => 'lastName ASC'
-                    )
-                ));
+            'criteria' => array(
+                'condition' => 'status=1',
+                'order' => 'lastName ASC'
+            )
+        ));
         return $usersDataProvider;
+    }
+
+    /**
+     * @return array (<username> => <full name>)
+     */
+    public static function getUserOptions () {
+        $userOptions = Yii::app()->db->createCommand ("
+            select username, concat(firstName, ' ', lastName) as fullName
+            from x2_users
+            where status=1
+            order by lastName asc
+        ")->queryAll ();
+        return array_combine (
+            array_map (function ($row) {
+                return $row['username'];
+            }, $userOptions),
+            array_map (function ($row) {
+                return $row['fullName'];
+            }, $userOptions)
+        );
     }
 
 
@@ -313,6 +402,21 @@ class User extends CActiveRecord {
         return array('' => Yii::t('app', 'Anyone')) + $userNames;
     }
 
+    public static function getUserId ($username) {
+        static $cache = array ();
+        if (!$cache) {
+            $records = Yii::app()->db->createCommand()
+                ->select('id, username')
+                ->from('x2_users')
+                ->where('status=1')
+                ->query();
+            foreach ($records as $record) {
+                $cache[$record['username']] = $record['id'];
+            }
+        }
+        if (isset ($cache[$username])) return $cache[$username];
+    }
+
     public function getName(){
         return $this->firstName.' '.$this->lastName;
     }
@@ -326,22 +430,15 @@ class User extends CActiveRecord {
         return $names;
     }
 
+    /**
+     * @return array
+     */
     public static function getTopContacts(){
-        $userRecord = X2Model::model('User')->findByPk(Yii::app()->user->getId());
-
-        //get array of IDs
-        $topContactIds = empty($userRecord->topContacts) ? array() : explode(',', $userRecord->topContacts);
-        $topContacts = array();
-        //get record for each ID
-        foreach($topContactIds as $contactId){
-            $record = X2Model::model('Contacts')->findByPk($contactId);
-            if(!is_null($record)) //only include contact if the contact ID exists
-                $topContacts[] = $record;
-        }
-        return $topContacts;
+        Yii::import('application.components.leftWidget.TopContacts');
+        return TopContacts::getBookmarkedRecords ();
     }
 
-    public static function getRecentItems(){
+    public static function getRecentItems($filter=null){
         $userRecord = X2Model::model('User')->findByPk(Yii::app()->user->getId());
 
         //get array of type-ID pairs
@@ -350,84 +447,39 @@ class User extends CActiveRecord {
         $recentItems = array();
 
         //get record for each ID/type pair
+        $validAbbreviations = array_keys (self::$recentItemTypes);
         foreach($recentItemsTemp as $item){
             $itemType = strtok($item, '-');
             $itemId = strtok('-');
+            if (in_array ($itemType, $validAbbreviations)) {
+                $recordType = self::$recentItemTypes[$itemType];
+                $record = $recordType::model ()->findByPk ($itemId);
 
-            switch($itemType){
-                case 'c': // contact
-                    $record = X2Model::model('Contacts')->findByPk($itemId);
-                    break;
-                case 't': // action
-                    $record = X2Model::model('Actions')->findByPk($itemId);
-                    break;
-                case 'a': // account
-                    $record = X2Model::model('Accounts')->findByPk($itemId);
-                    break;
-                case 'p': // campaign
-                    $record = X2Model::model('Campaign')->findByPk($itemId);
-                    break;
-                case 'o': // opportunity
-                    $record = X2Model::model('Opportunity')->findByPk($itemId);
-                    break;
-                case 'w': // workflow
-                    $record = X2Model::model('Workflow')->findByPk($itemId);
-                    break;
-                case 's': // service case
-                    $record = X2Model::model('Services')->findByPk($itemId);
-                    break;
-                case 'd': // document
-                    $record = X2Model::model('Docs')->findByPk($itemId);
-                    break;
-                case 'l': // x2leads object
-                    $record = X2Model::model('X2Leads')->findByPk($itemId);
-                    break;
-                case 'm': // media object
-                    $record = X2Model::model('Media')->findByPk($itemId);
-                    break;
-                case 'r': // product
-                    $record = X2Model::model('Product')->findByPk($itemId);
-                    break;
-                case 'q': // product
-                    $record = X2Model::model('Quote')->findByPk($itemId);
-                    break;
-                case 'g': // group
-                    $record = X2Model::model('Groups')->findByPk($itemId);
-                    break;
-                case 'f': // x2flow
-                    $record = X2Flow::model()->findByPk($itemId);
-                    break;
-                default:
-                    printR('Warning: getRecentItems: invalid item type'.$itemType);
-                    continue;
+                if(!is_null($record)) //only include item if the record ID exists
+                    array_push($recentItems, array('type' => $itemType, 'model' => $record));
             }
-            if(!is_null($record)) //only include item if the record ID exists
-                array_push($recentItems, array('type' => $itemType, 'model' => $record));
+
+        }
+        if (is_callable ($filter)) {
+            $recentItems = array_filter ($recentItems, $filter);
         }
         return $recentItems;
     }
 
-    private static $validRecentItemTypes = array(
-        'a', // account
-        'c', // contact
-        'd', // doc
-        'f', // x2flow
-        'g', // group
-        'l', // x2lead object
-        'm', // media object
-        'o', // opportunity
-        'p', // campaign
-        'q', // quote
-        'r', // product
-        's', // service case
-        't', // action
-        'w', // workflow
-    );
+    /**
+     * @param string $type recent item abbreviation (for backward compatibility)  or model type 
+     * @param int record id
+     * @param int userId id of user that recent item should be added to
+     */
+    public static function addRecentItem($type, $itemId, $userId=null){
+        if ($userId === null) $userId = Yii::app()->user->getId ();
+        if (in_array ($type, self::$recentItemTypes)) {
+            $validRecordTypes = array_flip (self::$recentItemTypes);
+            $type = $validRecordTypes[$type];
+        }
 
-    public static function addRecentItem($type, $itemId, $userId){
-        if(in_array($type, self::$validRecentItemTypes)){ //only proceed if a valid type is given
+        if(in_array($type, array_keys (self::$recentItemTypes))){ 
             $newItem = $type.'-'.$itemId;
-
             $userRecord = X2Model::model('User')->findByPk($userId);
             //create an empty array if recentItems is empty
             $recentItems = ($userRecord->recentItems == '') ? 
@@ -441,7 +493,7 @@ class User extends CActiveRecord {
                 array_pop($recentItems);  //remove the oldest ones
             }
             $userRecord->setAttribute('recentItems', implode(',', $recentItems));
-            $userRecord->save();
+            $userRecord->update(array('recentItems'));
         }
     }
 
@@ -454,14 +506,22 @@ class User extends CActiveRecord {
      * @param boolean $makeLinks Can be set to False to disable creating links but still return the name of the linked-to object
      * @return string The rendered links
      */
-    public static function getUserLinks($users, $makeLinks = true, $useFullName = true){
+    public static function getUserLinks(
+        $users, $makeLinks = true, $useFullName = true){
+
+        if (Yii::app()->params->isMobileApp) {
+            $makeGroupLinks = false;
+        } else {
+            $makeGroupLinks = $makeLinks;
+        }
+
         if(!is_array($users)){
             /* x2temp */
             if(preg_match('/^\d+$/',$users)){
                 $group = Groups::model()->findByPk($users);
                 if(isset($group))
                 //$link = $makeLinks ? CHtml::link($group->name, array('/groups/groups/view', 'id' => $group->id)) : $group->name;
-                    $link = $makeLinks ? 
+                    $link = $makeGroupLinks ? 
                         CHtml::link(
                             $group->name, 
                             Yii::app()->controller->createAbsoluteUrl(
@@ -479,20 +539,23 @@ class User extends CActiveRecord {
         }
         $links = array();
         $userCache = Yii::app()->params->userCache;
+        
         foreach($users as $user){
-            if($user == 'Anyone' || $user == 'Email'){  // skip these, they aren't users
+            if($user == 'Email'){  // skip these, they aren't users
                 continue;
+            }elseif($user == 'Anyone'){
+                $links[] = Yii::t('app', 'Anyone');
             }else if(is_numeric($user)){  // this is a group
                 if(isset($userCache[$user])){
                     $group = $userCache[$user];
                     //$links[] =  $makeLinks ? CHtml::link($group->name, array('/groups/groups/view', 'id' => $group->id)) : $group->name;
-                    $links[] = $makeLinks ? CHtml::link($group->name, Yii::app()->controller->createAbsoluteUrl('/groups/groups/view', array('id' => $group->id), array('style'=>'text-decoration:none;'))) : $group->name;
+                    $links[] = $makeGroupLinks ? CHtml::link($group->name, Yii::app()->controller->createAbsoluteUrl('/groups/groups/view', array('id' => $group->id)), array('style'=>'text-decoration:none;')) : $group->name;
                 }else{
                     $group = Groups::model()->findByPk($user);
                     // $group = Groups::model()->findByPk($users);
                     if(isset($group)){
                         //$groupLink = $makeLinks ? CHtml::link($group->name, array('/groups/groups/view', 'id' => $group->id)) : $group->name;
-                        $groupLink = $makeLinks ? CHtml::link($group->name, Yii::app()->controller->createAbsoluteUrl('/groups/groups/view', array('id' => $group->id)),array('style'=>'text-decoration:none;')) : $group->name;
+                        $groupLink = $makeGroupLinks ? CHtml::link($group->name, Yii::app()->controller->createAbsoluteUrl('/groups/groups/view', array('id' => $group->id)),array('style'=>'text-decoration:none;')) : $group->name;
                         $userCache[$user] = $group;
                         $links[] = $groupLink;
                     }
@@ -500,16 +563,16 @@ class User extends CActiveRecord {
             }else{
                 if(isset($userCache[$user])){
                     $model = $userCache[$user];
-                    $linkText = $useFullName ? $model->fullName : $user;
+                    $linkText = $useFullName ? $model->fullName : $model->getAlias ();
                     //$userLink = $makeLinks ? CHtml::link($linkText, array('/profile/view', 'id' => $model->id)) : $linkText;
-                    $userLink = $makeLinks ? CHtml::link($linkText, Yii::app()->controller->createAbsoluteUrl('/profile/view', array('id' => $model->id)),array('style'=>'text-decoration:none;')) : $linkText;
+                    $userLink = $makeLinks ? $model->getLink (array('style'=>'text-decoration:none;')) : $linkText;
                     $links[] = $userLink;
                 }else{
                     $model = X2Model::model('User')->findByAttributes(array('username' => $user));
                     if(isset($model)){
-                        $linkText = $useFullName ? $model->fullName : $user;
+                        $linkText = $useFullName ? $model->fullName : $model->getAlias ();
                         //$userLink = $makeLinks ? CHtml::link($linkText, array('/profile/view', 'id' => $model->id)) : $linkText;
-                        $userLink = $makeLinks ? CHtml::link($linkText, Yii::app()->controller->createAbsoluteUrl('/profile/view', array('id' => $model->id)),array('style'=>'text-decoration:none;')) : $linkText;
+                        $userLink = $makeLinks ? $model->getLink (array('style'=>'text-decoration:none;')) : $linkText;
                         $userCache[$user] = $model;
                         $links[] = $userLink;
                     }
@@ -589,7 +652,7 @@ class User extends CActiveRecord {
         $criteria->compare('login', $this->login);
         $criteria->addCondition('(temporary=0 OR temporary IS NULL)');
 
-        return new SmartDataProvider(get_class($this), array(
+        return new SmartActiveDataProvider(get_class($this), array(
                     'criteria' => $criteria,
                     'pagination'=>array(
                         'pageSize'=>Profile::getResultsPerPage(),
@@ -652,4 +715,33 @@ class User extends CActiveRecord {
         return $this->_fullName;
     }
 
+    public function getDisplayName ($plural=true, $ofModule=true) {
+        return Yii::t('users', '{user}', array(
+            '{user}' => Modules::displayName($plural, 'Users'),
+        ));
+    }
+
+    // check if user profile has a list to remember which calendars the user has checked
+    // if not, create the list
+    public function initCheckedCalendars() {
+        // calendar list not initialized?
+        if (is_null($this->showCalendars)) {
+            $showCalendars = array(
+                'userCalendars' => array(),
+            );
+            $this->showCalendars = CJSON::encode($showCalendars);
+
+            $this->update();
+        }
+    }
+
+    /**
+     * Custom validation rule to ensure the primary admin account cannot be disabled
+     */
+    public function validateUserDisable() {
+        if ($this->status === '0' && $this->id == X2_PRIMARY_ADMIN_ID) {
+            $this->addError ('status', Yii::t('users',
+                'The primary admin account cannot be disabled'));
+        }
+    }
 }

@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Checks uploaded files in the web request for invalid extensions.
@@ -53,7 +54,7 @@ class FileUploadsFilter extends CFilter {
      * 
      * https://www.owasp.org/index.php/Unrestricted_File_Upload#Using_Black-List_for_Files.E2.80.99_Extensions
      */
-    const EXT_BLACKLIST = '/\.\s*(?P<ext>html|htm|js|jsb|mhtml|mht|xhtml|xht|php|phtml|php3|php4|php5|phps|shtml|jhtml|pl|py|cgi|exe|scr|dll|msi|vbs|bat|com|pif|cmd|vxd|cpl|ini|conf|cnf|key|iv|htaccess)\b/';
+    const EXT_BLACKLIST = '/\.\s*(?P<ext>html|htm|js|jsb|mhtml|mht|xhtml|xht|php|pht|phtml|php3|php4|php5|phps|shtml|jhtml|pl|py|cgi|exe|scr|dll|msi|vbs|bat|com|pif|cmd|vxd|cpl|ini|conf|cnf|key|iv|htaccess)\b/i';
 
     /**
      * List of mime-types that uploaded files should never have
@@ -95,13 +96,32 @@ class FileUploadsFilter extends CFilter {
             }elseif(is_array($input['name'])){
                 // Multiple files in this input field
                 foreach($input['name'] as $name){
-                    $this->checkFileName($name);
+                    if (is_array ($name)) { 
+                        // nesting can go one level deeper if file is being uploaded as
+                        // <model name>["<attribute name>"][]
+
+                        $names = $name;
+                        foreach ($names as $name) {
+                            $this->checkFilename($name);
+                        }
+                    } else {
+                        $this->checkFilename($name);
+                    }
                 }
                 if((bool) ($finfo = FileUtil::finfo())) {
                     $types = array();
                     foreach ($input['tmp_name'] as $path) {
-                        if(file_exists($path)) {
-                            $types[] = finfo_file($finfo, $path, FILEINFO_MIME);
+                        if (is_array ($path)) {
+                            $paths = $path;
+                            foreach ($paths as $path) {
+                                if(file_exists($path)) {
+                                    $types[] = finfo_file($finfo, $path, FILEINFO_MIME);
+                                }
+                            }
+                        } else {
+                            if(file_exists($path)) {
+                                $types[] = finfo_file($finfo, $path, FILEINFO_MIME);
+                            }
                         }
                     }
                 } else {
@@ -112,7 +132,7 @@ class FileUploadsFilter extends CFilter {
                 }
             }else{
                 // One file in this input field
-                $this->checkFileName($input['name']);
+                $this->checkFilename($input['name']);
                 if(file_exists($input['tmp_name']) && (bool) ($finfo = FileUtil::finfo())) {
                     $type = finfo_file($finfo, $input['tmp_name'], FILEINFO_MIME);
                 } else  {
@@ -129,6 +149,7 @@ class FileUploadsFilter extends CFilter {
         if(empty($_FILES)){ // No files to be uploaded
             return true;
         }
+
         $this->checkFiles($_FILES);
         return true;
     }

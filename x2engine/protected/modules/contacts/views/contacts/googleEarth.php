@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,19 +33,21 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-$menuItems = array(
-    array('label'=>Yii::t('contacts','All Contacts'),'url'=>array('index')),
-    array('label'=>Yii::t('contacts','Lists'),'url'=>array('lists')),
-    array('label'=>Yii::t('contacts','Create Contact'),'url'=>array('create')),
-    array('label'=>Yii::t('contacts','Create List'),'url'=>array('createList')),
-    array('label'=>Yii::t('contacts','Import Contacts'),'url'=>array('/admin/importModels', 'model'=>'Contacts')),
-    array('label'=>Yii::t('contacts','Export to CSV'),'url'=>array('/admin/exportModels', 'model'=>'Contacts')),
-    array('label'=>Yii::t('contacts','Contact Map')),
-    array('label'=>Yii::t('contacts','Saved Maps'),'url'=>array('savedMaps')),
-);
-$this->actionMenu = $this->formatMenu($menuItems);
-Yii::app()->clientScript->registerScriptFile("https://maps.googleapis.com/maps/api/js?sensor=false&libraries=visualization");
+ **********************************************************************************/
+
+$this->insertMenu(array(
+    'all', 'lists', 'create', 'import', 'export', 'map', 'savedMaps',
+));
+
+$key = '';
+$settings = Yii::app()->settings;
+$creds = Credentials::model()->findByPk($settings->googleCredentialsId);
+if ($creds && $creds->auth)
+    $key = $creds->auth->apiKey;
+$assetUrl = 'https://maps.googleapis.com/maps/api/js?libraries=visualization';
+if (!empty($key))
+    $assetUrl .= '&key='.$key;
+Yii::app()->clientScript->registerScriptFile($assetUrl);
 
 if(isset($noHeatMap) && $noHeatMap){
     Yii::app()->clientScript->registerScript('maps-initialize',"
@@ -52,7 +55,7 @@ if(isset($noHeatMap) && $noHeatMap){
         var center=$center;
         var markerFlag=$markerFlag;
         var mapFlag=$mapFlag;
-        var zoom=0;
+        var zoom=".(isset($zoom)?$zoom:"0").";
         var noHeatMap=true;
         var bounds=new google.maps.LatLngBounds();
         var directionsService=new google.maps.DirectionsService();
@@ -65,6 +68,9 @@ if(isset($noHeatMap) && $noHeatMap){
                 mapTypeId: google.maps.MapTypeId.SATELLITE,
                 center: latLng
             };
+            if (zoom != 0) {
+                mapOptions.zoom = zoom;
+            }
             map = new google.maps.Map(document.getElementById('map_canvas'),
                 mapOptions);
             directionsDisplay.setMap(map);
@@ -141,42 +147,50 @@ if(isset($noHeatMap) && $noHeatMap){
 Yii::app()->clientScript->registerScript('maps-qtip', "
 var contactId=".(empty($contactId)?"0":$contactId).";
 var center=$markerLoc;
+
+function addLargeMapMarker(pos, contents, open = false) {
+        var latLng = new google.maps.LatLng(pos['lat'],pos['lng']);
+        var marker = new google.maps.Marker({
+            position: latLng,
+            map: map
+        });
+    if (contactId === 0 && markerFlag) {
+        marker.setIcon('https://maps.google.com/mapfiles/ms/icons/green-dot.png');
+    }
+    if(typeof infowindow==='undefined'){
+        var infowindow = new google.maps.InfoWindow({
+            content: contents
+        });
+        if (open)
+            infowindow.open(map, marker);
+    }
+    google.maps.event.addListener(infowindow,'domready',function(){
+        $('#corporate-directions').click(function(e){
+            e.preventDefault();
+            getDirections('corporate');
+        });
+        $('#personal-directions').click(function(e){
+            e.preventDefault();
+            getDirections('personal');
+        });
+    });
+
+    google.maps.event.addListener(marker,'click',function(){
+        infowindow.open(map,marker);
+    });
+
+    return marker;
+}
+
 function refreshQtip() {
         var fields=new Array('link','directions');
-		if(contactId!=0) {
+        if(contactId!=0) {
                 $.ajax({
                     url: yii.baseUrl+'/index.php/contacts/qtip',
                     data: { id: contactId,fields:fields },
                     method: 'get',
                     success: function(data){
-                        if(typeof marker==='undefined'){
-                            var latLng = new google.maps.LatLng(center['lat'],center['lng']);
-                            var marker = new google.maps.Marker({
-                                position: latLng,
-                                map: map
-                            });
-                        }
-                        if(typeof infowindow==='undefined'){
-                            var infowindow = new google.maps.InfoWindow({
-                                content: data
-                            });
-                            infowindow.open(map, marker);
-
-                        }
-                        google.maps.event.addListener(infowindow,'domready',function(){
-                            $('#corporate-directions').click(function(e){
-                                e.preventDefault();
-                                getDirections('corporate');
-                            });
-                            $('#personal-directions').click(function(e){
-                                e.preventDefault();
-                                getDirections('personal');
-                            });
-                        });
-
-                        google.maps.event.addListener(marker,'click',function(){
-                            infowindow.open(map,marker);
-                        });
+                        var marker = addLargeMapMarker(center, data, true);
                         $('#hide-marker-link').click(function(){
                             $(this).remove();
                             $('#contactId').val(null);
@@ -199,7 +213,19 @@ function refreshQtip() {
 
                     }
                 });
-		}
+        } else if (center && markerFlag) {
+            addLargeMapMarker(center, '".CHtml::link(Yii::t('contacts', 'Link to {User} Record', array(
+                    '{User}' => (Modules::displayName(false, 'Users')),
+                )), array('users/view', 'id' => $userId))."');
+        }
+
+        if (noHeatMap) {
+            var locations = ".$locations.";
+            $.each(locations, function(i, loc) {
+                var details = loc.info + '<br />' + loc.time;
+                addLargeMapMarker(loc, details);
+            });
+        }
 }
 function getDirections(type){
     var latLng = new google.maps.LatLng(center['lat'],center['lng']);
@@ -255,10 +281,15 @@ $('#save-button').click(function(e){
     if(mapName){
         var center=map.getCenter();
         var tags=new Array();
+        var locationType = $('#params_locationType').val();
         $.each($('#mapControlForm').find ('.x2-tag-list a'),function(){
             tags.push($(this).text());
         })
-        var parameters={'assignedTo':'".(empty($assignment)?"":$assignment)."','tags':tags};
+        var parameters = {
+            'assignedTo':'".(empty($assignment)?"":$assignment)."',
+            'tags':tags,
+            'locationType':locationType,
+        };
         var contactIdPost=$('#contactId').val();
         centerLat=center.lat();
         centerLng=center.lng();
@@ -266,7 +297,7 @@ $('#save-button').click(function(e){
         $.ajax({
             url:'saveMap',
             type:'POST',
-            data:{'mapName':mapName,'contactId':contactIdPost,'parameters':parameters,'centerLat':centerLat,'centerLng':centerLng,'zoom':zoom},
+            data:{'mapName':mapName,'contactId':contactIdPost,'parameters':parameters,'centerLat':centerLat,'centerLng':centerLng,'zoom':zoom,'locationType':locationType},
             success:function(){
                 alert('Map parameters saved!');
             }
@@ -303,11 +334,17 @@ $('#save-button').click(function(e){
     ?>
     <div class="row">
         <h2 style='margin-top: 5px'><?php echo Yii::t('contacts','Filters');?></h2>
-        <div class="cell">
-            <?php if(!empty($contactId)) { ?>
-                <a href="#" id="hide-marker-link" style="text-decoration:none;"><?php echo Yii::t('contacts','Clear Marker');?></a>
+        <?php if(!empty($contactId)) { ?>
+            <?php if(!empty($contactName)) { ?>
+                <div class="row">
+                    <?php echo CHtml::link(Yii::t('contacts', 'View ').$contactName,
+                    array('contacts/view', 'id' => $contactId), array('style' => 'text-decoration:none;')); ?>
+                </div>
             <?php } ?>
-        </div>
+            <div class="row">
+                <a href="#" id="hide-marker-link" style="text-decoration:none;"><?php echo Yii::t('contacts','Clear Marker');?></a>
+            </div>
+        <?php } ?>
 
         <div class="cell">
             <label><?php echo Yii::t('contacts','Assigned To'); ?></label>
@@ -315,8 +352,22 @@ $('#save-button').click(function(e){
         </div>
 
         <div class="cell" style="width:350px;">
-            <?php $this->widget('InlineTags', array('filter'=>true,'tags'=>$tags)); ?>
+            <?php $this->widget('ContactMapInlineTags', array('filter'=>true,'tags'=>$tags)); ?>
             <?php echo CHtml::hiddenField('params[tags]'); ?>
+        </div>
+
+        <div class="cell">
+            <label><?php echo Yii::t('contacts','Location Type'); ?></label>
+            <?php echo CHtml::dropDownList (
+                'params[locationType]',
+                $locationType,
+                Locations::getLocationTypes(),
+                array (
+                    'multiple' => 'multiple',
+                    'data-selected-text' => Yii::t('app', 'filters(s)'),
+                    'class' => 'x2-multiselect-dropdown'
+                )
+            ); ?>
         </div>
 
         <div class="cell">
@@ -334,4 +385,5 @@ $('#save-button').click(function(e){
     <div style="width:auto;height:788px;margin-bottom:0px;overflow-y:scroll;" class="form" id="directions-panel"></div>
 </div>
 <div id="map_canvas" style="height: 800px; width:100%;float:right;"></div>
+
 

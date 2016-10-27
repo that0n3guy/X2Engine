@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerCss('recordViewCss',"
 #content {
@@ -44,24 +45,10 @@ Yii::app()->clientScript->registerResponsiveCssFile(
     Yii::app()->theme->baseUrl.'/css/responsiveRecordView.css');
 
 
+$layoutManager = $this->widget ('RecordViewLayoutManager', array ('staticLayout' => false));
 
 Yii::app()->clientScript->registerScriptFile(Yii::app()->getBaseUrl().'/js/Relationships.js');
 
-$authParams['X2Model']=$model;
-$menuItems = array(
-	array('label'=>Yii::t('accounts','All Accounts'), 'url'=>array('index')),
-	array('label'=>Yii::t('accounts','Create Account'), 'url'=>array('create')),
-	array('label'=>Yii::t('accounts','View')),
-	array('label'=>Yii::t('accounts','Edit Account'), 'url'=>array('update', 'id'=>$model->id)),
-	array('label'=>Yii::t('accounts','Share Account'),'url'=>array('shareAccount','id'=>$model->id)),
-	array('label'=>Yii::t('accounts','Delete Account'), 'url'=>'#', 'linkOptions'=>array('submit'=>array('delete','id'=>$model->id),'confirm'=>'Are you sure you want to delete this item?')),
-    array(
-        'label' => Yii::t('app', 'Send Email'), 'url' => '#',
-        'linkOptions' => array('onclick' => 'toggleEmailForm(); return false;')),
-	array('label'=>Yii::t('app','Attach A File/Photo'),'url'=>'#','linkOptions'=>array('onclick'=>'toggleAttachmentForm(); return false;')),
-    array('label' => Yii::t('quotes', 'Quotes/Invoices'), 'url' => 'javascript:void(0)', 'linkOptions' => array('onclick' => 'x2.inlineQuotes.toggle(); return false;')),
-//	array('label'=>Yii::t('quotes','Quotes/Invoices'),'url'=>'javascript:void(0)','linkOptions'=>array('onclick'=>'x2.inlineQuotes.toggle(); return false;')),
-);
 $modelType = json_encode("Accounts");
 $modelId = json_encode($model->id);
 Yii::app()->clientScript->registerScript('widgetShowData', "
@@ -72,23 +59,16 @@ $(function() {
 $opportunityModule = Modules::model()->findByAttributes(array('name'=>'opportunities'));
 $contactModule = Modules::model()->findByAttributes(array('name'=>'contacts'));
 
-if($opportunityModule->visible && $contactModule->visible)
-	$menuItems[] = 	array('label'=>Yii::t('app', 'Quick Create'), 'url'=>array('/site/createRecords', 'ret'=>'accounts'), 'linkOptions'=>array('id'=>'x2-create-multiple-records-button', 'class'=>'x2-hint', 'title'=>Yii::t('app', 'Create a Contact, Account, and Opportunity.')));
 
-$menuItems[] = array(
-	'label' => Yii::t('app', 'Print Record'), 
-	'url' => '#',
-	'linkOptions' => array (
-		'onClick'=>"window.open('".
-			Yii::app()->createUrl('/site/printRecord', array (
-				'modelClass' => 'Accounts', 
-				'id' => $model->id, 
-				'pageTitle' => Yii::t('app', 'Account').': '.$model->name
-			))."');"
-	)
+$authParams['X2Model']=$model;
+$menuOptions = array(
+    'all', 'create', 'view', 'edit', 'share',
+    'delete', 'email', 'attach', 'quotes', 'print', 'editLayout',
 );
+if ($opportunityModule->visible && $contactModule->visible)
+    $menuOptions[] = 'quick';
+$this->insertMenu($menuOptions, $model, $authParams);
 
-$this->actionMenu = $this->formatMenu($menuItems, $authParams);
 $themeUrl = Yii::app()->theme->getBaseUrl();
 ?>
 
@@ -99,32 +79,28 @@ $themeUrl = Yii::app()->theme->getBaseUrl();
 	<?php //echo CHtml::link('['.Yii::t('contacts','Show All').']','javascript:void(0)',array('id'=>'showAll','class'=>'right hide','style'=>'text-decoration:none;')); ?>
 	<?php //echo CHtml::link('['.Yii::t('contacts','Hide All').']','javascript:void(0)',array('id'=>'hideAll','class'=>'right','style'=>'text-decoration:none;')); ?>
 
-	<h2><span class="no-bold"><?php echo Yii::t('accounts','Account:'); ?></span> <?php echo CHtml::encode($model->name); ?></h2>
+	<h2><span class="no-bold"><?php echo Yii::t('accounts','{module}:', array('{module}'=>Modules::displayName(false))); ?></span> <?php echo CHtml::encode($model->name); ?></h2>
 	<?php
-	if(Yii::app()->user->checkAccess('AccountsUpdate',$authParams)){ ?>
-		<a class="x2-button icon edit right" href="<?php echo $this->createUrl('update',array('id'=>$model->id));?>"><span></span></a>
-
-	<?php } 
-    echo CHtml::link(
-        '<img src="'.Yii::app()->request->baseUrl.'/themes/x2engine/images/icons/email_button.png'.
-            '"></img>', '#',
-        array(
-            'class' => 'x2-button icon right email',
-            'title' => Yii::t('app', 'Open email form'),
-            'onclick' => 'toggleEmailForm(); return false;'
-        )
-    );
+    if(Yii::app()->user->checkAccess('AccountsUpdate',$authParams)){
+        echo X2Html::editRecordButton($model);
+    } 
+    echo X2Html::emailFormButton();
+    echo X2Html::inlineEditButtons();
     ?>
 </div>
 </div>
 </div>
-<div id="main-column" class="half-width">
+<div id="main-column" <?php echo $layoutManager->columnWidthStyleAttr (1); ?>>
+
 <?php $form=$this->beginWidget('CActiveForm', array(
 	'id'=>'accounts-form',
 	'enableAjaxValidation'=>false,
 	'action'=>array('saveChanges','id'=>$model->id),
 ));
-$this->renderPartial('application.components.views._detailView',array('model'=>$model,'form'=>$form,'modelName'=>'accounts'));
+$this->widget ('DetailView', array(
+    'model' => $model
+));
+// $this->renderPartial('application.components.views.@DETAILVIEW',array('model'=>$model,'form'=>$form,'modelName'=>'accounts'));
 
 $this->endWidget();
 
@@ -137,12 +113,10 @@ $this->widget('InlineEmailForm',
 		),
 		'templateType' => 'email',
 		'insertableAttributes' => 
-            array(Yii::t('accounts','Account Attributes')=>$model->getEmailInsertableAttrs ()),
+            array(Yii::t('accounts','{module} Attributes', array('{module}'=>Modules::displayName(false)))=>$model->getEmailInsertableAttrs ()),
 		'startHidden'=>true,
 	)
 );
-
-$this->widget('X2WidgetList', array('block'=>'center', 'model'=>$model, 'modelType'=>'accounts'));
 
 ?>
     <div id="quote-form-wrapper">
@@ -155,37 +129,17 @@ $this->widget('X2WidgetList', array('block'=>'center', 'model'=>$model, 'modelTy
         ));
         ?>
     </div>
-<?php $this->widget('Attachments',array('associationType'=>'accounts','associationId'=>$model->id,'startHidden'=>true)); ?>
-<?php
-//$this->widget('InlineRelationships', array('model'=>$model, 'modelName'=>'Accounts'));
-
-$createContactUrl = $this->createUrl('/contacts/contacts/create');
-$createOpportunityUrl = $this->createUrl('/opportunities/opportunities/create');
-$createAccountUrl = $this->createUrl('/accounts/accounts/create');
-$accountName = json_encode($model->name);
-$assignedTo = json_encode($model->assignedTo);
-$phone = json_encode($model->phone);
-$website = json_encode($model->website);
-$opportunityTooltip = json_encode(Yii::t('accounts', 'Create a new Opportunity associated with this Account.'));
-$contactTooltip = json_encode(Yii::t('accounts', 'Create a new Contact associated with this Account.'));
-$accountsTooltip = json_encode(Yii::t('accounts', 'Create a new Account associated with this Account.'));
-?>
+<?php $this->widget ('ModelFileUploader', array(
+    'associationId' => $model->id,
+    'associationType' => 'accounts'
+)); ?>
 </div>
-<div class="history half-width">
-<?php
-$this->widget('Publisher',
-	array(
-		'associationType'=>'accounts',
-		'associationId'=>$model->id,
-		'assignedTo'=>Yii::app()->user->getName(),
-		'calendar' => false
-	)
-);
-
-$this->widget('History',array('associationType'=>'accounts','associationId'=>$model->id));
-?>
-</div>
-
-<?php //$this->widget('CStarRating',array('name'=>'rating-js-fix', 'htmlOptions'=>array('style'=>'display:none;'))); ?>
-
-
+<?php  
+$this->widget(
+    'X2WidgetList', 
+    array(
+        'layoutManager' => $layoutManager,
+        'block'=>'center',
+        'model'=>$model,
+        'modelType'=>'accounts'
+    ));

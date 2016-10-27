@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * A model class for dealing with "embedded" models, whose attributes are stored
@@ -47,6 +48,12 @@
  * @author Demitri Morgan <demitri@x2engine.com>
  */
 abstract class JSONEmbeddedModel extends CModel {
+
+    /**
+     * Whether or not admin rights are required to access this model
+     * @var bool
+     */
+    public $requiresAdmin = false;
 
     /**
      * Stores derived value returned by {@link attributeNames()}
@@ -67,10 +74,73 @@ abstract class JSONEmbeddedModel extends CModel {
     public $exoFormName;
 
     /**
-     * The name of the model to which this embedded model belongs
-     * @var type
+     * The model to which this embedded model belongs
+     * @var CActiveRecord
      */
     public $exoModel;
+
+    public static function getProtectedFieldPlaceholder () {
+        return Yii::t('app', 'Protected field value');
+    }
+
+    public function getProtectedFields () {
+        return array ();
+    }
+
+    /**
+     * Overridden to skip placeholder values 
+     */
+    public function setAttributes ($values, $safeOnly=true) {
+        if(!is_array($values))
+            return;
+        $protectedFields = array_flip ($this->getProtectedFields ());
+
+        foreach ($values as $fieldName => $value) {
+            if (isset ($protectedFields[$fieldName]) && 
+                $value === $this->getProtectedFieldPlaceholder ()) {
+
+                unset ($values[$fieldName]);
+            }
+        }
+        return parent::setAttributes ($values, $safeOnly);
+    }
+
+    public function renderProtectedInput ($field) {
+        $htmlOptions = array ();
+        if ($this->$field) {
+            $htmlOptions['class'] = 'x2-protected-field';
+            $this->$field = self::getProtectedFieldPlaceholder ();
+        }
+        Yii::app()->clientScript->registerScript('renderProtectedInput',"
+        ");
+        echo CHtml::activeTextField($this, $field, $this->htmlOptions($field, $htmlOptions));
+    }
+
+    public function renderInput ($field) {
+        $protectedFields = array_flip ($this->getProtectedFields ());
+        if (isset ($protectedFields[$field])) {
+            echo $this->renderProtectedInput ($field);
+        } else { 
+            echo CHtml::activeTextField($this, $field, $this->htmlOptions($field));
+        }
+    }
+
+    public function renderForm () {
+		echo '<br />';
+		echo '<br />';
+		echo CHtml::tag ('h3', array (), $this->exoModel->getAttributeLabel ($this->exoAttr));
+		echo '<hr />';
+		$this->renderInputs();
+		echo '<br />';
+		echo '<br />';
+    }
+
+    /**
+     * Values of properties of parent model to set when embedded model is created
+     */
+    public function getMetaData () {
+        return array ();
+    }
 
     public function attributeNames() {
         if(!isset($this->_attributeNames)) {
@@ -90,14 +160,14 @@ abstract class JSONEmbeddedModel extends CModel {
     /**
      * A UI-friendly name that the model should be called.
      */
-    public abstract function modelLabel();
+    public function modelLabel() {}
 
     /**
      * Child classes implementing this should generate all necessary input form
      * elements for modifying fields of the embedded model. The resulting
      * markup should be echoed out, not returned.
      */
-    public abstract function renderInputs();
+    public function renderInputs() {}
 
     /**
      * Generate form input name for an attribute so that the urlencoded post data
@@ -119,7 +189,7 @@ abstract class JSONEmbeddedModel extends CModel {
      * @param type $options
      */
     public function htmlOptions($name,$options=array()) {
-        return array_merge($options,array('name'=>$this->resolveName($name)));
+        return X2Html::mergeHtmlOptions ($options,array('name'=>$this->resolveName($name)));
     }
 
 }

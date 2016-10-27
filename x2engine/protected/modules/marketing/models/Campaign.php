@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * A Campaign represents a one time mailing to a list of contacts.
@@ -47,6 +48,8 @@
  */
 class Campaign extends X2Model {
 
+    const CAMPAIGN_TYPE_DROPDOWN = 107;
+
     public $supportsWorkflow = false;
 
 	public static function model($className=__CLASS__) {
@@ -57,15 +60,19 @@ class Campaign extends X2Model {
 
 	public function behaviors() {
 		return array_merge(parent::behaviors(),array(
-			'X2LinkableBehavior'=>array(
-				'class'=>'X2LinkableBehavior',
+			'LinkableBehavior'=>array(
+				'class'=>'LinkableBehavior',
 				'module'=>'marketing'
 			),
 			'ERememberFiltersBehavior' => array(
-				'class'=>'application.components.ERememberFiltersBehavior',
+				'class'=>'application.components.behaviors.ERememberFiltersBehavior',
 				'defaults'=>array(),
 				'defaultStickOnClear'=>false
-			)
+			),
+            'TagBehavior' => array(
+                'class' => 'TagBehavior',
+                'disableTagScanning' => true,
+            ),
 		));
 	}
 
@@ -133,45 +140,7 @@ class Campaign extends X2Model {
 	 */
 	public function search() {
 		$criteria=new CDbCriteria;
-		$condition = '';
-		if(!Yii::app()->user->checkAccess('MarketingAdminAccess')) {
-			$condition = 't.visibility="1" OR t.assignedTo="Anyone"  OR t.assignedTo="'.Yii::app()->user->getName().'"';
-				/* x2temp */
-				$groupLinks = Yii::app()->db->createCommand()->select('groupId')->from('x2_group_to_user')->where('userId='.Yii::app()->user->getId())->queryColumn();
-				if(!empty($groupLinks))
-					$condition .= ' OR t.assignedTo IN ('.implode(',',$groupLinks).')';
-
-				$condition .= 'OR (t.visibility=2 AND t.assignedTo IN
-					(SELECT username FROM x2_group_to_user WHERE groupId IN
-						(SELECT groupId FROM x2_group_to_user WHERE userId='.Yii::app()->user->getId().')))';
-            $criteria->addCondition($condition);
-		}
 		return $this->searchBase($criteria);
-	}
-
-	/**
-	 * Returns a CDbCriteria containing record-level access conditions.
-	 * @return CDbCriteria
-	 */
-	public function getAccessCriteria() {
-		$criteria = new CDbCriteria;
-
-		$accessLevel = X2PermissionsBehavior::QUERY_NONE;
-		if(Yii::app()->user->checkAccess('MarketingAdmin'))
-			$accessLevel = X2PermissionsBehavior::QUERY_ALL;
-		elseif(Yii::app()->user->checkAccess('MarketingView'))
-			$accessLevel = X2PermissionsBehavior::QUERY_PUBLIC;
-		elseif(Yii::app()->user->checkAccess('MarketingViewPrivate'))
-			$accessLevel = X2PermissionsBehavior::QUERY_SELF;
-
-        $conditions=$this->getAccessConditions($accessLevel);
-		foreach($conditions as $arr){
-            $criteria->addCondition($arr['condition'],$arr['operator']);
-            if (is_array($arr['params']))
-                $criteria->params = array_merge($criteria->params,$arr['params']);
-        }
-
-		return $criteria;
 	}
 
     /**
@@ -179,9 +148,27 @@ class Campaign extends X2Model {
      *
      * Skips HTML purification for the content so that tracking links will work.
      */
-    public function setX2Fields(&$data, $filter = false){
-        $originalContent = isset($data['content'])?$data['content']:null;
-        parent::setX2Fields($data, $filter);
+    public function setX2Fields(&$data, $filter = false, $bypassPermissions=false) {
+        $originalContent = isset($data['content'])?$data['content']:$this->content;
+        parent::setX2Fields($data, $filter, $bypassPermissions);
         $this->content = $originalContent;
+    }
+
+    public static function getValidContactLists () {
+        $list = new X2List;
+        $criteria = $list->getAccessCriteria();
+        $criteria->addCondition("type!='campaign'");
+    	$lists = X2Model::model('ContactList')->findAllByAttributes (array(), 
+    		$criteria
+    	);
+    	return $lists;
+    }
+
+    public function getDisplayName ($plural=true, $ofModule=true) {
+        if (!$ofModule) {
+            return Yii::t('app', 'Campaign'.($plural ? 's' : ''));
+        } else {
+            return parent::getDisplayName ($plural, $ofModule);
+        }
     }
 }

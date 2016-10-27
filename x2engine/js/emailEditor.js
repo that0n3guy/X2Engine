@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,9 +32,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-
+if (typeof x2 === 'undefined') x2 = {};
 
 /**
  * Creates an instance of CKEditor, replacing the speficied element. Checks if the editor
@@ -143,6 +144,51 @@ function createCKEditor(editorId,editorConfig,callback, toolbar) {
     return editor;
 }
 
+x2.emailEditor = (function () {
+
+var emailEditor = {};
+
+/**
+ * Adds a new attachment to the inline email editor form 
+ * @param int id
+ * @param string type ('media'|'temp'|'emailInboxes') 
+ * @param string filename
+ */
+emailEditor.newAttachment = function (id, type, filename) {
+    var file = $('<input>', {
+        'type': 'hidden',
+        'name': 'AttachmentFiles[id][]',
+        'class': 'AttachmentFiles',
+        'value': id 
+    });
+
+    var temp = $('<input>', {
+        'type': 'hidden',
+        'name': 'AttachmentFiles[types][]',
+        'value': type 
+    });
+
+    var attachment = $('.next-attachment');
+    var newFileChooser = attachment.clone();
+    var remove = attachment.find('.remove');
+    attachment.children('.error').html(''); // clear attachment errors (if any)
+
+    attachment.removeClass('next-attachment').show ();
+    attachment.addClass('upload-file-container');
+
+    attachment.append(temp);
+    attachment.append(file);
+    attachment.find('.filename').html(filename);
+    attachment.find('.upload-wrapper').remove();
+
+    remove.click(function() {
+        attachment.remove ();
+        return false;
+    });
+
+    attachment.after(newFileChooser);
+    x2.forms.initX2FileInput();
+};
 
 /**
  *	Set up attachments in the email form so that the attachments div is droppable for
@@ -150,7 +196,7 @@ function createCKEditor(editorId,editorConfig,callback, toolbar) {
  *  page has an inline email form) and whenever the email form is replaced, like after an
  *  ajax call from pressing the preview button.
  */
-function setupEmailAttachments(droppableId) {
+emailEditor.setupEmailAttachments = function (droppableId) {
     $('#'+droppableId).droppable({
         accept:'.media',
         activeClass:'x2-state-active',
@@ -205,46 +251,7 @@ function setupEmailAttachments(droppableId) {
             }else{
                 var mediaId = media.href.split('/').pop();
                 var mediaName = media.innerHTML;
-
-                var file = $('<input>', {
-                    'type': 'hidden',
-                    'name': 'AttachmentFiles[id][]',
-                    'class': 'AttachmentFiles',
-                    'value': mediaId // name of temp file
-                });
-
-                var temp = $('<input>', {
-                    'type': 'hidden',
-                    'name': 'AttachmentFiles[temp][]',
-                    'value': false // indicates that this is not a temp file
-                });
-
-                var remove = $("<a>", {
-                    'href': "#",
-                    'html': "[x]"
-                });
-
-                var attachment = $('.next-attachment');
-                var newFileChooser = attachment.clone();
-                attachment.children('.error').html(''); // clear attachment errors (if any)
-
-                attachment.removeClass('next-attachment');
-
-                attachment.append(temp);
-                attachment.append(file);
-                attachment.find('.filename').html(mediaName);
-                attachment.find('.remove').append(remove);
-                attachment.find('.upload-wrapper').remove();
-
-                remove.click(function() {
-                    attachment.fadeOut(200,function(){
-                        $(this).remove();
-                    });
-                    return false;
-                });
-
-                attachment.after(newFileChooser);
-                x2.forms.initX2FileInput();
+                x2.emailEditor.newAttachment (mediaId, 'media', mediaName);
             }
         }
     }).on('click','.remove a',function() {	// remove attachments when user clicks on the X
@@ -252,3 +259,7 @@ function setupEmailAttachments(droppableId) {
         return false;
     });
 }
+
+return emailEditor;
+
+}) ();

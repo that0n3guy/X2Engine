@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+Yii::app()->clientScript->registerCssFile(Yii::app()->theme->baseUrl.'/css/importexport.css');
 ?>
 <div class="page-title"><h2><?php echo Yii::t('admin','Import Data from Template'); ?></h2></div>
 <div class='admin-form-container'>
@@ -47,12 +50,38 @@
 <?php echo Yii::t('admin','Each record type should have a set of column names as metadata with the type of record (e.g. "Contacts" or "Accounts" at the end.  Each record should also have the record type as the last column.'); ?>
 <br><br>
 <h3><?php echo Yii::t('contacts','Upload File'); ?></h3>
-<?php echo CHtml::form('import','post',array('enctype'=>'multipart/form-data','id'=>'file-form')); ?>
-<?php echo CHtml::fileField('data', '', array('id'=>'data')); ?> <br><br>
-<?php echo Yii::t('admin','Overwrite old data');?>
-<?php echo X2Html::hint("Overwriting is disabled on Fields as this would remove all currently existing data in that field."); ?><br>
-<?php echo CHtml::dropDownList('overwrite', '', array('0'=>Yii::t('app','No'),'1'=>Yii::t('app','Yes')),array('id'=>'overwrite-selector')); ?> <br><br>
-<?php echo CHtml::submitButton(Yii::t('app','Submit'),array('class'=>'x2-button','id'=>'import-button')); ?>
-<?php echo CHtml::endForm(); ?>
+<?php 
+echo CHtml::form('import','post',array('enctype'=>'multipart/form-data','id'=>'file-form')); 
+echo CHtml::activeFileField($formModel, 'data', array('id'=>'data')); 
+echo CHtml::error ($formModel, 'data');
+?> <br><br>
+<?php 
+echo Yii::t('admin','Overwrite old data');
+echo X2Html::hint("Overwriting is disabled on Fields as this would remove all currently existing data in that field."); 
+?><br>
+<?php 
+echo CHtml::activeDropDownList(
+    $formModel, 
+    'overwrite', 
+    array(0=>Yii::t('app','No'),1=>Yii::t('app','Yes')),array('id'=>'overwrite-selector')); 
+?>
+
+<h3><?php
+    echo Yii::t('admin', 'Customize CSV') .
+        X2Html::minimizeButton (array('class' => 'pseudo-link'), '#importSeparator'); ?>
+</h3>
+<div id='importSeparator' style='display:none'>
+    <?php
+        echo CHtml::activeLabel($formModel, 'delimeter');
+        echo CHtml::activeTextField($formModel, 'delimeter').'<br />';
+        echo CHtml::activeLabel($formModel, 'enclosure');
+        echo CHtml::activeTextField($formModel, 'enclosure');
+    ?>
+</div>
+<br><br>
+<?php 
+echo CHtml::submitButton(Yii::t('app','Submit'),array('class'=>'x2-button','id'=>'import-button'));
+echo CHtml::endForm(); 
+?>
 </div>
 </div>

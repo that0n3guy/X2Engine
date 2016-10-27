@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Manages quotes line items table 
@@ -78,7 +79,12 @@ function LineItems (argsDict) {
         /**
          * @param string used to prefix unique identifiers (e.g. html element ids)
          */
-        namespacePrefix: null
+        namespacePrefix: null,
+        /**
+         * @param string url to request product options for combo box 
+         */
+        getItemsUrl: null,
+        modelName: null
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
     var that = this;
@@ -99,7 +105,10 @@ function LineItems (argsDict) {
 
     $(function () {
         // used to instantiate moneyMask fields
-        that._currencyConfig = $.extend ({}, x2.currencyInfo, {'affixStay' : true});
+        that._currencyConfig = $.extend ({}, x2.currencyInfo, {
+            affixStay: true,
+            allowNegative: true
+        });
     });
 
     this._init ();
@@ -116,6 +125,11 @@ Private static methods
 /*
 Public instance methods
 */
+
+LineItems.prototype.resolveName = function (name) {
+    if (!this.modelName) return name;
+    else return this.modelName + name.replace (/^([^[]+)/, '[$1]');
+};
 
 /*
 Parameters:
@@ -199,7 +213,7 @@ LineItems.prototype.calculateLineTotal = function (rowElement) {
         $(rowElement).find (".adjustment-type").val ();
     var adjustment = that.getAdjustment (rowElement, adjustmentType);
     var name =
-        $(rowElement).find ("[name*='name']").val ();
+        $(rowElement).find ("[name*='" + this.resolveName ('name') + "']").val ();
 
     var lineTotal = price * quantity;
 
@@ -254,7 +268,6 @@ a float, save the float, and convert the value of the input field back to a curr
 The converted currency is returned.
 */
 LineItems.prototype.extractCurrency = function (element) {
-    var that = this;
     return $(element).maskMoney ('unmasked')[0];
     /*$(element).toNumber(
         {'region': that.currency});
@@ -358,14 +371,14 @@ LineItems.prototype.addLineItem = function (
 
     var that = this;
     if (!fillLineItem) {
-            values = { // default values,
-                    "product-name": ['' /* default input value */, false /* validation error */],
-                    "price": ['0', false],
-                    "quantity": ['1', false],
-                    "adjustment": ['0', false],
-                    "description": ['', false],
-                    "adjustment-type": ['linear', false]
-            }
+        values = { // default values,
+            "product-name": ['' /* default input value */, false /* validation error */],
+            "price": ['0', false],
+            "quantity": ['1', false],
+            "adjustment": ['0', false],
+            "description": ['', false],
+            "adjustment-type": ['linear', false]
+        }
     }
 
     var lineItemRow = $("<tr>", {'class': 'line-item'});
@@ -373,8 +386,8 @@ LineItems.prototype.addLineItem = function (
     $firstCell = lineItemRow.append ($("<td>", {'class': 'first-cell'}));
     if (!that.readOnly) {
         $firstCell.find ('td').append (
-            $("<img>", {src: that.deleteImageSource, 'class': 'item-delete-button'}),
-            $("<img>", {src: that.arrowBothImageSource, 'class': 'handle arrow-both-handle'})
+            $("<span>", {'class': 'fa fa-times x2-delete-icon item-delete-button'}),
+            $("<span>", {'class': 'fa fa-sort handle arrow-both-handle'})
         );
     }
     $inputCell = lineItemRow.append ($("<td>", {'class': 'x2-2nd-child input-cell'}).append (
@@ -383,40 +396,45 @@ LineItems.prototype.addLineItem = function (
             'class': 'line-item-field product-name',
             maxlength: '100',
             value: values['product-name'][0],
-            name: 'lineitem[' + ++that._lineCounter + '][name]' })
+            name: this.resolveName ('lineitem[' + ++that._lineCounter + '][name]') 
+        })
     ));
     if (!that.readOnly) {
-        $inputCell.find ('input').after (
+        /*$inputCell.find ('input').after (
             $("<button>", {'class': 'x2-button product-select-button', 'type': 'button'}).
-                append ($("<img>", { src: that.arrowDownImageSource })));
+                append ($("<img>", { src: that.arrowDownImageSource })));*/
     }
     lineItemRow.append ($("<td>", {'class': 'x2-3rd-child input-cell'}).append (
         $("<input>", {
             type: 'text',
             'class': 'line-item-field price',
             value: values['price'][0],
-            name: 'lineitem[' + that._lineCounter + '][price]' }))
+            name: this.resolveName ('lineitem[' + that._lineCounter + '][price]')
+        }))
     );
     lineItemRow.append ($("<td>", {'class': 'x2-4th-child input-cell'}).append (
         $("<input>", {
             type: 'text',
             'class': 'line-item-field quantity',
             value: values['quantity'][0],
-            name: 'lineitem[' + that._lineCounter + '][quantity]' }))
+            name: this.resolveName ('lineitem[' + that._lineCounter + '][quantity]') 
+        }))
     );
     lineItemRow.append ($("<td>", {'class': 'x2-5th-child input-cell'}).append (
         $("<input>", {
             type: 'text',
             'class': 'line-item-field adjustment',
             value: values['adjustment'][0],
-            name: 'lineitem[' + that._lineCounter + '][adjustment]' }))
+            name: this.resolveName ('lineitem[' + that._lineCounter + '][adjustment]') 
+        }))
     );
     lineItemRow.append ($("<td>", {'class': 'x2-6th-child input-cell'}).append (
         $("<input>", {
             type: 'text',
             'class': 'line-item-field description',
             'value': values['description'][0],
-            name: 'lineitem[' + that._lineCounter + '][description]' }))
+            name: this.resolveName ('lineitem[' + that._lineCounter + '][description]') 
+        }))
     );
     lineItemRow.append ($("<td>", {
         'class': 'input-cell line-item-field x2-7th-child'}).append (
@@ -425,16 +443,19 @@ LineItems.prototype.addLineItem = function (
                 'class': 'line-item-total',
                 readonly: 'readonly',
                 onfocus: 'this.blur();',
-                name: 'lineitem[' + that._lineCounter + '][total]' }),
+                name: this.resolveName ('lineitem[' + that._lineCounter + '][total]') 
+            }),
             $("<input>", {
                 type: 'hidden',
                 'class': 'adjustment-type',
                 value: values['adjustment-type'][0],
-                name: 'lineitem[' + that._lineCounter + '][adjustmentType]' }),
+                name: this.resolveName ('lineitem[' + that._lineCounter + '][adjustmentType]') 
+            }),
             $("<input>", {
                 type: 'hidden',
                 'class': 'line-number',
-                name: 'lineitem[' + that._lineCounter + '][lineNumber]' }))
+                name: this.resolveName ('lineitem[' + that._lineCounter + '][lineNumber]') 
+            }))
     );
 
     if (fillLineItem) { // add error class if server side validation failed
@@ -468,16 +489,27 @@ LineItems.prototype.addLineItem = function (
 
     if (!that.readOnly) { // set up product select menu behavior
         var productNameInput = $(lineItemRow).find ('input.product-name');
-        $(productNameInput).autocomplete ({
-                source: that.productNames,
-                select: function (event, ui) { that.selectProductFromAutocomplete (event, ui); },
-                open: function (evt, ui) {
-                        if ($(that._productMenuSelector).is (":visible")) {
-                                $(that._productMenuSelector).hide ();
-                        }
-                }
+        x2.combodebug = new x2.ComboBox ({
+            element: productNameInput,
+            getItemsUrl: this.getItemsUrl,
+            optionClick: function (option$) {
+                that.selectProductFromDropDown (option$.text (), option$.data ('data-val'));
+            },
+            onShow: function () {
+                that._clickedLineItem = $(this.element);
+            }
         });
-        that.formatAutocompleteWidget (productNameInput);
+        /*$(productNameInput).autocomplete ({
+            source: that.productNames,
+            select: function (event, ui) { that.selectProductFromAutocomplete (event, ui); },
+            open: function (evt, ui) {
+                if ($(that._productMenuSelector).is (":visible")) {
+                    $(that._productMenuSelector).hide ();
+                }
+                }
+            }
+        });
+        that.formatAutocompleteWidget (productNameInput);*/
         $('tbody.sortable').sortable ('refresh');
     }
     if (!fillLineItem) { // format default input field values
@@ -567,8 +599,8 @@ LineItems.prototype.addAdjustment = function (
     $firstCell = lineItemRow.append ($("<td>", {'class': 'first-cell'}));
     if (!that.readOnly) {
         $firstCell.find ('td').append (
-            $("<img>", {src: that.deleteImageSource, 'class': 'item-delete-button'}),
-            $("<img>", {src: that.arrowBothImageSource, 'class': 'handle arrow-both-handle'})
+            $("<span>", {'class': 'fa fa-times x2-delete-icon item-delete-button'}),
+            $("<span>", {'class': 'fa fa-sort handle arrow-both-handle'})
         );
     }
     lineItemRow.append ($("<td>"));
@@ -579,21 +611,21 @@ LineItems.prototype.addAdjustment = function (
             'class': 'line-item-field adjustment-name',
             maxlength: '100',
             value: values['adjustment-name'][0],
-            name: 'lineitem[' + ++that._lineCounter + '][name]' }))
+            name: this.resolveName ('lineitem[' + ++that._lineCounter + '][name]') }))
     );
     lineItemRow.append ($("<td>", {'class': 'input-cell x2-5th-child'}).append (
         $("<input>", {
             type: 'text',
             'class': 'line-item-field adjustment',
             value: values['adjustment'][0],
-            name: 'lineitem[' + that._lineCounter + '][adjustment]' }))
+            name: this.resolveName ('lineitem[' + that._lineCounter + '][adjustment]') }))
     );
     lineItemRow.append ($("<td>", {'class': 'input-cell x2-6th-child'}).append (
         $("<input>", {
             type: 'text',
             'class': 'line-item-field description',
             value: values['description'][0],
-            name: 'lineitem[' + that._lineCounter + '][description]' }))
+            name: this.resolveName ('lineitem[' + that._lineCounter + '][description]') }))
     );
     lineItemRow.append ($("<td>", {'class': 'input-cell x2-7th-child'}).append (
         //$("<span></span>", {'class': 'line-item-total'}),
@@ -601,11 +633,11 @@ LineItems.prototype.addAdjustment = function (
             type: 'hidden',
             'class': 'adjustment-type',
             value: values['adjustment-type'][0],
-            name: 'lineitem[' + that._lineCounter + '][adjustmentType]' }),
+            name: this.resolveName ('lineitem[' + that._lineCounter + '][adjustmentType]') }),
         $("<input>", {
             type: 'hidden',
             'class': 'line-number',
-            name: 'lineitem[' + that._lineCounter + '][lineNumber]' }))
+            name: this.resolveName ('lineitem[' + that._lineCounter + '][lineNumber]') }))
     );
 
     if (fillAdjustment) { // add error class if server side validation failed
@@ -646,93 +678,134 @@ LineItems.prototype.addAdjustment = function (
     that.updateTotals ();
 };
 
-LineItems.prototype.selectProductFromAutocomplete = function (event, ui) {
-    var that = this;
-    that.DEBUG && console.log ('selectProductFromAutocomplete');
-    event.preventDefault ();
-    var lineItemName = ui.item.label;
-    $(event.target).val (lineItemName);
-    var lineItemPrice = $(event.target).attr ('name').replace (/name/, 'price');
-    var lineItemDescription = $(event.target).attr ('name').replace (/name/, 'description');
-    $('[name="' + lineItemPrice + '"]').val (that.productPrices[lineItemName]).maskMoney ('mask');/*.
-        formatCurrency ({region: that.currency});*/
-    $('[name="' + lineItemDescription + '"]').val (that.productDescriptions[lineItemName]);
-    that.validateName (event.target);
-    that.updateTotals ();
-    return false;
-};
+//LineItems.prototype.selectProductFromAutocomplete = function (event, ui) {
+//    var that = this;
+//    that.DEBUG && console.log ('selectProductFromAutocomplete');
+//    event.preventDefault ();
+//    var lineItemName = ui.item.label;
+//    $(event.target).val (lineItemName);
+//    var lineItemPrice = $(event.target).attr ('name').replace (/name/, 'price');
+//    var lineItemDescription = $(event.target).attr ('name').replace (/name/, 'description');
+//    this.element$.find ('[name="' + lineItemPrice + '"]').
+//        val (that.productPrices[lineItemName]).maskMoney ('mask');
+//    this.element$.find ('[name="' + lineItemDescription + '"]').
+//        val (that.productDescriptions[lineItemName]);
+//    that.validateName (event.target);
+//    that.updateTotals ();
+//    return false;
+//};
 
-LineItems.prototype.selectProductFromDropDown = function (event, ui) {
+//LineItems.prototype.selectProductFromDropDown = function (item) {
+//    var that = this;
+//    that.DEBUG && console.log ('selectProductFromDropDown');
+//    var lineItemName = item.text ();
+//    $(that._clickedLineItem).val (lineItemName);
+//    var lineItemPrice = $(that._clickedLineItem).attr ('name').replace (/name/, 'price');
+//    var lineItemDescription = 
+//        $(that._clickedLineItem).attr ('name').replace (/name/, 'description');
+//
+//    this.element$.find ('[name="' + lineItemPrice + '"]').
+//        val (that.productPrices[lineItemName]).maskMoney ('mask');
+//    this.element$.find ('[name="' + lineItemDescription + '"]').
+//        val (that.productDescriptions[lineItemName]);
+//    that.validateName (that._clickedLineItem);
+//    that.updateTotals ();
+//    return false;
+//};
+
+LineItems.prototype.selectProductFromDropDown = function (name, attrs) {
     var that = this;
-    event.preventDefault ();
     that.DEBUG && console.log ('selectProductFromDropDown');
-    var lineItemName = ui.item.text ();
+    var lineItemName = name;
     $(that._clickedLineItem).val (lineItemName);
     var lineItemPrice = $(that._clickedLineItem).attr ('name').replace (/name/, 'price');
     var lineItemDescription = 
         $(that._clickedLineItem).attr ('name').replace (/name/, 'description');
-    $('[name="' + lineItemPrice + '"]').val (that.productPrices[lineItemName]).maskMoney ('mask');
-    $('[name="' + lineItemDescription + '"]').val (that.productDescriptions[lineItemName]);
+
+    this.element$.find ('[name="' + lineItemPrice + '"]').
+        val (attrs.price).maskMoney ('mask');
+    this.element$.find ('[name="' + lineItemDescription + '"]').
+        val (attrs.description);
     that.validateName (that._clickedLineItem);
     that.updateTotals ();
     return false;
 };
 
-LineItems.prototype.formatAutocompleteWidget = function (element) {
-    var that = this;
-    var widget = $(element).autocomplete ("widget");
-    $(widget).css ({
-            "font-size": "10px",
-            "max-height": "16em",
-            "overflow-y": "scroll"
-    });
-    $(window).resize (function () {
-        $(widget).hide ();
-    });
-};
+//LineItems.prototype.formatAutocompleteWidget = function (element) {
+//    var that = this;
+//    var widget = $(element).autocomplete ("widget");
+//    $(widget).css ({
+//            "font-size": "10px",
+//            "max-height": "16em",
+//            "overflow-y": "scroll"
+//    });
+//    $(window).resize (function () {
+//        $(widget).hide ();
+//    });
+//};
 
 /*
 Sets up a combo box that allows ad-hoc line item names and selection from a
 list of existing products
 */
-LineItems.prototype.setupProductSelectMenu = function () {
-    var that = this;
-    if (that.productNames) {
-        $(this._containerElemSelector + ' input.product-name').autocomplete ({
-            source: that.productNames,
-            select: function (event, ui) { 
-                return that.selectProductFromAutocomplete (event, ui); 
-            },
-            open: function (evt, ui) {
-                if ($(that._productMenuSelector).is (":visible")) {
-                    $(that._productMenuSelector).hide ();
-                }
-            }
-        });
-        $(this._containerElemSelector + ' input.product-name').each (function () {
-            that.formatAutocompleteWidget ($(this));
-        });
-    }
-
-    $(that._lineItemsSelector).on (
-        'click', '.product-select-button', function (event) {
-
-        that._clickedLineItem = $(this).siblings ('.line-item-field');
-        $(that._productMenuSelector).show ().position ({
-            my: "left top",
-            at: "left bottom",
-            of: $(this).prev ().prev ()
-        });
-        $(document).one ('click', function () {
-            $(that._productMenuSelector).hide ();
-        });
-        return false;
-    });
-
-    $(that._productMenuSelector).hide ().menu ({select: function (event, ui) { 
-        return that.selectProductFromDropDown (event, ui); 
-    }});
-};
+//LineItems.prototype.setupProductSelectMenu = function () {
+//    var that = this;
+//    if (that.productNames) {
+//        $(this._containerElemSelector + ' input.product-name').autocomplete ({
+//            source: that.productNames,
+//            select: function (event, ui) { 
+//                return that.selectProductFromAutocomplete (event, ui); 
+//            },
+//            open: function (evt, ui) {
+//                if ($(that._productMenuSelector).is (":visible")) {
+//                    $(that._productMenuSelector).hide ();
+//                }
+//            }
+//        });
+//        $(this._containerElemSelector + ' input.product-name').each (function () {
+//            that.formatAutocompleteWidget ($(this));
+//        });
+//    }
+//
+//    $(that._lineItemsSelector).on (
+//        'click', '.product-select-button', function (event) {
+//
+//        that._clickedLineItem = $(this).siblings ('.line-item-field');
+//        $(that._productMenuSelector).show ().position ({
+//            my: "left top",
+//            at: "left bottom",
+//            of: $(this).prev ()
+//        });
+//        if (that.element$.closest ('.ui-dialog').length) {
+//            that.element$.closest ('.ui-dialog').one ('click', function (event) {
+//                var target = event.target;
+//                if ($(target).closest ('.ui-menu-item').length || 
+//                    $(target).is ('.ui-menu-item')) {
+//
+//                    // kludge to resolve menu item select event issue
+//                    that.selectProductFromDropDown (
+//                        ($(target).closest ('.ui-menu-item').length && 
+//                        $(target).closest ('.ui-menu-item')) || $(target));
+//                } 
+//                $(that._productMenuSelector).hide ();
+//            });
+//        } else {
+//            $(document).one ('click', function () {
+//                $(that._productMenuSelector).hide ();
+//            });
+//        }
+//        event.stopPropagation ();
+//    });
+//
+//    $(that._productMenuSelector).hide ().menu ({select: function (event, ui) { 
+//        if (!that.element$.closest ('.ui-dialog').length) {
+//            that.selectProductFromDropDown (ui.item); 
+//        }
+//    }});
+//
+//    // kludge to prevent link behavior of menu items when line items are inside action frame
+//    $(that._productMenuSelector).find ('a').attr ('href', 'javascript:void(0)');
+//};
 
 /*
 Recalculate line item total, the subtotal, and the overall total
@@ -782,10 +855,10 @@ LineItems.prototype.checkAdjustment = function (element) {
 
     if (elemVal.match (/%/)) {
 
-        if ($('[name="' + typeElementName + '"]').val ().match (/total/)) {
-            $('[name="' + typeElementName + '"]').val ('totalPercent');
+        if (this.element$.find ('[name="' + typeElementName + '"]').val ().match (/total/)) {
+            this.element$.find ('[name="' + typeElementName + '"]').val ('totalPercent');
         } else {
-            $('[name="' + typeElementName + '"]').val ('percent');
+            this.element$.find ('[name="' + typeElementName + '"]').val ('percent');
         }
 
         if (elemVal.match (/^\-?[0-9]+(\.[0-9]+)?%$/)) {
@@ -798,10 +871,10 @@ LineItems.prototype.checkAdjustment = function (element) {
     } else {
         $(element).removeClass ('error');
 
-        if ($('[name="' + typeElementName + '"]').val ().match (/total/)) {
-            $('[name="' + typeElementName + '"]').val ('totalLinear');
+        if (this.element$.find ('[name="' + typeElementName + '"]').val ().match (/total/)) {
+            this.element$.find ('[name="' + typeElementName + '"]').val ('totalLinear');
         } else {
-            $('[name="' + typeElementName + '"]').val ('linear');
+            this.element$.find ('[name="' + typeElementName + '"]').val ('linear');
         }
 
         return true;
@@ -990,17 +1063,13 @@ LineItems.prototype.setupEditingBehavior = function () {
         $(that._productMenuSelector).hide ();
     });
 
-    that.setupProductSelectMenu ();
+    //that.setupProductSelectMenu ();
 
     that.DEBUG && console.log ('setupEditingBehavior');
     $(that._containerElemSelector + ' .quote-table tbody.sortable').sortable ({
         handle: ".handle",
         start: function (event, ui) {
             $(that._productMenuSelector).hide ();
-            if ($(ui.item).hasClass ("line-item")) {
-                var widget = $(ui.item).find ("input.product-name").autocomplete ("widget");
-                if (widget) $(widget).hide ();
-            }
         },
         stop: function (evt, ui) { that.resetLineNums (evt, ui); },
         //helper: function (evt, sortedElem) { that.preserveRowWidth (evt, sortedElem); }
@@ -1040,6 +1109,7 @@ Private instance methods
 LineItems.prototype._init = function () {
     var that = this;
     $(function () {
+        that.element$ = $(that._containerElemSelector);
         that.maskMoney ([$(that._totalSelector), $(that._subtotalSelector)]);
 
         if (that.readOnly) {

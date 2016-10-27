@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Prototype for publisher log a call tab
@@ -51,8 +52,6 @@ function PublisherCallTab (argsDict) {
     auxlib.applyArgs (this, defaultArgs, argsDict);
 
 	x2.PublisherTimeTab.call (this, argsDict);	
-
-    this._init ();
 }
 
 PublisherCallTab.prototype = auxlib.create (x2.PublisherTimeTab.prototype);
@@ -73,15 +72,6 @@ Public instance methods
 /*
 Private instance methods
 */
-
-PublisherCallTab.prototype._init = function () {
-    var that = this;
-    x2.PublisherTimeTab.prototype._init.call (this);
-
-    $('#quickNote2').change (function () {
-        $(that._elemSelector + ' .action-description').val ($(this).val ());
-    });
-};
 
 return PublisherCallTab;
 

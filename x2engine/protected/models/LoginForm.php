@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Form model for logging into the app.
@@ -44,13 +45,14 @@
  * @propoerty User $user The user model corresponding to the current login; null
  *  if no match for username/alias was found.
  */
-class LoginForm extends CFormModel {
+class LoginForm extends X2FormModel {
 
     public $username;
     public $password;
     public $rememberMe;
     public $verifyCode;
     public $useCaptcha;
+    public $sessionToken;
     private $_identity;
 
     /**
@@ -58,17 +60,20 @@ class LoginForm extends CFormModel {
      * @return array
      */
     public function rules() {
-	return array(
-	    // username and password are required
-	    array('username, password', 'required'),
-	    // rememberMe needs to be a boolean
-	    array('rememberMe', 'boolean'),
-	    // password needs to be authenticated
-	    array('password', 'authenticate'),
-	    // captcha needs to be filled out
-	    array('verifyCode', 'captcha', 'allowEmpty' => !(CCaptcha::checkRequirements()), 'on' => 'loginWithCaptcha'),
-	    array('verifyCode', 'safe'),
-	);
+        return array(
+            // username and password are required
+            array('username, password', 'required'),
+            // rememberMe needs to be a boolean
+            array('rememberMe', 'boolean'),
+            // password needs to be authenticated
+            array('password', 'authenticate'),
+            // captcha needs to be filled out
+            array(
+                'verifyCode', 
+                'captcha', 
+                'allowEmpty' => !(CCaptcha::checkRequirements()), 'on' => 'loginWithCaptcha'),
+            array('verifyCode', 'safe'),
+        );
     }
 
     /**
@@ -81,6 +86,7 @@ class LoginForm extends CFormModel {
             'password' => Yii::t('app', 'Password'),
             'rememberMe' => Yii::t('app', 'Remember me'),
             'verifyCode' => Yii::t('app', 'Verification Code'),
+            'sessionToken' => Yii::t('app', 'Session Token'),
         );
     }
 
@@ -114,24 +120,63 @@ class LoginForm extends CFormModel {
     public function login($google = false) {
         if(!isset($this->_identity))
             $this->getIdentity()->authenticate($google);
-		if($this->getIdentity()->errorCode === UserIdentity::ERROR_NONE) {
+        if($this->getIdentity()->errorCode === UserIdentity::ERROR_NONE) {
 			$duration = $this->rememberMe ? 2592000 : 0; //60*60*24*30 = 30 days
 			Yii::app()->user->login($this->_identity, $duration);
 
 			// update lastLogin time
 			$user = User::model()->findByPk(Yii::app()->user->getId());
-            Yii::app()->setSuModel($user);
-			$user->lastLogin = $user->login;
-			$user->login = time();
-			$user->update(array('lastLogin','login'));
+                        Yii::app()->setSuModel($user);
+            $user->lastLogin = $user->login;
+            $user->login = time();
+            $user->update(array('lastLogin','login'));
 			
-			Yii::app()->session['loginTime'] = time();
+            Yii::app()->session['loginTime'] = time();
 			
-			return true;
-		}
-		
-		return false;
+            return true;
 	}
+		
+        return false;
+    }
+    
+	/**
+	 * Logs in the user using the given sesson token in the model.
+	 * 
+	 * @param boolean $google Whether or not Google is being used for the login
+	 * @return boolean whether login is successful
+	 */
+    public function loginSessionToken($google = false) {
+        if(isset(Yii::app()->request->cookies['sessionToken'])){
+            $sessionToken = Yii::app()->request->cookies['sessionToken']->value;
+            if(empty(Yii::app()->request->cookies['sessionToken']->value))
+                return false;
+            $sessionModel = X2Model::model('SessionToken')->findByPk($sessionToken); 
+            if($sessionModel === null)
+                return false;
+            $user = User::model()->findByAlias($sessionModel->user);
+            if($user === null)
+                return false;
+            $userCached = new UserIdentity($user->username, $user->password);
+            $userCached->authenticate(true);
+            if($userCached->errorCode === UserIdentity::ERROR_NONE) {
+                $duration = $this->rememberMe ? 2592000 : 0; //60*60*24*30 = 30 days
+                Yii::app()->user->login($userCached, $duration);
+
+                // update lastLogin time
+                $user = User::model()->findByPk(Yii::app()->user->getId());
+                Yii::app()->setSuModel($user);
+                $user->lastLogin = $user->login;
+                $user->login = time();
+                $user->update(array('lastLogin','login'));
+
+                Yii::app()->session['loginTime'] = time();
+
+                return true;
+            }
+        }
+		
+        return false;
+    }
 
     /**
      * User identity component.

@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,13 +34,16 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 // uncomment the following to define a path alias
 // Yii::setPathOfAlias('local','path/to/local-folder');
 // This is the testing application configuration. Any writable
 // CWebApplication properties can be configured here.
 $config = require(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'main.php');
+
+require_once(dirname(__FILE__).'/../tests/testconstants.php');
+
 require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'X2Config-test.php');
 
 $config['components']['db'] = array(
@@ -48,8 +52,8 @@ $config['components']['db'] = array(
 	'username' => $user,
 	'password' => $pass,
 	'charset' => 'utf8',
-	//'enableProfiling'=>true,
-	//'enableParamLogging' => true,
+	'enableProfiling' => YII_DEBUG,
+	'enableParamLogging' => YII_DEBUG,
 	'schemaCachingDuration' => 84600
 );
 $config['components']['fixture'] = array(
@@ -57,7 +61,31 @@ $config['components']['fixture'] = array(
 	'initScriptSuffix' => '.init.php'
 );
 $config['import'] = array_merge($config['import'], array('application.tests.*', 'application.components.*', 'application.models.*'));
-$config['components']['log']['routes'] = array(
+
+$debugLogRoutes = array(
+	array(
+		'class' => 'CFileLogRoute',
+		'logFile' => 'debug.log',
+        'categories' => 'application.debug',
+        'maxLogFiles' => 10,
+        'maxFileSize' => 128,
+	),
+	array(
+		'class' => 'CFileLogRoute',
+		'logFile' => 'trace.log',
+        'levels' => 'trace',
+        'maxLogFiles' => 10,
+        'maxFileSize' => 128,
+	),
+);
+
+$config['components']['log']['routes'] = array_merge (array(
+	array(
+		'class' => 'CFileLogRoute',
+		'logFile' => 'test-results.log',
+        'levels' => 'error,warning,trace,info',
+        'categories' => 'system.test-output'
+	),
 	array(
 		'class' => 'CFileLogRoute',
 		'logFile' => php_sapi_name() == 'cli' ? 'system-test.log' : 'system-test-web.log',
@@ -69,8 +97,9 @@ $config['components']['log']['routes'] = array(
 		'logFile' => php_sapi_name() == 'cli' ? 'test.log' : 'test-web.log',
         'levels' => 'error,warning,trace,info',
         'categories' => 'application.*'
-	)
-);
+	),
+), YII_DEBUG ? $debugLogRoutes : array ());
+
 $config['params']['automatedTesting'] = true;
 
 $custom = dirname(__FILE__).'/../../custom/protected/config/test.php';

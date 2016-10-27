@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,9 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+
 
 /**
  * X2FlowAction that creates a notification
@@ -45,7 +48,6 @@ class X2FlowWait extends X2FlowAction {
 	public $info = 'Delay execution of the remaining steps until the specified time.';
 
 	public $flowId = null;
-	public $flowPath = null;
 
     public function getFormattedUnit ($unit) {
         switch ($unit) {
@@ -65,7 +67,6 @@ class X2FlowWait extends X2FlowAction {
     }
 
 	public function paramRules() {
-
 		$units = array(
 			'mins'=>Yii::t('studio','minutes'),
 			'hours'=>Yii::t('studio','hours'),
@@ -73,49 +74,56 @@ class X2FlowWait extends X2FlowAction {
 			'months'=>Yii::t('studio','months'),
             'secs'=>Yii::t('studio','seconds (recommended for formulas only)'),
 		);
-		return array(
+		return array_merge (parent::paramRules (), array (
 			'title' => Yii::t('studio',$this->title),
 			'info' => Yii::t('studio',$this->info),
             'requiresCron' => $this->requiresCron,
 			'options' => array(
+				array('name'=>'delay','label'=>Yii::t('studio','For')),
+				array(
+                    'name'=>'unit',
+                    'label'=>Yii::t('studio','Type'),
+                    'type'=>'dropdown',
+                    'options'=>$units
+                ),
 				// array('name'=>'user','label'=>'User','type'=>'assignment','options'=>$assignmentOptions),	// just users, no groups or 'anyone'
 				// array('name'=>'type','label'=>'Type','type'=>'dropdown','options'=>$notifTypes),
-				array('name'=>'delay','label'=>Yii::t('studio','For')),
-				array('name'=>'unit','label'=>Yii::t('studio','Type'),'type'=>'dropdown','options'=>$units),
 				// array('name'=>'timeOfDay','type'=>'time','label'=>'Time of Day','optional'=>1),
-			));
+			)));
 	}
 
 	public function execute(&$params, $triggerLogId=null) {
 		$options = &$this->config['options'];
         $options['delay']['value']=$this->parseOption('delay',$params);
-		if(!is_array($this->flowPath) || !is_numeric($options['delay']['value']))
+		if(!is_numeric($options['delay']['value']))
 			return array (false, "");
 
 		$time = X2FlowItem::calculateTimeOffset(
-            (int)$options['delay']['value'],$options['unit']['value']);
+            (int) $options['delay']['value'], $options['unit']['value']);
 
 		if($time === false) {
 			return array (false, "");
         }
         $timeOffset = $time + time ();
 
-        // add 1 to the branch position in the flow path, to skip this action
-		$this->flowPath[count($this->flowPath)-1]++;	
-
 		$cron = new CronEvent;
 		$cron->type = 'x2flow';
-		$cron->createDate = time();
 		$cronData = array(
 			'flowId'=>$this->flowId,
-			'flowPath'=>$this->flowPath,
+            // called flowPath since it referred to a path to the wait action before 5.2
+            'flowPath' => $this->config['id'],
             'triggerLogId'=>$triggerLogId
 		);
 		$cron->time = $timeOffset;
 
 		if(isset($params['model'])) {
+            // stored in two places for legacy reasons. CronBehavior expects model id and type
+            // to be stored in JSON data. Eventually duplication should be removed and only
+            // association columns should be used.
 			$cronData['modelId'] = $params['model']->id;
 			$cronData['modelClass'] = get_class($params['model']);
+            $cron->associationType = get_class ($params['model']);
+            $cron->associationId = $params['model']->id;
 		}
 		foreach(array_keys($params) as $param) {
 

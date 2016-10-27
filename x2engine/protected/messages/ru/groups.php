@@ -1,12 +1,8 @@
-<?php
-return array (
-// Misc
-'Manage Groups'=>'Управление группами',
-'Create Group'=>'Создать группу',
-'Update Group'=>'Обновление группы',
-'Delete Group'=>'Удалить группу',
-'Group List'=>'Список групп',
-'Group:'=>'Группа:',
-'Users:'=>'Пользователей:',
-'Edit Group'=>'Редактировать группу',
+<?php return array (
+  'Create {group}' => 'Создать {group}',
+  '{group}:' => '{group}',
+  '{users}:' => '{users}',
+  '{group} List' => 'Список {group}',
+  'Edit {group}' => 'Редактировать {group}',
+  'Delete {group}' => 'Удалить {group}',
 );

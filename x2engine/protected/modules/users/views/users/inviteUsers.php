@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerCss('inviteUsersCss',"
 
@@ -44,19 +45,17 @@ Yii::app()->clientScript->registerCss('inviteUsersCss',"
 
 ");
 
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
+$menuOptions = array(
+    'feed', 'admin', 'create', 'invite',
+);
+$this->insertMenu($menuOptions);
 
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('profile','Social Feed'),'url'=>array('/profile/index')),
-	array('label'=>Yii::t('users','Manage Users'), 'url'=>array('admin')),
-	array('label'=>Yii::t('users','Create User'), 'url'=>array('create')),
-	array('label'=>Yii::t('users','Invite Users')),
-));
 ?>
-<div class="page-title icon users"><h2><?php echo Yii::t('users','Invite Users to X2Engine'); ?></h2></div>
+<div class="page-title icon users"><h2>
+    <?php echo Yii::t('users','Invite {users} to X2Engine', array(
+        '{users}' => Modules::displayName(),
+    )); ?>
+</h2></div>
 
 <form method="POST">
 <div class="form">
@@ -65,4 +64,5 @@ $this->actionMenu = $this->formatMenu(array(
 	<div class="row"><textarea id='invitation-email-list' name="emails"></textarea></div>
 	<div class="row"><input type="submit" value="<?php echo Yii::t('app','Submit');?>" class="x2-button"></div>
 </div>
+<?php echo X2Html::csrfToken(); ?>
 </form>

@@ -1,153 +1,86 @@
-<?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
- * 
- * This program is free software; you can redistribute it and/or modify it under
- * the terms of the GNU Affero General Public License version 3 as published by the
- * Free Software Foundation with the addition of the following permission added
- * to Section 15 as permitted in Section 7(a): FOR ANY PART OF THE COVERED WORK
- * IN WHICH THE COPYRIGHT IS OWNED BY X2ENGINE, X2ENGINE DISCLAIMS THE WARRANTY
- * OF NON INFRINGEMENT OF THIRD PARTY RIGHTS.
- * 
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU Affero General Public License along with
- * this program; if not, see http://www.gnu.org/licenses or write to the Free
- * Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301 USA.
- * 
- * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
- * 
- * The interactive user interfaces in modified source and object code versions
- * of this program must display Appropriate Legal Notices, as required under
- * Section 5 of the GNU Affero General Public License version 3.
- * 
- * In accordance with Section 7(b) of the GNU Affero General Public License version 3,
- * these Appropriate Legal Notices must retain the display of the "Powered by
- * X2Engine" logo. If the display of the logo is not reasonably feasible for
- * technical reasons, the Appropriate Legal Notices must display the words
- * "Powered by X2Engine".
- *****************************************************************************************/
-
-return array (
-'Calendar'=>'Календарь',
-'Calendars'=>'Календари',
-// // 
-'User Calendars'=>'Календари пользователей',
-'Group Calendars'=>'Календари групп',
-'Google Calendars'=>'Google Календари',
-'Sync My Actions To Google Calendar'=>'Синхронизировать с Google',
-'Don\'t Sync My Actions To Google Calendar'=>'Отменить привязку к моему календарю',
-'Google Calendar Name'=>'Пользователь календаря',
-'Filter'=>'Фильтр',
-'My Calendar Permissions'=>'Доступ к моему календарю',
-'User Calendar Permissions'=>'Доступ к календарям пользователей',
-'Google Event'=>'Google события',
-'Contacts'=>'Контакты',
-'Accounts'=>'Компании',
-'Opportunities'=>'Возможности',
-'Products'=>'Продукты',
-'Media'=>'Медиафайлы',
-'View Permission'=>'Просмотр разрешений',
-'These users can view your calendar.'=>'Эти пользователи могут просматривать ваш календарь.',
-'Edit Permission'=>'Изменить разрешение',
-'These users can edit your calendar.'=>'Эти пользователи могут редактировать свои календаря.',
-
-// // 
-
-
-'Completed'=>'Завершенный',
-'Quotes'=>'кавычки',
-'Email'=>'E-mail',
-'Attachment'=>'Вложение',
-'Quick Note'=>'Быстрая заметка',
-
-
-// // 
-'List'=>'Список',
-'Delete'=>'Удалить',
-'Create'=>'Создать',
-
-
-// // button text
-'Update'=>'Обновить',
-'today'=>'Сегодня',
-'month'=>'Месяц',
-'week'=>'Неделя',
-'day'=>'День',
-// // 
-// // month names
-'January'=>'январь',
-'February'=>'февраль',
-'March'=>'март',
-'April'=>'апрель',
-'May'=>'май',
-'June'=>'июнь',
-'July'=>'июль',
-'August'=>'август',
-'September'=>'сентябрь',
-'October'=>'октябрь',
-'November'=>'ноябрь',
-'December'=>'декабрь',
-// // 
-// // short month names
-'Jan'=>'янв',
-'Feb'=>'февр',
-'Mar'=>'март',
-'Apr'=>'апр',
-'May'=>'май',
-'Jun'=>'июнь',
-'Jul'=>'июль',
-'Aug'=>'авг',
-'Sep'=>'сент',
-'Oct'=>'окт',
-'Nov'=>'ноябрь',
-'Dec'=>'дек',
-// // 
-// // day names
-'Sunday'=>'воскресенье',
-'Monday'=>'понедельник',
-'Tuesday'=>'вторник',
-'Wednesday'=>'среда',
-'Thursday'=>'четверг',
-'Friday'=>'пятница',
-'Saturday'=>'суббота',
-// // 
-// // short day names,
-'Sun'=>'ВСК',
-'Mon'=>'ПНД',
-'Tue'=>'ВТР',
-'Wed'=>'СРД',
-'Thu'=>'ЧТВ',
-'Fri'=>'ПТН',
-'Sat'=>'СБТ',
-
-
-'Create Shared Calendar'=>'Создать общий календарь',
-'Don\'t link to Google Calendar'=>'T Don \ &#39;ссылка на Google Calendar',
-'Link to Google Calendar'=>'Ссылка на Google Calendar',
-'Shared Calendar:'=>'Общий календарь:',
-'These users can view {fullname}\'s calendar.'=>'Эти пользователи могут просматривать {fullname} \ &#39;ы календаря.',
-'These users can edit {fullname}\'s calendar.'=>'Эти пользователи могут редактировать {fullname} \ &#39;ы календаря.',
-'Back To User List'=>'Вернуться к Список пользователей',
-'Your actions are being synced to the Google Calendar "{calendarName}".'=>'Ваши действия синхронизируются с Google Calendar &quot; {calendarName} &quot;.',
-'Google Integration is not configured on this server.'=>'Интеграция с Google не настроен на этом сервере.',
-'Once'=>'Один раз',
-'Yearly'=>'Ежегодный',
-'Google Calendar'=>'Календарь Google',
-'Google Feed'=>'Поток Google',
-'Show Actions associated with Contacts'=>'Показать действия, связанные с контактами',
-'Show Actions associated with Accounts'=>'Показать Действия связанные с учетными записями',
-'Show Actions associated with Opportunities'=>'Показать действия, связанные с возможностями',
-'Show Actions associated with Quotes'=>'Показать действия, связанные с кавычками',
-'Show Actions associated with Products'=>'Показать Действия, связанные с продуктами',
-'Show Actions associated with Media'=>'Показать действия, связанные со средствами массовой информации',
-'Show Completed Actions'=>'Показать завершенных действий',
-'Show Emails'=>'Показать Письма',
-'Show Attachments'=>'Показать Вложения',
+<?php return array (
+  'Sync My Actions To Google Calendar' => 'Синхронизировать мои действия с календарем Google',
+  'Google Calendar Name' => 'Название календаря Google',
+  'My Calendar Permissions' => 'Доступ к моему календарю',
+  'Google Event' => 'Google событие',
+  'View Permission' => 'Просмотр права доступа',
+  'Edit Permission' => 'Изменить право доступа',
+  'Attachment' => 'Вложение',
+  'February' => 'февраль',
+  'Jan' => 'янв',
+  'Feb' => 'фев',
+  'Mar' => 'мар',
+  'Apr' => 'апр',
+  'Jun' => 'июн',
+  'Jul' => 'июл',
+  'Aug' => 'авг',
+  'Sep' => 'сен',
+  'Oct' => 'окт',
+  'Nov' => 'ноя',
+  'Dec' => 'дек',
+  'Saturday' => 'суббота',
+  'Sun' => 'ВС',
+  'Mon' => 'ПН',
+  'Tue' => 'ВТ',
+  'Wed' => 'СР',
+  'Thu' => 'ЧТ',
+  'Fri' => 'ПТ',
+  'Sat' => 'СБ',
+  'Don\'t link to Google Calendar' => 'Не связывать с календарем Google',
+  'Link to Google Calendar' => 'Связать с календарем Google',
+  'Google Integration is not configured on this server.' => 'Интеграция с Google не настроена на этом сервере.',
+  'Once' => 'Один раз',
+  'Yearly' => 'Ежегодно',
+  'Google Calendar' => 'Календарь Google',
+  'Google Feed' => 'Лента Google',
+  'Show Emails' => 'Показать электронные письма',
+  'Show Attachments' => 'Показать вложения',
+  '{calendar}' => '{calendar}',
+  'My {module} Permissions' => 'Права доступа к моему {module}',
+  'Sync My {actions} To Google Calendar' => 'Синхронизация моих {actions} с календарем Google',
+  'Create Shared {module}' => 'Создание общего {module}',
+  'User {calendars}' => 'Пользовательские {calendars}',
+  'Show {actions} associated with {contacts}' => 'Показать {actions} связанные с {contacts}',
+  'Show {actions} associated with {accounts}' => 'Показать {actions} связанные с {accounts}',
+  'Show {actions} associated with {opportunities}' => 'Показать {actions} связанные с {opportunities}',
+  'Show {actions} associated with {quotes}' => 'Показать {actions} связанные с {quotes}',
+  'Show {actions} associated with {products}' => 'Показать {actions} связанные с {products}',
+  'Show {actions} associated with {media}' => 'Показать {actions} связанные с {media}',
+  'Show Completed {actions}' => 'Показать завершенные {actions}',
+  'Group {calendars}' => '{calendars} группы',
+  'Export {calendar}' => 'Экспортировать {calendar}',
+  'link' => 'ссылка',
+  'Your {actions} are being synced to the Google Calendar "{calendarName}".' => 'Ваши {actions} синхронизируются с календарем Google {calendarName}',
+  'Don\'t Sync My {actions} To Google Calendar' => 'Не синхронизовать мои {actions} с календарем Google',
+  'Shared {module}:' => 'Общий {module}',
+  'These {users} can view {fullname}\'s {calendar}.' => 'Эти {users} могут просматривать {calendar} {fullname}',
+  'These {users} can edit {fullname}\'s {calendar}.' => 'Эти {users} могут редактировать {calendar} {fullname}',
+  'Back To {user} List' => 'Вернуться к списку {user}',
+  '{user} {calendar} Permissions' => 'Права доступа {user} к {calendar}',
+  'Are you sure you want to delete this action?' => 'Вы уверены, что хотите удалить эту задачу?',
+  'Are you sure you want to delete this {action}?' => 'Вы уверены, что хотите удалить эту {action}',
+  'Contact Event' => 'Событие контакта',
+  'Contact Action' => 'Задача контакта',
+  'These users can view your {module}.' => 'Эти пользователи могут просматривать ваш {module}',
+  'These {users} can edit your {module}.' => 'Эти {users} могут редактировать ваш {module}',
+  'My {calendar} Permissions' => 'Права доступа к моему {calendar}',
+  'Edit Calendar Event' => 'Редактировать событие календаря',
+  'Are you sure you want to delete this event?' => 'Вы уверены, что хотите удалить это событие?',
+  'View Calendar Event' => 'Просмотр календаря событий',
+  'Full Calendar' => 'Полный календарь',
+  'Show just my events' => 'Показать только мои события',
+  'Guest' => 'гость',
+  'Awaiting response' => 'В ожидании ответа',
+  'Remote Calendar Name' => 'Remote Calendar Имя',
+  'Create {calendar}' => 'Создание {calendar}',
+  'Update {calendar}' => 'Обновление {calendar}',
+  'Delete {calendar}' => 'Удалить {calendar}',
+  'Google Calendar Sync' => 'Google Calendar Sync',
+  'Select a calendar' => 'Выберите календарь',
+  'Event RSVP' => 'RSVP событий',
+  'You are RSVPing for the following event:' => 'Вы RSVPing для следующего события:',
+  'What:' => 'Какие:',
+  'When:' => 'Когда:',
+  'Please select one of the options below to confirm your status.' => 'Пожалуйста, выберите один из вариантов ниже, чтобы подтвердить свой статус.',
+  'Maybe' => 'Может быть',
 );

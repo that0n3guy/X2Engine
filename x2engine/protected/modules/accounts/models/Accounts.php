@@ -1,7 +1,8 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.models.X2Model');
 
@@ -42,204 +44,225 @@ Yii::import('application.models.X2Model');
  * @package application.modules.accounts.models
  */
 class Accounts extends X2Model {
-	/**
-	 * Returns the static model of the specified AR class.
-	 * @return Accounts the static model class
-	 */
-	public static function model($className=__CLASS__) {
-		return parent::model($className);
-	}
 
-	/**
-	 * @return string the associated database table name
-	 */
-	public function tableName() {
-		return 'x2_accounts';
-	}
+    /**
+     * Returns the static model of the specified AR class.
+     * @return Accounts the static model class
+     */
+    public static function model($className = __CLASS__) {
+        return parent::model($className);
+    }
 
-	public function behaviors() {
-		return array_merge(parent::behaviors(),array(
-			'X2LinkableBehavior'=>array(
-				'class'=>'X2LinkableBehavior',
-				'module'=>'accounts',
-				'icon'=>'accounts_icon.png',
-			),
-			'ERememberFiltersBehavior' => array(
-				'class'=>'application.components.ERememberFiltersBehavior',
-				'defaults'=>array(),
-				'defaultStickOnClear'=>false
-			),
-			'InlineEmailModelBehavior' => array(
-				'class'=>'application.components.InlineEmailModelBehavior',
-			)
-		));
-	}
+    /**
+     * @return string the associated database table name
+     */
+    public function tableName() {
+        return 'x2_accounts';
+    }
 
-	/**
-	 * Responds to {@link CModel::onBeforeValidate} event.
-	 * Fixes the revenue field before validating.
-	 *
-	 * @return boolean whether validation should be executed. Defaults to true.
-	 *//*
-	public function beforeValidate() {
-		$this->annualRevenue = Formatter::parseCurrency($this->annualRevenue,false);
-		return parent::beforeValidate();
-	}*/
+    public function behaviors() {
+        return array_merge(parent::behaviors(), array(
+            'LinkableBehavior' => array(
+                'class' => 'LinkableBehavior',
+                'module' => 'accounts',
+                'icon' => 'accounts_icon.png',
+            ),
+            'ERememberFiltersBehavior' => array(
+                'class' => 'application.components.behaviors.ERememberFiltersBehavior',
+                'defaults' => array(),
+                'defaultStickOnClear' => false
+            ),
+            'InlineEmailModelBehavior' => array(
+                'class' => 'application.components.behaviors.InlineEmailModelBehavior',
+            ),
+            'AddressBehavior' => array(
+                'class' => 'application.components.behaviors.AddressBehavior',
+            ),
+            'DuplicateBehavior' => array(
+                'class' => 'application.components.behaviors.DuplicateBehavior',
+            ),
+            'MergeableBehavior' => array(
+                'class' => 'MergeableBehavior',
+                'restrictedFields' => array (
+                    'id', 'nameId', 'dupeCheck', 
+                    // legacy field
+                    'associatedContacts'
+                )
+            ),
+        ));
+    }
 
-	public static function parseContacts($arr){
-		$str="";
-		foreach($arr as $contact){
-			$str.=$contact." ";
-		}
-		return $str;
-	}
+    public function duplicateFields() {
+        return array_merge(array(
+            'tickerSymbol',
+            'website',
+        ), parent::duplicateFields());
+    }
 
-	public static function parseContactsTwo($arr){
-		$str="";
-		foreach($arr as $id=>$contact){
-			$str.=$id." ";
-		}
-		return $str;
-	}
+    /**
+     * Responds to {@link CModel::onBeforeValidate} event.
+     * Fixes the revenue field before validating.
+     *
+     * @return boolean whether validation should be executed. Defaults to true.
+     *//*
+      public function beforeValidate() {
+      $this->annualRevenue = Formatter::parseCurrency($this->annualRevenue,false);
+      return parent::beforeValidate();
+      } */
 
-	public static function editContactArray($arr, $model) {
+    public static function parseContacts($arr) {
+        $str = "";
+        foreach ($arr as $contact) {
+            $str.=$contact . " ";
+        }
+        return $str;
+    }
 
-		$pieces=explode(" ",$model->associatedContacts);
-		unset($arr[0]);
+    public static function parseContactsTwo($arr) {
+        $str = "";
+        foreach ($arr as $id => $contact) {
+            $str.=$id . " ";
+        }
+        return $str;
+    }
 
-		foreach($pieces as $contact){
-			if(array_key_exists($contact,$arr)){
-				unset($arr[$contact]);
-			}
-		}
+    public static function editContactArray($arr, $model) {
 
-		return $arr;
-	}
+        $pieces = explode(" ", $model->associatedContacts);
+        unset($arr[0]);
 
-	public static function editUserArray($arr, $model) {
+        foreach ($pieces as $contact) {
+            if (array_key_exists($contact, $arr)) {
+                unset($arr[$contact]);
+            }
+        }
 
-		$pieces=explode(', ',$model->assignedTo);
-		unset($arr['Anyone']);
-		unset($arr['admin']);
-		foreach($pieces as $user){
-			if(array_key_exists($user,$arr)){
-				unset($arr[$user]);
-			}
-		}
-		return $arr;
-	}
+        return $arr;
+    }
 
-	public static function editUsersInverse($arr) {
+    public static function editUserArray($arr, $model) {
 
-		$data=array();
+        $pieces = explode(', ', $model->assignedTo);
+        unset($arr['Anyone']);
+        unset($arr['admin']);
+        foreach ($pieces as $user) {
+            if (array_key_exists($user, $arr)) {
+                unset($arr[$user]);
+            }
+        }
+        return $arr;
+    }
 
-		foreach($arr as $username)
-			$data[] = CActiveRecord::model('User')->findByAttributes(array('username'=>$username));
+    public static function editUsersInverse($arr) {
 
-		$temp=array();
-			foreach($data as $item){
-				if(isset($item))
-					$temp[$item->username]=$item->firstName.' '.$item->lastName;
-			}
-		return $temp;
-	}
+        $data = array();
 
-	public static function editContactsInverse($arr) {
-		$data=array();
+        foreach ($arr as $username)
+            $data[] = CActiveRecord::model('User')->findByAttributes(array('username' => $username));
 
-		foreach($arr as $id){
-			if($id!='')
-				$data[]=CActiveRecord::model('Contacts')->findByPk($id);
-		}
-		$temp=array();
+        $temp = array();
+        foreach ($data as $item) {
+            if (isset($item))
+                $temp[$item->username] = $item->firstName . ' ' . $item->lastName;
+        }
+        return $temp;
+    }
 
-		foreach($data as $item){
-			$temp[$item->id]=$item->firstName.' '.$item->lastName;
-		}
-		return $temp;
-	}
+    public static function editContactsInverse($arr) {
+        $data = array();
 
-	public static function getAvailableContacts($accountId = 0) {
+        foreach ($arr as $id) {
+            if ($id != '')
+                $data[] = CActiveRecord::model('Contacts')->findByPk($id);
+        }
+        $temp = array();
 
-		$availableContacts = array();
+        foreach ($data as $item) {
+            $temp[$item->id] = $item->firstName . ' ' . $item->lastName;
+        }
+        return $temp;
+    }
 
-		$criteria = new CDbCriteria;
-		$criteria->addCondition("accountId='$accountId'");
-		$criteria->addCondition(array("accountId=''"),'OR');
+    public static function getAvailableContacts($accountId = 0) {
 
+        $availableContacts = array();
 
-		$contactRecords = CActiveRecord::model('Contacts')->findAll($criteria);
-		foreach($contactRecords as $record)
-			$availableContacts[$record->id] = $record->name;
-
-		return $availableContacts;
-	}
+        $criteria = new CDbCriteria;
+        $criteria->addCondition("accountId='$accountId'");
+        $criteria->addCondition(array("accountId=''"), 'OR');
 
 
-	public static function getContacts($accountId) {
-		$contacts = array();
-		$contactRecords = CActiveRecord::model('Contacts')->findAllByAttributes(array('accountId'=>$accountId));
-		if(!isset($contactRecords))
-			return array();
+        $contactRecords = CActiveRecord::model('Contacts')->findAll($criteria);
+        foreach ($contactRecords as $record)
+            $availableContacts[$record->id] = $record->name;
 
-		foreach($contactRecords as $record)
-			$contacts[$record->id] = $record->name;
+        return $availableContacts;
+    }
 
-		return $contacts;
-	}
+    public static function getContacts($accountId) {
+        $contacts = array();
+        $contactRecords = CActiveRecord::model('Contacts')->findAllByAttributes(array('accountId' => $accountId));
+        if (!isset($contactRecords))
+            return array();
 
-	public static function setContacts($contactIds,$accountId) {
+        foreach ($contactRecords as $record)
+            $contacts[$record->id] = $record->name;
 
-		$account = CActiveRecord::model('Accounts')->findByPk($accountId);
+        return $contacts;
+    }
 
-		if(!isset($account))
-			return false;
+    public static function setContacts($contactIds, $accountId) {
 
-		// get all contacts currently associated
-		$oldContacts = CActiveRecord::model('Contacts')->findAllByAttributes(array('accountId'=>$accountId));
-		foreach($oldContacts as $contact) {
-			if(!in_array($contact->id,$contactIds)) {
-				$contact->accountId = 0;
-				$contact->company = '';		// dissociate if they are no longer in the list
-				$contact->save();
-			}
-		}
+        $account = CActiveRecord::model('Accounts')->findByPk($accountId);
 
-		// now set association for all contacts in the list
-		foreach($contactIds as $id) {
-			$contactRecord = CActiveRecord::model('Contacts')->findByPk($id);
-			$contactRecord->accountId = $account->id;
-			$contactRecord->company = $account->name;
-			$contactRecord->save();
-		}
-		return true;
-	}
+        if (!isset($account))
+            return false;
 
-	public function search($pageSize=null, $uniqueId=null) {
-		$criteria = new CDbCriteria;
-		return $this->searchBase($criteria, $pageSize, $uniqueId);
-	}
+        // get all contacts currently associated
+        $oldContacts = CActiveRecord::model('Contacts')->findAllByAttributes(array('accountId' => $accountId));
+        foreach ($oldContacts as $contact) {
+            if (!in_array($contact->id, $contactIds)) {
+                $contact->accountId = 0;
+                $contact->company = '';  // dissociate if they are no longer in the list
+                $contact->save();
+            }
+        }
 
-    public function searchList($id, $pageSize=null) {
-		$list = X2List::model()->findByPk($id);
+        // now set association for all contacts in the list
+        foreach ($contactIds as $id) {
+            $contactRecord = CActiveRecord::model('Contacts')->findByPk($id);
+            $contactRecord->accountId = $account->id;
+            $contactRecord->company = $account->name;
+            $contactRecord->save();
+        }
+        return true;
+    }
 
-		if(isset($list)) {
-			$search = $list->queryCriteria();
+    public function search($pageSize = null, $uniqueId = null) {
+        $criteria = new CDbCriteria;
+        return $this->searchBase($criteria, $pageSize);
+    }
 
-			$this->compareAttributes($search);
+    public function searchList($id, $pageSize = null) {
+        $list = X2List::model()->findByPk($id);
 
-			return new SmartDataProvider('Accounts',array(
-				'criteria'=>$search,
-				'sort'=>array(
-					'defaultOrder'=>'t.lastUpdated DESC'	// true = ASC
-				),
-				'pagination'=>array(
-					'pageSize'=>isset($pageSize)? $pageSize : Profile::getResultsPerPage(),
-				),
-			));
+        if (isset($list)) {
+            $search = $list->queryCriteria();
 
-		} else {	//if list is not working, return all contacts
-			return $this->searchBase();
-		}
-	}
+            $this->compareAttributes($search);
+
+            return new SmartActiveDataProvider('Accounts', array(
+                'criteria' => $search,
+                'sort' => array(
+                    'defaultOrder' => 't.lastUpdated DESC' // true = ASC
+                ),
+                'pagination' => array(
+                    'pageSize' => isset($pageSize) ? $pageSize : Profile::getResultsPerPage(),
+                ),
+            ));
+        } else { //if list is not working, return all contacts
+            return $this->searchBase();
+        }
+    }
+
 }

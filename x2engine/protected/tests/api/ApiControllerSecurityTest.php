@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.modules.users.models.User');
 
@@ -120,7 +121,10 @@ class ApiControllerSecurityTest extends CURLDbTestCase {
 
 		// Test access permissions:
 		$origUrlFormat = $this->_urlFormat;
-		$param = array();
+		$param = $this->param;
+		$user->userKey = $param['userKey'];
+		$user->save();
+
 		$this->_urlFormat = 'api/checkPermissions/action/{action}/username/{username}/api/1';
 		$urlParam['{username}'] = 'testuser';
 
@@ -133,10 +137,12 @@ class ApiControllerSecurityTest extends CURLDbTestCase {
 				$ch = $this->getCurlHandle($urlParam,$param);
 				$apiAccess = curl_exec($ch) == 'true';
 				$access = false;
-				foreach ($roles as $role) {
-					$access = $access || $auth->checkAccess($urlParam['{action}'], $role->roleId);
-				}
-				$this->assertEquals($access,$apiAccess,'Failed asserting consistency between API-reported permissions and internal app permissions.');
+                $access = $auth->checkAccess($urlParam['{action}'], $user->id);
+                X2_TEST_DEBUG_LEVEL > 1 && println ('Action:');
+                X2_TEST_DEBUG_LEVEL > 1 && print_r ($urlParam);
+                X2_TEST_DEBUG_LEVEL > 1 && println ((int) $access);
+                X2_TEST_DEBUG_LEVEL > 1 && println ((int) $apiAccess);
+				$this->assertEquals((int) $access, (int) $apiAccess,'Failed asserting consistency between API-reported permissions and internal app permissions.');
 			}
 		}
 		$this->_urlFormat = $origUrlFormat;
@@ -157,7 +163,10 @@ class ApiControllerSecurityTest extends CURLDbTestCase {
 		$ch = $this->getCurlHandle($urlParam,$this->param);
 		$response = curl_exec($ch);
 //		file_put_contents('api_response.html',$response);
-		$this->assertEquals(501, curl_getinfo($ch,CURLINFO_HTTP_CODE));
+        $this->assertTrue(
+            501 == curl_getinfo($ch,CURLINFO_HTTP_CODE) ||
+            preg_match ('/open_basedir restriction in effect/', $response)); 
+
 		
 		// Model class exists but isn't a child of X2Model
 		$urlParam['{model}'] = 'Admin'; // Nobody should be able to change this!

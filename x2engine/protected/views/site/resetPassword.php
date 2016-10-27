@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,20 +34,31 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+if (!Yii::app()->params->isMobileApp) {
+    LoginThemeHelper::init();
+}
+
 ?>
 
 <div id="password-reset-form-outer">
     <div class="container" id="login-page">
-        <div id="login-box">
+        <div id="login-box" class='login-box'>
             <div id='login-title-container'>
-                <h1 id='app-title'>
+                <h1 id='app-title' class='app-title'>
                     <?php echo $title; ?>
                 </h1>
-                <p><?php echo $message; ?></p>
+                <p class='message'><?php echo $message; ?></p>
             </div>
-            <?php if($scenario != 'message') { ?>
-            <?php echo CHtml::beginForm(); ?>
+            <?php 
+            if($scenario != 'message') { 
+                if (Yii::app()->params->isMobileApp) {
+                    $this->beginWidget ('application.modules.mobile.components.MobileActiveForm');
+                } else {
+                    $this->beginWidget ('CActiveForm');
+                }
+            ?>
             <div class="form" id="login-form">
                 <div class="row">
                     <?php if($scenario=='new') {
@@ -61,23 +73,21 @@
                     }
                     echo CHtml::submitButton(Yii::t('app','Submit'),
                             array(
-                                'class'=>'x2-button x2-blue',
+                                'class'=>'x2-button x2-blue no-css-override',
                                 'style'=>'color:white; margin: 0 auto;'));
                     ?>
                 </div>
             </div><!-- #login-form -->
-            <?php echo CHtml::endForm(); ?>
-            <?php } else {
-                echo '<hr />'.CHtml::link(Yii::t('app','Sign In'),
-                                        array('/site/login'),
-                                        array(
-                                            'class'=>'x2-button x2-blue',
-                                            'style'=>'color:white;'
-                                        )
-                                        );
+            <?php 
+            $this->endWidget ();
+            } else {
+                echo '<hr />'.CHtml::link(Yii::t('app','Sign in'),
+                    $this->createAbsoluteUrl ($loginRoute),
+                    array(
+                        'class'=>'x2-button x2-blue sign-in-button-small',
+                        'style'=>'color:white;'
+                    ));
             } ?>
         </div><!-- #login-box -->
     </div><!-- #login-page -->
 </div><!-- #password-reset-form-outer -->
-<div id="racing-stripe">
-</div>

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,21 +33,25 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 ?>
 <div class='stage-member-container stage-member-id-<?php echo $data['id']; 
- ?> stage-member-type-<?php echo $data['recordType']; ?>'> 
+ ?> stage-member-type-<?php echo $recordType; ?>'> 
 
 <?php
-$modelName = X2Model::getModelName ($data['recordType']);
-$recordName = $recordNames[$modelName];
+$modelName = X2Model::getModelName ($recordType);
 ?>
 
 <div class='stage-icon-container' 
- title='<?php echo Yii::t('workflow', '{recordName}', array ('{recordName}' => $recordName)); ?>'>
+ title='<?php echo Yii::t('workflow', '{recordName}', array ('{recordName}' => $modelName)); ?>'>
     <img src='<?php 
-        echo Yii::app()->theme->getBaseUrl ().'/images/workflow_stage_'.$data['recordType'].
-            '.png'; ?>' 
+  if(file_exists(substr(Yii::app()->theme->getBaseUrl() . '/images/workflow_stage_' . $recordType .'.png',1))) {
+             echo Yii::app()->theme->getBaseUrl() . '/images/workflow_stage_' . $recordType .
+             '.png';
+         } else {
+             echo Yii::app()->theme->getBaseUrl() . '/images/workflow_stage_model.png';
+         }
+         ?>' 
      class='stage-member-type-icon left' alt=''>
 </div>
 <div class='stage-member-name left'><?php 
@@ -68,17 +73,21 @@ $recordName = $recordNames[$modelName];
     <a class='stage-member-button edit-details-button right' style='display: none;'
      title='<?php echo Yii::t('app', 'View/Edit Workflow Details'); ?>'>
         <span class='x2-edit-icon'></span>
-</a>
+    </a>
 </div>
-<div class='stage-member-info'>
-<span class='stage-member-value'>
-<?php
-if (!$dummyPartial) {
-echo Yii::app()->locale->numberFormatter->formatCurrency (
-    Workflow::getProjectedValue ($data['recordType'], $data),Yii::app()->params->currency);
-}
-?>
-</span>
-</div>
-
+    <div class='stage-member-info'>
+        <?php if($workflow->financial && $workflow->financialModel === $recordType){ ?>
+        <span class='stage-member-value'>
+            <?php
+            if (!$dummyPartial && array_key_exists($workflow->financialField, $data)) {
+                echo Yii::app()->locale->numberFormatter->formatCurrency(
+                        $data[$workflow->financialField],
+                        Yii::app()->params->currency);
+            }
+            ?>
+        </span>
+        <?php } ?>
+    </div>
+    
+    
 </div>

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 
 Yii::import('application.models.*');
@@ -49,8 +50,7 @@ Yii::import('application.components.util.*');
  *
  * @package application.tests.unit.components
  */
-class RepairUserDataCommandTest extends CDbTestCase {
-
+class RepairUserDataCommandTest extends X2DbTestCase {
 
     public $fixtures = array (
         'users' => 'User',
@@ -87,6 +87,7 @@ class RepairUserDataCommandTest extends CDbTestCase {
         // reassigned but left valid complete/updatedBy fields
         $action1 = $this->actions ('action1');
         $this->assertTrue ($action1->assignedTo === 'testUser');
+        $this->assertTrue ($action1->completedBy === 'testUser2');
 
         // reassigned and updated completedBy field
         $action2 = $this->actions ('action2');
@@ -126,16 +127,15 @@ class RepairUserDataCommandTest extends CDbTestCase {
         $return_var;
         $output = array ();
         $command = Yii::app()->basePath."/yiic repairuserdata repair --username='testUser'";
-        if(VERBOSE_MODE)
-            println("Running $command...");
+        X2_TEST_DEBUG_LEVEL > 1 && println("Running $command...");
         ob_start();
-        println (exec ($command, $return_var, $output));
-        if(VERBOSE_MODE)
+        exec ($command, $return_var, $output);
+        if(X2_TEST_DEBUG_LEVEL > 1)
             ob_end_flush();
         else
             ob_end_clean();
-        VERBOSE_MODE && println ($output);
-        VERBOSE_MODE && print_r ($return_var);
+        X2_TEST_DEBUG_LEVEL > 1 && println ($output);
+        X2_TEST_DEBUG_LEVEL > 1 && print_r ($return_var);
 
         /*
         actions reassignment

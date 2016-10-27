@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 if (typeof x2 === 'undefined') x2 = {};
 if (typeof x2.gridViewStickyHeader === 'undefined') {
@@ -42,7 +43,7 @@ function GridViewStickyHeader (argsDict) {
     argsDict = typeof argsDict === 'undefined' ? {} : argsDict;
     var defaultArgs = {
         gridId: null,
-        DEBUG: false && x2.DEBUG
+        DEBUG: true && x2.DEBUG
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
 
@@ -79,6 +80,10 @@ Private static methods
 Public instance methods
 */
 
+GridViewStickyHeader.prototype.bodyContainer = function () {
+    return $('#' + this.gridId).find ('.x2grid-body-container');
+};
+
 GridViewStickyHeader.prototype.getIsStuck = function () {
     return this._isStuck;
 };
@@ -94,27 +99,30 @@ GridViewStickyHeader.prototype.makeUnstickyForMobile = function () {
 };
 
 GridViewStickyHeader.prototype.makeSticky = function () {
-    var bodyContainer = this._bodyContainer;
+    var bodyContainer = this.bodyContainer ();
     var $titleBar =
         $('#x2-gridview-top-bar-outer').
             removeClass ('x2-gridview-fixed-top-bar-outer')
+
     $(bodyContainer).find ('table').
         removeClass ('x2-gridview-body-with-fixed-header');
+    $(bodyContainer).find ('table').addClass ('x2-gridview-body-without-fixed-header');
 
     $('.column-selector').addClass ('stuck');
-    $('#' + this.gridId + '-mass-action-buttons .more-drop-down-list').
+    $('#' + this.gridId + 'more-drop-down-list').
         addClass ('stuck');
     this._isStuck = true;
 };
 
 GridViewStickyHeader.prototype.makeUnsticky = function () {
-    var bodyContainer = this._bodyContainer;
+    var bodyContainer = this.bodyContainer ();
     var $titleBar =
         $('#x2-gridview-top-bar-outer').addClass ('x2-gridview-fixed-top-bar-outer')
     $(bodyContainer).find ('table').addClass ('x2-gridview-body-with-fixed-header');
+    $(bodyContainer).find ('table').removeClass ('x2-gridview-body-without-fixed-header');
 
     $('.column-selector').removeClass ('stuck');
-    $('#' + this.gridId + '-mass-action-buttons .more-drop-down-list').
+    $('#' + this.gridId + 'more-drop-down-list').
         removeClass ('stuck');
     this._isStuck = false;
 };
@@ -142,6 +150,15 @@ GridViewStickyHeader.prototype.checkX2GridViewHeaderSticky = function () {
         this.DEBUG && console.log ('sticky');
 
         $(titleContainer).hide ();
+        if ($('#' + this.gridId + 'more-drop-down-list').length) {
+            if ($('#' + this.gridId + 'more-drop-down-list').is (':visible')) {
+                x2.gridViewStickyHeader.listWasVisible = true;
+                $('#' + this.gridId + 'more-drop-down-list').hide ();
+            } else {
+                x2.gridViewStickyHeader.listWasVisible = false;
+            }
+        }
+        //$('#' + this.gridId + 'more-drop-down-list').hide ();
 
         /* unfix header */
         //$(bodyContainer).hide ();
@@ -198,6 +215,10 @@ GridViewStickyHeader.prototype.checkX2GridViewHeaderUnsticky = function () {
         //x2.gridviewStickyHeader.DEBUG && console.log ('unsticky');
 
         $(titleContainer).show ();
+        if (x2.gridViewStickyHeader.listWasVisible &&
+                $('#' + this.gridId + 'more-drop-down-list').length) {
+            $('#' + this.gridId + 'more-drop-down-list').show ();
+        }
 
         /*var bodyContainer = x2.gridviewStickyHeader.bodyContainer;
         x2.gridviewStickyHeader.isStuck = false;*/

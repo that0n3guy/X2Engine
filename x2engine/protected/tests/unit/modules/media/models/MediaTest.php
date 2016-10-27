@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.components.util.FileUtil');
 Yii::import('application.modules.media.models.Media');
@@ -43,93 +44,106 @@ Yii::import('application.modules.media.models.Media');
  * @package application.tests.unit.modules.media.models
  */
 class MediaTest extends X2DbTestCase {
-	
-	public static function referenceFixtures(){
-		return array(
-			'media' => 'Media'
-		);
-	}
-	
-	public function getRootPath() {
-		return realpath(Yii::app()->basePath.DIRECTORY_SEPARATOR.'..');
-	}
-	
-	public function testFilesystem() {
-		$image = $this->media('bg');
-		$this->assertNotEquals(null,$image->path,'Failed asserting valid path for media item "bg"');
-		$this->assertFileExists($image->path);
-	}
+    
+    public static function referenceFixtures(){
+        return array(
+            'media' => 'Media'
+        );
+    }
+    
+    public function getRootPath() {
+        return realpath(Yii::app()->basePath.DIRECTORY_SEPARATOR.'..');
+    }
+    
+    public function testFilesystem() {
+        $image = $this->media('bg');
+        $this->assertNotEquals(null,$image->path,'Failed asserting valid path for media item "bg"');
+        $this->assertFileExists($image->path);
+    }
         
-        public function testGetFilePath() {
-            $image = $this->media("bg");
-            $expected = implode(DIRECTORY_SEPARATOR, array('uploads', $image->fileName));
-            $this->assertEquals($expected, Media::getFilePath(null, $image->fileName));
-        }
+    public function testGetFilePath() {
+        $image = $this->media("bg");
+        $expected = implode(DIRECTORY_SEPARATOR, array('uploads', 'protected', $image->fileName));
+        $this->assertEquals($expected, Media::getFilePath(null, $image->fileName));
+    }
         
-        public function testFileExists() {
-            $image = $this->media("bg");
-            $this->assertTrue($image->fileExists());
-            $image = $this->media("testfile");
-            $this->assertFalse($image->fileExists());
-        }
+    public function testFileExists() {
+        $image = $this->media("bg");
+        $this->assertTrue($image->fileExists());
+        $image = $this->media("testfile");
+        $this->assertFalse($image->fileExists());
+    }
+    
+    public function testGetImage() {
+        TestingAuxLib::loadControllerMock ();
+        $image = $this->media('bg');
+        $this->assertTrue($image->fileExists());
+        $this->assertTrue($image->isImage());
+        $expected = '<img class="attachment-img" src="'.$image->getPublicUrl ().'" alt="" />';
+        $imageTag = $image->getImage();
+        $this->assertEquals($expected, $imageTag);
+        TestingAuxLib::restoreController();
+    }
         
-        public function testGetImage() {
-            $image = $this->media('bg');
-            $this->assertTrue($image->fileExists());
-            $this->assertTrue($image->isImage());
-            $expected = '<img class="attachment-img" src="'.Yii::app()->baseUrl.'/uploads/'.$image->fileName.'" alt="" />';
-            $imageTag = $image->getImage();
-            $this->assertEquals($expected, $imageTag);
-        }
-        
-        public function testGetPath() {
-            $source = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, 'tests', 'data', 'media', 'testfile.txt'));
-            $dest = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, '..', 'uploads', 'media', 'admin', 'testfile.txt'));
-            FileUtil::ccopy($source, $dest);
-            $dest = realpath($dest);
-            $testfile = $this->media("testfile");
+    public function testGetPath() {
+        $source = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, 'tests', 'data', 'media', 'testfile.txt'));
+        $dest = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, '..', 'uploads', 'protected', 'media', 'admin', 'testfile.txt'));
+        FileUtil::ccopy($source, $dest);
+        $dest = realpath($dest);
+        $testfile = $this->media("testfile");
 
-            $this->assertEquals($dest, $testfile->getPath());
-            
-            unlink($dest);
-        }
-	
-        public function testDeleteUpload() {
-            $source = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, 'tests', 'data', 'media', 'testfile.txt'));
-            $dest = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, '..', 'uploads', 'media', 'admin', 'testfile.txt'));
-            FileUtil::ccopy($source, $dest);
-            $dest = realpath($dest);
-            $testfile = $this->media("testfile");
-            
-            $this->assertFileExists($dest);
-            $testfile->delete();
-            $this->assertFileNotExists($dest);
-        }
+        $this->assertEquals($dest, $testfile->getPath());
+
+        unlink($dest);
+    }
+
+    public function testDeleteUpload() {
+        $source = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, 'tests', 'data', 'media', 'testfile.txt'));
+        $dest = implode(DIRECTORY_SEPARATOR, array(Yii::app()->basePath, '..', 'uploads', 'protected', 'media', 'admin', 'testfile.txt'));
+        FileUtil::ccopy($source, $dest);
+        $dest = realpath($dest);
+        $testfile = $this->media("testfile");
+
+        $this->assertFileExists($dest);
+        $testfile->delete();
+        $this->assertFileNotExists($dest);
+    }
         
-	public function testResolveMimetype() {
-		$image = $this->media('bg');
-		$mt = $image->resolveType();
-		$this->assertStringStartsWith('image/', $mt);
-		$this->assertStringStartsWith('image/',Yii::app()->db->createCommand()->select('mimetype')->from('x2_media')->where("id=:id",array(':id'=>$image->id))->queryScalar());
-	}
-	
-	public function testResolveSize() {
-		$image = $this->media('bg');
-		$this->assertEquals(97724,$image->resolveSize());
-		$this->assertEquals(97724,Yii::app()->db->createCommand()->select('filesize')->from('x2_media')->where("id=:id",array(':id'=>$image->id))->queryScalar());
-	}
-	
-	public function testResolveDimensions() {
-		$this->assertEquals(1,extension_loaded('gd'));
-		$image = $this->media('bg');
-		$this->assertEquals(array('height'=>682,'width'=>1024),CJSON::decode($image->resolveDimensions()));
-		$this->assertEquals(array('height'=>682,'width'=>1024),CJSON::decode(Yii::app()->db->createCommand()->select('dimensions')->from('x2_media')->where("id=:id",array(':id'=>$image->id))->queryScalar()));
-	}
+    public function testResolveMimetype() {
+        $image = $this->media('bg');
+        $image->refresh (); 
+        $mt = $image->resolveType();
+        $this->assertStringStartsWith('image/', $mt);
+        $image->refresh (); 
+        $mimetype = $image->mimetype;
+        $this->assertStringStartsWith('image/',$mimetype);
+    }  
+    
+    public function testResolveSize() {
+        $image = $this->media('bg');
+        $this->assertEquals(97724,$image->resolveSize());
+        $this->assertEquals(97724,Yii::app()->db->createCommand()->select('filesize')->from('x2_media')->where("id=:id",array(':id'=>$image->id))->queryScalar());
+    }
+
+    public function testResolveDimensions() {
+        $this->assertEquals(1,extension_loaded('gd'));
+        $image = $this->media('bg');
+        $this->assertEquals(array('height'=>682,'width'=>1024),CJSON::decode($image->resolveDimensions()));
+        $this->assertEquals(
+            array('height'=>682,'width'=>1024),
+            CJSON::decode(
+                Yii::app()->db->createCommand()
+                    ->select('dimensions')
+                    ->from('x2_media')
+                    ->where("id=:id",array(':id'=>$image->id))
+                    ->queryScalar()
+                ));
+    }
         
-        public function testGetFmtDimensions() {
-            $image = $this->media('bg');
-            $this->assertEquals('1024 x 682', $image->getFmtDimensions());
-        }
+    public function testGetFmtDimensions() {
+        $image = $this->media('bg');
+        $this->assertEquals('1024 x 682', $image->getFmtDimensions());
+    }
 
         public function testToBytes() {
             $fn = TestingAuxLib::setPublic('Media', 'toBytes');
@@ -142,7 +156,7 @@ class MediaTest extends X2DbTestCase {
                 666 => 666,
             );
             foreach ($testSizes as $readable => $bytes) {
-                $this->assertEquals($bytes, $fn (array($readable)));
+                $this->assertEquals($bytes, $fn ($readable));
             }
         }
 }

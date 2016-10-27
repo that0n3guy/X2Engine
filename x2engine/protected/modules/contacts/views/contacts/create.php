@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,34 +33,26 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
-
-$menuItems = array(
-	array('label'=>Yii::t('contacts','All Contacts'),'url'=>array('index')),
-	array('label'=>Yii::t('contacts','Lists'),'url'=>array('lists')),
-	array('label'=>Yii::t('contacts','Create Contact')),
-);
+ **********************************************************************************/
 
 $opportunityModule = Modules::model()->findByAttributes(array('name'=>'opportunities'));
 $accountModule = Modules::model()->findByAttributes(array('name'=>'accounts'));
 
-if($opportunityModule->visible && $accountModule->visible)
-	$menuItems[] = 	array('label'=>Yii::t('app', 'Quick Create'), 'url'=>array('/site/createRecords', 'ret'=>'contacts'), 'linkOptions'=>array('id'=>'x2-create-multiple-records-button', 'class'=>'x2-hint', 'title'=>Yii::t('app', 'Create a Contact, Account, and Opportunity.')));
-
-$this->actionMenu = $this->formatMenu($menuItems);
+$menuOptions = array(
+    'all', 'lists', 'create',
+);
+if ($opportunityModule->visible && $accountModule->visible)
+    $menuOptions[] = 'quick';
+$this->insertMenu($menuOptions);
 
 ?>
 <div class="page-title icon contacts">
-	<h2><?php echo Yii::t('contacts','Create Contact'); ?></h2>
+	<h2><?php echo Yii::t('contacts','Create {module}', array('{module}'=>Modules::displayName(false))); ?></h2>
 </div>
 <?php 
 
-echo $this->renderPartial(
-    'application.components.views._form', 
-    array(
-        'model'=>$model,
-        'users'=>$users,
-        'modelName'=>'contacts',
+    $this->widget ('FormView', array(
+        'model' => $model,
         'defaultsByRelatedModelType' => array (
             'Accounts' => array (
                 'phone' => 'js: $("div.formInputBox #Contacts_phone").val();',
@@ -67,7 +60,22 @@ echo $this->renderPartial(
                 'assignedTo' => 'js: $("#Contacts_assignedTo_assignedToDropdown").val();'
             )
         )
-    )); 
+    ));
+
+// echo $this->renderPartial(
+//    'application.components.views.@FORMVIEW', 
+//     array(
+//         'model'=>$model,
+//         'users'=>$users,
+//         'modelName'=>'contacts',
+//         'defaultsByRelatedModelType' => array (
+//             'Accounts' => array (
+//                 'phone' => 'js: $("div.formInputBox #Contacts_phone").val();',
+//                 'website' => 'js: $("div.formInputBox #Contacts_website").val();',
+//                 'assignedTo' => 'js: $("#Contacts_assignedTo_assignedToDropdown").val();'
+//             )
+//         )
+//     )); 
 
 if(isset($_POST['x2ajax'])) {
     echo "<script>\n";

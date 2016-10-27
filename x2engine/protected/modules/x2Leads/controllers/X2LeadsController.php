@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * @package application.modules.x2Leads.controllers
@@ -64,6 +65,14 @@ class X2LeadsController extends x2base {
 
     public function behaviors(){
         return array_merge(parent::behaviors(), array(
+            'MobileControllerBehavior' => array(
+                'class' => 
+                    'application.modules.mobile.components.behaviors.MobileControllerBehavior'
+            ),
+            'MobileActionHistoryBehavior' => array(
+                'class' => 
+                    'application.modules.mobile.components.behaviors.MobileActionHistoryBehavior'
+            ),
             'QuickCreateRelationshipBehavior' => array(
                 'class' => 'QuickCreateRelationshipBehavior',
                 'attributesOfNewRecordToUpdate' => array (
@@ -75,19 +84,9 @@ class X2LeadsController extends x2base {
         ));
     }
 
-    public function actions() {
-        return array_merge(parent::actions(), array(
-        ));
-    }
 
-    public function actionGetItems(){
-        $sql = 'SELECT id, name as value FROM x2_x2leads WHERE name LIKE :qterm ORDER BY name ASC';
-        $command = Yii::app()->db->createCommand($sql);
-        $qterm = $_GET['term'].'%';
-        $command->bindParam(":qterm", $qterm, PDO::PARAM_STR);
-        $result = $command->queryAll();
-        echo CJSON::encode($result);
-        Yii::app()->end();
+    public function actionGetItems($term){
+        LinkableBehavior::getItems ($term);
     }
 
     /**
@@ -103,12 +102,7 @@ class X2LeadsController extends x2base {
             // add opportunity to user's recent item list
             User::addRecentItem('l', $id, Yii::app()->user->getId()); 
 
-            parent::view($model, $type, array (
-                'conversionIncompatibilityWarnings' => 
-                    $model->getConversionIncompatibilityWarnings (),
-                'opportunity' => 
-                    $opportunity,
-            ));
+            parent::view($model, $type);
         }else{
             $this->redirect('index');
         }
@@ -166,9 +160,8 @@ class X2LeadsController extends x2base {
             if(!empty($model->associatedContacts))
                 $model->associatedContacts=implode(', ',$model->associatedContacts);
 
-            // $this->update($model,$temp);
-            $model->save();
-            $this->redirect(array('view','id'=>$model->id));
+            if ($model->save())
+                $this->redirect(array('view','id'=>$model->id));
         }
         /* Set assignedTo back into an array only before re-rendering the input box with assignees 
            selected */
@@ -233,18 +226,116 @@ class X2LeadsController extends x2base {
     }
 
     /**
-     * Converts a lead to an opportunity 
-     * @param int $id id of the lead
-     * @param bool $force If true, lead conversion will be attempted even if there are compatibility
-     *  issues.
+     * Create a menu for Leads
+     * @param array Menu options to remove
+     * @param X2Model Model object passed to the view
+     * @param array Additional menu parameters
      */
-    public function actionConvertLead ($id, $force=false) {
-        $model = $this->loadModel ($id);
-        $newOpportunity = $model->convertToOpportunity ($force);
-        if ($newOpportunity instanceof Opportunity && !$newOpportunity->hasErrors ()) {
-            $this->redirect($this->createUrl (
-                    '/opportunities/opportunities/view', array ('id' => $newOpportunity->id)));
-        }
-        $this->actionView ($id, $newOpportunity);
+    public function insertMenu($selectOptions = array(), $model = null, $menuParams = null) {
+        $Leads = Modules::displayName();
+        $Lead = Modules::displayName(false);
+        $modelId = isset($model) ? $model->id : 0;
+
+        /**
+         * To show all options:
+         * $menuOptions = array(
+         *     'index', 'create', 'view', 'edit', 'delete', 'attach', 'quotes',
+         *     'convert', 'print', 'import', 'export',
+         * );
+         */
+
+        $menuItems = array(
+            array(
+                'name'=>'index',
+                'label'=>Yii::t('x2Leads','{leads} List', array(
+                    '{leads}' => $Leads,
+                )),
+                'url'=>array('index')
+            ),
+            array(
+                'name'=>'create',
+                'label'=>Yii::t('x2Leads','Create {lead}', array(
+                    '{lead}' => $Lead,
+                )),
+                'url'=>array('create')
+            ),
+            RecordViewLayoutManager::getViewActionMenuListItem ($modelId),
+            array(
+                'name'=>'edit',
+                'label'=>Yii::t('x2Leads','Edit {lead}', array(
+                    '{lead}' => $Lead,
+                )),
+                'url'=>array('update', 'id'=>$modelId)
+            ),
+            array(
+                'name'=>'delete',
+                'label'=>Yii::t('x2Leads','Delete {lead}', array(
+                    '{lead}' => $Lead,
+                )),
+                'url'=>'#',
+                'linkOptions'=>array(
+                    'submit'=>array('delete','id'=>$modelId),
+                    'confirm'=>'Are you sure you want to delete this item?')
+            ),
+            ModelFileUploader::menuLink(),
+            array(
+                'name'=>'quotes',
+                'label' => Yii::t('quotes', 'Quotes/Invoices'),
+                'url' => 'javascript:void(0)',
+                'linkOptions' => array(
+                    'onclick' => 'x2.inlineQuotes.toggle(); return false;')
+            ),
+            array(
+                'name'=>'convertToContact',
+                'label' => Yii::t('x2Leads', 'Convert to {contact}', array(
+                    '{contact}' => Modules::displayName(false, "Contacts"),
+                )),
+                'url' => '#',
+                'linkOptions' => array ('id' => 'convert-lead-to-contact-button'),
+            ),
+            array(
+                'name'=>'convert',
+                'label' => Yii::t('x2Leads', 'Convert to {opportunity}', array(
+                    '{opportunity}' => Modules::displayName(false, "Opportunities"),
+                )),
+                'url' => '#',
+                'linkOptions' => array ('id' => 'convert-lead-button'),
+            ),
+            array(
+                'name'=>'print',
+                'label' => Yii::t('app', 'Print Record'),
+                'url' => '#',
+                'linkOptions' => array (
+                    'onClick'=>"window.open('".
+                        Yii::app()->createUrl('/site/printRecord', array (
+                            'modelClass' => 'X2Leads',
+                            'id' => $modelId,
+                            'pageTitle' => Yii::t('app', 'Leads').': '.(isset($model) ?
+                                $model->name : "")
+                        ))."');"
+	            )
+            ),
+            array(
+                'name'=>'import',
+                'label'=>Yii::t('x2Leads', 'Import {leads}', array(
+                    '{leads}' => $Leads,
+                )),
+                'url'=>array('admin/importModels', 'model'=>'X2Leads'),
+                'visible'=>Yii::app()->params->isAdmin
+            ),
+            array(
+                'name'=>'export',
+                'label'=>Yii::t('x2Leads', 'Export {leads}', array(
+                    '{leads}' => $Leads,
+                )),
+                'url'=>array('admin/exportModels', 'model'=>'X2Leads'),
+                'visible'=>Yii::app()->params->isAdmin
+            ),
+            RecordViewLayoutManager::getEditLayoutActionMenuListItem (),
+        );
+
+        $this->prepareMenu($menuItems, $selectOptions);
+        $this->actionMenu = $this->formatMenu($menuItems, $menuParams);
     }
+
 }

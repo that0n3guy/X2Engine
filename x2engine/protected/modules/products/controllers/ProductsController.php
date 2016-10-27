@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * @package application.modules.products.controllers 
@@ -58,30 +59,34 @@ class ProductsController extends x2base {
 
     public function behaviors(){
         return array_merge(parent::behaviors(), array(
+            'MobileControllerBehavior' => array(
+                'class' => 
+                    'application.modules.mobile.components.behaviors.MobileControllerBehavior'
+            ),
+            'MobileActionHistoryBehavior' => array(
+                'class' => 
+                    'application.modules.mobile.components.behaviors.MobileActionHistoryBehavior'
+            ),
             'QuickCreateRelationshipBehavior' => array(
                 'class' => 'QuickCreateRelationshipBehavior',
             ),
         ));
     }
 
-    public function actionGetItems(){
-        $sql = 'SELECT id, name as value FROM x2_products WHERE name LIKE :qterm ORDER BY name ASC';
-        $command = Yii::app()->db->createCommand($sql);
-        $qterm = $_GET['term'].'%';
-        $command->bindParam(":qterm", $qterm, PDO::PARAM_STR);
-        $result = $command->queryAll();
-        echo CJSON::encode($result); exit;
+    public function actionGetItems($term){
+        LinkableBehavior::getItems ($term);
     }
     /**
      * Displays a particular model.
      * @param integer $id the ID of the model to be displayed
      */
     public function actionView($id) {
+        $model = $this->loadModel($id);
+        if (!$this->checkPermissions($model, 'view')) $this->denied ();
 
         // add product to user's recent item list
         User::addRecentItem('r', $id, Yii::app()->user->getId()); 
 
-        $model = $this->loadModel($id);
         parent::view($model);
     }
 
@@ -152,11 +157,11 @@ class ProductsController extends x2base {
             $action->visibility = 1;
             $action->complete='Yes';
         
-            $action->actionDescription = "Update: <b>{$model->name}</b>
-            Type: <b>{$model->type}</b>
-            Price: <b>{$model->price}</b>
-            Currency: <b>{$model->currency}</b>
-            Inventory: <b>{$model->inventory}</b>";
+            $action->actionDescription = "Update: {$model->name}
+            Type: {$model->type}
+            Price: {$model->price}
+            Currency: {$model->currency}
+            Inventory: {$model->inventory}";
             $action->save();         
             parent::update($model,$temp,'0');
         }
@@ -204,4 +209,103 @@ class ProductsController extends x2base {
             Yii::app()->end();
         }
     }
+
+    /**
+     * Retrieve items for combo box
+     * @param string $prefix parameter to getItems2
+     * @param int $page parameter to getItems2
+     */
+    public function actionGetItems2 () {
+        $prefix = isset ($_POST['prefix']) ? $_POST['prefix'] : '';
+        $page = isset ($_POST['page']) ? $_POST['page'] : 0;
+        $pageSize = isset ($_POST['pageSize']) ? $_POST['pageSize'] : 20;
+
+        $items = X2Model::model ($this->modelClass)->getItems2 (
+            $prefix, $page, $pageSize, array ('id', 'description', 'price'), 'name');
+        echo CJSON::encode ($items);
+    }
+
+    /**
+     * Create a menu for Products
+     * @param array Menu options to remove
+     * @param X2Model Model object passed to the view
+     * @param array Additional menu parameters
+     */
+    public function insertMenu($selectOptions = array(), $model = null, $menuParams = null) {
+        $Products = Modules::displayName();
+        $Product = Modules::displayName(false);
+        $modelId = isset($model) ? $model->id : 0;
+
+        /**
+         * To show all options:
+         * $menuOptions = array(
+         *     'index', 'create', 'view', 'edit', 'delete', 'print', 'import', 'export',
+         * );
+         */
+
+        $menuItems = array(
+            array(
+                'name'=>'index',
+                'label'=>Yii::t('products','{module} List', array(
+                    '{module}'=>$Product,
+                )),
+                'url'=>array('index')
+            ),
+            array(
+                'name'=>'create',
+                'label'=>Yii::t('products','Create'),
+                'url'=>array('create')
+            ),
+            RecordViewLayoutManager::getViewActionMenuListItem ($modelId),
+            array(
+                'name'=>'edit',
+                'label'=>Yii::t('products','Update'),
+                'url'=>array('update', 'id'=>$modelId)
+            ),
+            array(
+                'name'=>'delete',
+                'label'=>Yii::t('products','Delete'),
+                'url'=>'#',
+                'linkOptions'=>array(
+                    'submit'=>array('delete','id'=>$modelId),
+                    'confirm'=>Yii::t('app','Are you sure you want to delete this item?')
+                )
+            ),
+            array(
+                'name' => 'print',
+                'label' => Yii::t('app', 'Print Record'),
+                'url' => '#',
+                'linkOptions' => array (
+                    'onClick'=>"window.open('".
+                        Yii::app()->createUrl('/site/printRecord', array (
+                            'modelClass' => 'Product',
+                            'id' => $modelId,
+                            'pageTitle' => Yii::t('app', '{module}', array(
+                                '{module}' => $Product,
+                            )).': '.(isset($model) ? $model->name : "")
+			        ))."');"
+	            ),
+            ),
+            array(
+                'name'=>'import',
+                'label'=>Yii::t('products', 'Import {module}', array(
+                    '{module}' => $Products,
+                )),
+                'url'=>array('admin/importModels', 'model'=>'Product'),
+            ),
+            array(
+                'name'=>'export',
+                'label'=>Yii::t('products', 'Export {module}',  array(
+                    '{module}' => $Products,
+                )),
+                 'url'=>array('admin/exportModels', 'model'=>'Product'),
+            ),
+            RecordViewLayoutManager::getEditLayoutActionMenuListItem (),
+        );
+
+        $this->prepareMenu($menuItems, $selectOptions);
+        $this->actionMenu = $this->formatMenu($menuItems, $menuParams);
+    }
+
+
 }

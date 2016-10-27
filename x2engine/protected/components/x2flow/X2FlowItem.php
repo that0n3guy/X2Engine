@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,12 +33,14 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * @package application.components.x2flow
  */
 abstract class X2FlowItem extends CComponent {
+
+    const VALIDATION_WARNING = 2;
 
     /**
      * "Cache" of instantiated triggers, for reference purposes
@@ -48,34 +51,39 @@ abstract class X2FlowItem extends CComponent {
      * $var string the text label for this action
      */
     public $label = '';
+
     /**
      * $var string the description of this action
      */
     public $info = '';
+
     /**
      * $var array the config parameters for this action
      */
     public $config = '';
+
     /**
-     * $var bool Distinguishes whether cron is required for running the action properly.
+     * $var bool distinguishes whether cron is required for running the action properly
      */
     public $requiresCron = false;
+
     /**
      * @return array the param rules.
      */
     abstract public function paramRules();
+
     /**
      * Checks if all all the params are ship-shape
      */
-    abstract public function validate(&$params=array(), $flowId);
+    abstract public function validate(&$params=array(), $flowId=null);
 
     /**
      * Checks if all the config variables and runtime params are ship-shape
      * Ignores param requirements if $params isn't provided
+     * @param bool $staticValidation If true, validation will include checks for warnings
      */
-    public function validateOptions(&$paramRules,&$params=null) {
+    public function validateOptions(&$paramRules,$params=null,$staticValidation=false) {
         $configOptions = &$this->config['options'];
-        // die(var_dump($configOptions));
 
         // loop through options defined in paramRules() and make sure they're all set in $config
         foreach($paramRules['options'] as &$optRule) {    
@@ -85,7 +93,11 @@ abstract class X2FlowItem extends CComponent {
 
             // each option must be present in $this->config and $params
             if(!isset($configOptions[$optName])) {  
-                continue;                            // but just ignore them for future proofing
+                if (isset ($optRule['defaultVal'])) {
+                    $configOptions[$optName] = array ();
+                } else {
+                    continue; // but just ignore them for future proofing
+                }
             }
             // if params are provided, check them for this option name
             // if($params !== null && !isset($params[$optName]))    
@@ -98,39 +110,98 @@ abstract class X2FlowItem extends CComponent {
             // treat each option like a condition and compare it to the param.
 
             $option = &$configOptions[$optName];
+
             // set optional flag
             $option['optional'] = isset($optRule['optional']) && $optRule['optional'];
+            $option['comparison'] = isset($optRule['comparison']) ? $optRule['comparison'] : true;
+
             // operator defaults to "=" if not set
-            $option['operator'] = isset($option['operator'])? $option['operator'] : '=';
+            $option['operator'] = isset($option['operator']) ? $option['operator'] : '=';
+
             // if there's a type setting, set that in the config data
             if(isset($optRule['type']))
                 $option['type'] = $optRule['type'];
+
             // if there's an operator setting, it must be valid
-            if(isset($optRule['operator']) && 
-               !in_array($optRule['operators'],$configOptions['operator'])) {
+            if(isset($optRule['operators']) &&
+               !in_array($option['operator'], $optRule['operators'])) {
 
                 return array (
                     false,
-                    Yii::t('studio', 'Flow item validation error'));
+                    Yii::t('studio', 'Flow item validation error: Invalid operator'));
             }
-
+            
             // value must not be empty, unless it's an optional setting
             if(!isset($option['value']) || $option['value'] === null || $option['value'] === '') {
-                if(isset($optRule['defaultVal'])) {        // try to use the default value
-                    $option[$optName] = $optRule['defaultVal'];
+                if(isset($optRule['defaultVal'])) { 
+
+                    // use the default value 
+                    $option['value'] = $optRule['defaultVal'];
                 } elseif(!$option['optional']) {
+
                     // if not, fail if it was required
-                    if (YII_DEBUG)
-                        return array ( false,
+                    if (YII_DEBUG) {
+                        return array (
+                            false,
                             Yii::t('studio', 
                                 'Required flow item input missing: {optName} was left blank.',
                                 array ('{optName}' => $optName)));
-                    else
+                    } else {
                         return array (
                             false,
                             Yii::t('studio', 'Required flow item input missing'));
+                    }
                 }
             }
+            
+            if (isset ($option['type']) && isset ($option['value'])) {
+                switch ($option['type']) {
+                    case 'dropdown':
+                        list ($success, $message) = $this->validateDropdown ($option, $optRule);
+                        if (!$success) return array (false, $message);
+                        break;
+                    case 'email':
+                        list ($success, $message) = $this->validateEmail ($option, $optRule);
+                        if (!$success) return array (false, $message);
+                        break;
+                }
+            }
+        }
+
+        return array (true, '');
+    }
+
+    public function validateEmail ($option, $optRule) {
+        if (isset ($option['value']) && 
+            !Formatter::isFormula ($option['value']) &&
+            !Formatter::isShortcode ($option['value'])) {
+            try {
+                EmailDeliveryBehavior::addressHeaderToArray ($option['value']);
+            } catch (CException $e) {
+                return array (false, $e->getMessage ());
+            }
+        }
+        return array (true, '');
+    }
+
+    public function validateDropdown (&$option, $optRule) {
+        $name = $optRule['name'];
+        if (!((isset ($option['operator']) && 
+               in_array ($option['operator'], array ('list', 'notList', 'between'))) || 
+              (isset ($optRule['multiple']) && $optRule['multiple'])) && 
+             is_array ($option['value'])) {
+
+            if (count ($option['value']) === 1 &&
+                isset ($option['value'][0])) { // repair value if possible
+
+                $option['value'] = $option['value'][0];
+                return array (true, '');
+            }
+
+            return array (false, Yii::t('studio', 'Invalid option value for {optionName}. '.
+                'Multiple values specified but only one is allowed.', array (
+                    '{optionName}' => $name,
+                )));
         }
         return array (true, '');
     }

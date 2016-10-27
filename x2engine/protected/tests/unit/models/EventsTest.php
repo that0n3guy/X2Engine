@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,8 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
 Yii::import('application.models.*');
 
 /**
@@ -43,7 +45,11 @@ Yii::import('application.models.*');
 class EventsTest extends X2DbTestCase {
     
     public $fixtures=array(
-        'event'=>'Events',
+        'event'=> array ('Events', '.GetEvents'),
+        'modules'=>'Modules',
+        'users'=>'User',
+        'groups'=>'Groups',
+        'group_to_user'=>'GroupToUser',
     );
 
     public static function referenceFixtures(){
@@ -52,118 +58,322 @@ class EventsTest extends X2DbTestCase {
         );
     }
 
-    public function testGetFilteredEventsDataProvider () {
-        return;
-        /*$isMyProfile = false;
-        $profile = Profile::model()->findByAttributes(array('username' => 'testuser'));
-        extract (Events::getFilteredEventsDataProvider (
-            $profile, $isMyProfile, null, false));
-        $data = $dataProvider->getData ();
-        print (count ($data));*/
+    public function tearDown () {
+        Yii::app()->settings->historyPrivacy = null;
+        return parent::tearDown ();
     }
 
-    /**
-     * @todo Refactor Events::getEventsProfile so it uses the substitute user
-     *  instead of the web user, and find a way to not have to uncomment the
-     *  lines in the fixture file to get the necessary data
-     */
-    public function testGetEventsProfile(){
-        $this->markTestIncomplete();
-        //return; // comment this and uncomment records in events fixture to test
+    public function testGetFilteredEventsDataProvider () {
+        /*
+         * This test is marked as skipped until it can be refactored. The test 
+         * assumes that Events::getEvents and Events::getFilteredEventsDataProvider
+         * return the same data, which may be true in some circumstances but depends
+         * on the parameters passed to getEvents, which are currently incorrect. 
+         */
+        $this->markTestIncomplete('Test requires refactor');
+        TestingAuxLib::loadX2NonWebUser ();
+        $testUser = $this->users ('testUser');
+        TestingAuxLib::suLogin ($testUser->username);
+        Yii::app()->settings->historyPrivacy = null;
+        $profile = Profile::model()->findByAttributes(array('username' => $testUser->username));
+        $retVal = Events::getFilteredEventsDataProvider ($profile, true, null, false);
+        $dataProvider = $retVal['dataProvider'];
+        $events = $dataProvider->getData ();
+        $expectedEvents = Events::getEvents (0, 0, count ($events), $profile);
+        
+        // I'm not sure this assert is necessary, at the very least it needs
+        // more thorough conditions
+        // verify events from getData
+        $this->assertEquals (
+            Yii::app()->db->createCommand ("
+                select id
+                from x2_events
+                where user='testuser' or visibility or (
+                    associationType='User' and associationId=:userId)
+                order by timestamp desc, id desc
+            ")->queryColumn (array (':userId' => $testUser->id)),
+            array_map (
+                function ($event) { return $event->id; }, 
+                $expectedEvents['events']
+            )
+        );
+
+        // ensure that getFilteredEventsDataProvider returns same events as getData
+        $this->assertEquals (
+            array_map (
+                function ($event) { return $event->id; }, 
+                $expectedEvents['events']
+            ),
+            array_map (
+                function ($event) { return $event->id; }, 
+                $events
+            )
+        );
+    }
+
+    public function testGetEventsPublicProfile(){
+        /*
+         * This test is currently run with some faulty assumptions and is
+         * marked to skip until a refactor can happen. Events::getEvents has far
+         * more conditions applied to it than the findAllByAttributes it's being
+         * compared against and so it is possible for them to not match up
+         */
+        $this->markTestIncomplete('Test requires refactor');
+        TestingAuxLib::loadX2NonWebUser ();
+        TestingAuxLib::suLogin ('testuser');
+
+        Yii::app()->settings->historyPrivacy = null;
         $lastEventId=0;
         $lastTimestamp=0;
-        $profile = Profile::model()->findByAttributes(array('username' => 'testuser'));
-        $myProfile = Profile::model()->findByAttributes(array('username' => 'admin'));
-
+        $myProfile = Profile::model()->findByAttributes(array('username' => 'testuser2'));
         $events=Events::getEvents(
-            $lastEventId,$lastTimestamp,'admin',null,null,$myProfile,$profile);
-        $this->assertCount(3, $events['events']);
+            $lastEventId,$lastTimestamp,null,$myProfile, false);
+        $this->assertEquals (
+            array_map (
+                function ($event) { return $event->id; }, 
+                Events::model ()->findAllByAttributes (array (
+                    'user' => 'testuser2',
+                    'visibility' => 1 
+                ))
+            ),
+            array_map (function ($event) { return $event->id; }, $events['events']));
+
     }
     
     public function testGetEvents(){
-        $lastEventId=0;
-        $lastTimestamp=0;
-        $events=Events::getEvents($lastEventId,$lastTimestamp,'admin',1359483530);
+        TestingAuxLib::loadX2NonWebUser ();
+        TestingAuxLib::suLogin ('admin');
+
+        Yii::app()->settings->historyPrivacy = null;
+        $lastEventId = 0;
+        $lastTimestamp = 0;
+        $events = Events::getEvents ($lastEventId, $lastTimestamp, 4);
+        $this->assertEquals (
+            Yii::app()->db->createCommand (
+                "select id from x2_events order by timestamp desc, id desc limit 4")
+                ->queryColumn (),
+            array_map(function ($event) { return $event->id; }, $events['events'])
+        ); 
+    }
+
+    public function testGetAccessCriteria () {
+        TestingAuxLib::loadX2NonWebUser ();
+        TestingAuxLib::suLogin ('admin');
+
+        // admin privileges private profile
+        $accessCriteria = Events::model ()->getAccessCriteria ();
+        $this->assertEquals ('TRUE', $accessCriteria->condition);
+        $this->assertEquals (
+            array_map (function ($event) { return $event->id; }, 
+                Events::model ()->findAll ($accessCriteria)),
+            array_map (function ($event) { return $event->id; }, Events::model ()->findAll ()));
+
+        // admin privileges public profile
+        $accessCriteria = Events::model ()->getAccessCriteria (
+            Profile::model ()->findByAttributes (array (
+                'username' => 'testuser'
+            )));
+        $this->assertEquals (
+            array_map (function ($event) { return $event->id; }, 
+                Events::model ()->findAll ($accessCriteria)),
+            array_map (function ($event) { return $event->id; }, 
+            Events::model ()->findAll ('user="testuser"')));
+
+        // non-admin public profile
+        TestingAuxLib::suLogin ('testuser2');
+        Yii::app()->settings->historyPrivacy = null;
+        $accessCriteria = Events::model ()->getAccessCriteria (
+            Profile::model ()->findByAttributes (array (
+                'username' => 'testuser'
+            )));
+        $this->assertEquals (
+            array_map (function ($event) { return $event->id; }, 
+                Events::model ()->findAll ($accessCriteria)),
+            array_map (function ($event) { return $event->id; }, 
+            Events::model ()->findAll ('user="testuser" and visibility')));
+
+        // non-admin private profile
+        TestingAuxLib::suLogin ('testuser2');
+        Yii::app()->settings->historyPrivacy = null;
+        $accessCriteria = Events::model ()->getAccessCriteria ();
+        $this->assertEquals (
+            array_map (function ($event) { return $event->id; }, 
+                Events::model ()->findAll ($accessCriteria)),
+            array_map (function ($event) { return $event->id; }, 
+            Events::model ()->findAll ('
+                user="testuser2" or visibility or (associationType="User" and associationId=3)
+            ')));
+
+        // non-admin private profile, user history
+        TestingAuxLib::suLogin ('testuser2');
+        Yii::app()->settings->historyPrivacy = 'user';
+        $accessCriteria = Events::model ()->getAccessCriteria ();
+        $this->assertEquals (
+            array_map (function ($event) { return $event->id; }, 
+                Events::model ()->findAll ($accessCriteria)),
+            array_map (function ($event) { return $event->id; }, 
+            Events::model ()->findAll ('
+                user="testuser2" or (associationType="User" and associationId=3)
+            ')));
+
+        // non-admin private profile, group history
+        // assumes that testuser2 and testuser3 are groupmates
+        Yii::app()->settings->historyPrivacy = 'group';
+        $accessCriteria = Events::model ()->getAccessCriteria ();
+        $this->assertEquals (
+            array_map (function ($event) { return $event->id; }, 
+                Events::model ()->findAll ($accessCriteria)),
+            array_map (function ($event) { return $event->id; }, 
+            Events::model ()->findAll ('
+                user="testuser2" or user="testuser3" or
+                (associationType="User" and (associationId=2 or associationId=3))
+            ')));
+
+    }
+
+    /**
+     * Attempts to ensure that isVisibleTo and getAccessCriteria check the same permissions
+     */
+    public function testPermissionsCheckEquivalence () {
+        TestingAuxLib::loadX2NonWebUser ();
+        TestingAuxLib::suLogin ('testuser2');
+        $allEvents = Events::model ()->findAll ();
+        $that = $this; 
+
+        $checkEquivalence = function ($events) use ($allEvents, $that) {
+            $ids = array_map (function ($event) { return $event->id; }, $events);
+            $that->assertTrue (count ($events) > 1);
+            foreach ($events as $event) {
+                $that->assertTrue ($event->isVisibleTo (Yii::app()->params->profile->user));
+            }
+            $found = false;
+            foreach ($allEvents as $event) {
+                if (!in_array ($event->id, $ids)) {
+                    $found = true;
+                    $that->assertFalse ($event->isVisibleTo (Yii::app()->params->profile->user));
+                }
+            }
+            $that->assertTrue ($found);
+        };
+
+        Yii::app()->settings->historyPrivacy = null;
+        $accessCriteria = Events::model ()->getAccessCriteria ();
+        $events = Events::model ()->findAll ($accessCriteria);
+        $checkEquivalence ($events);
+
+        Yii::app()->settings->historyPrivacy = 'group';
+        $accessCriteria = Events::model ()->getAccessCriteria ();
+        $events = Events::model ()->findAll ($accessCriteria);
+        $checkEquivalence ($events);
+
+        Yii::app()->settings->historyPrivacy = 'user';
+        $accessCriteria = Events::model ()->getAccessCriteria ();
+        $events = Events::model ()->findAll ($accessCriteria);
+        $checkEquivalence ($events);
+
+    }
+
+    /**
+     * Ensure that a model name can be properly parsed and resolved
+     */
+    public function testParseModelName() {
+        $models = array(
+            'Product' => 'product',
+            'Opportunity' => 'opportunity',
+            'Campaign' => 'campaign',
+            
+            'AnonContact' => 'anonymous contact',
+            
+            'Contacts' => 'contact',
+            'Accounts' => 'account',
+            'Marketing' => 'marketing',
+            'Quote' => 'quote',
+            'Non Existant Module' => null,
+        );
+        // First ensure parseModelName works as expected for default modules
+        foreach ($models as $model => $expected) {
+            $this->assertEquals ($expected, Events::parseModelName ($model));
+        }
+
+        // Now ensure renamed modules can be properly resolved
+        foreach ($models as $model => $expected) {
+            
+            // Skip AnonContact: no dedicate module to test
+            if ($model === 'AnonContact') continue;
+            
+            // Correct pluralization inconsistancies
+            if ($model === 'Opportunity') $model = 'Opportunities';
+            if ($model === 'Product' || $model === 'Quote') $model .= 's';
+            $dummyTitle = $model . time();
+            $module = Modules::model()->findByAttributes (array(
+                'name' => strtolower($model)
+            ));
+            if ($module && $module->retitle ($dummyTitle)) {
+                $this->assertEquals (strtolower($dummyTitle), Events::parseModelName ($model));
+            }
+        }
+    }
+    
+    /**
+     * TODO: Remove hardcoded references to events in the fixture.
+     */
+    public function testCheckPermissions(){
+        TestingAuxLib::loadX2NonWebUser ();
+        $event1 = $this->event(0);
+        // Admin can do anything
+        TestingAuxLib::suLogin ('admin');
+        $this->assertTrue($event1->checkPermissions('view', true));
+        $this->assertTrue($event1->checkPermissions('edit', true));
+        $this->assertTrue($event1->checkPermissions('delete', true));
+        // Private and no shared group means testuser can't do anything
+        TestingAuxLib::suLogin ('testuser');
+        $this->assertFalse($event1->checkPermissions('view', true));
+        $this->assertFalse($event1->checkPermissions('edit', true));
+        $this->assertFalse($event1->checkPermissions('delete', true));
+        // Associated with testuser2, so they can view and delete but not edit
+        TestingAuxLib::suLogin ('testuser2');
+        $this->assertTrue($event1->checkPermissions('view', true));
+        $this->assertFalse($event1->checkPermissions('edit', true));
+        $this->assertTrue($event1->checkPermissions('delete', true));
+        // Created by testuser3, so they can do anything
+        TestingAuxLib::suLogin ('testuser3');
+        $this->assertTrue($event1->checkPermissions('view', true));
+        $this->assertTrue($event1->checkPermissions('edit', true));
+        $this->assertTrue($event1->checkPermissions('delete', true));
         
-        $this->assertArrayHasKey('events',$events);
-        $this->assertNotEmpty($events['events']);
-        $this->assertCount(1,$events['events']);
+        $event2 = $this->event(6);
+        // Admin can do anything
+        TestingAuxLib::suLogin ('admin');
+        $this->assertTrue($event2->checkPermissions('view', true));
+        $this->assertTrue($event2->checkPermissions('edit', true));
+        $this->assertTrue($event2->checkPermissions('delete', true));
+        // Public posts are visible but not editable or deletable by regular users
+        TestingAuxLib::suLogin ('testuser');
+        $this->assertTrue($event2->checkPermissions('view', true));
+        $this->assertFalse($event2->checkPermissions('edit', true));
+        $this->assertFalse($event2->checkPermissions('delete', true));
+        // Public posts are visible but not editable or deletable by regular users
+        TestingAuxLib::suLogin ('testuser2');
+        $this->assertTrue($event2->checkPermissions('view', true));
+        $this->assertFalse($event2->checkPermissions('edit', true));
+        $this->assertFalse($event2->checkPermissions('delete', true));
         
-        $firstEvent=array_pop($events['events']); 
-        $this->assertEquals('Test social post.',$firstEvent->text);
-        if(empty($events['events'])){
-            $lastEvent=$firstEvent;
-        }else{
-            $lastEvent=array_pop($events['events']);
-        }
-        if($lastEvent->id > $lastEventId){
-            $lastEventId=$lastEvent->id;
-        }
-        if($lastEvent->timestamp > $lastTimestamp){
-            $lastTimestamp=$lastEvent->timestamp;
-        }
-        
-        $events2=Events::getEvents($lastEventId,$lastTimestamp,'admin',1359484627);
-        $this->assertArrayHasKey('events',$events2);
-        $this->assertNotEmpty($events2['events']);
-        $this->assertCount(1,$events2['events']);
-        
-        $firstEvent2=array_pop($events2['events']);
-        $this->assertEquals('New social post.',$firstEvent2->text);
-        if(empty($events2['events'])){
-            $lastEvent=$firstEvent2;
-        }else{
-            $lastEvent=array_pop($events2['events']);
-        }
-        if($lastEvent->id > $lastEventId){
-            $lastEventId=$lastEvent->id;
-        }
-        if($lastEvent->timestamp > $lastTimestamp){
-            $lastTimestamp=$lastEvent->timestamp;
-        }
-        
-        $events3=Events::getEvents($lastEventId,$lastTimestamp,'admin',1359485241);
-        $this->assertArrayHasKey('events',$events3);
-        $this->assertNotEmpty($events3['events']);
-        $this->assertCount(2,$events3['events']);
-        
-        $firstEvent3=array_pop($events3['events']);
-        $this->assertEquals('record_create',$firstEvent3->type);
-        if(empty($events3['events'])){
-            $lastEvent=$firstEvent3;
-        }else{
-            $lastEvent=array_pop($events3['events']);
-        }
-        if($lastEvent->id > $lastEventId){
-            $lastEventId=$lastEvent->id;
-        }
-        if($lastEvent->timestamp > $lastTimestamp){
-            $lastTimestamp=$lastEvent->timestamp;
-        }
-        
-        $events4=Events::getEvents($lastEventId,$lastTimestamp,'admin',1359485280);
-        $this->assertArrayHasKey('events',$events4);
-        $this->assertNotEmpty($events4['events']);
-        $this->assertCount(1,$events4['events']);
-        
-        $firstEvent4=array_pop($events4['events']);
-        $this->assertEquals('action_reminder',$firstEvent4->type);
-        if(empty($events4['events'])){
-            $lastEvent=$firstEvent4;
-        }else{
-            $lastEvent=array_pop($events4['events']);
-        }
-        if($lastEvent->id > $lastEventId){
-            $lastEventId=$lastEvent->id;
-        }
-        if($lastEvent->timestamp > $lastTimestamp){
-            $lastTimestamp=$lastEvent->timestamp;
-        }
-        
-        $events5=Events::getEvents($lastEventId,$lastTimestamp,'admin',null);
-        $this->assertArrayHasKey('events',$events5);
-        $this->assertEmpty($events5['events']);
-        
+        $event3 = $this->event(7);
+        // Admin can do anything
+        TestingAuxLib::suLogin ('admin');
+        $this->assertTrue($event3->checkPermissions('view', true));
+        $this->assertTrue($event3->checkPermissions('edit', true));
+        $this->assertTrue($event3->checkPermissions('delete', true));
+        // Non-social post is visible to user it's assigned to but they can't edit or delete
+        TestingAuxLib::suLogin ('testuser');
+        $this->assertTrue($event3->checkPermissions('view', true));
+        $this->assertFalse($event3->checkPermissions('edit', true));
+        $this->assertFalse($event3->checkPermissions('delete', true));
+        // Private, so testuser3 can't do anything
+        TestingAuxLib::suLogin ('testuser3');
+        $this->assertFalse($event3->checkPermissions('view', true));
+        $this->assertFalse($event3->checkPermissions('edit', true));
+        $this->assertFalse($event3->checkPermissions('delete', true));
     }
 }
 

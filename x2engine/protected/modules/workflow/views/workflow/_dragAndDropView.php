@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerScriptFile(
     Yii::app()->request->baseUrl.'/js/WorkflowDragAndDropSortable.js', CClientScript::POS_END);
@@ -41,9 +42,22 @@ Yii::app()->clientScript->registerScriptFile(
 Yii::app()->clientScript->registerScriptFile(
     $this->module->assetsUrl.'/js/DragAndDropViewManager.js', CClientScript::POS_END);
 Yii::app()->clientScript->registerScriptFile(
-    Yii::app()->request->baseUrl.'/js/X2QtipManager.js', CClientScript::POS_END);
-Yii::app()->clientScript->registerX2Flashes ();
+    Yii::app()->request->baseUrl.'/js/QtipManager.js', CClientScript::POS_END);
+Yii::app()->clientScript->registerScriptFile(
+    Yii::app()->request->baseUrl.'/js/X2GridView/X2GridViewQtipManager.js', CClientScript::POS_END);
 
+$listItemColors = Workflow::getPipelineListItemColors ($colors, true);
+$listItemColorCss = '';
+for ($i = 1; $i <= count ($listItemColors); ++$i) {
+    $listItemColorCss .= 
+    "#workflow-stage-$i .stage-member-container {
+        background-color: ".$listItemColors[$i - 1][0].";
+    }
+    #workflow-stage-$i .stage-member-container:hover {
+        background-color: ".$listItemColors[$i - 1][1].";
+    }";
+}
+Yii::app()->clientScript->registerCss('stageMemberColorCss',$listItemColorCss);
 
 
 $stages = $model->stages;
@@ -102,11 +116,13 @@ x2.dragAndDropViewManager = new x2.DragAndDropViewManager ({
 
 <!-- used to set up the add a deal form -->
 <div id="add-a-deal-form-dialog" style="display: none;" class='form'>
-    <form>
+    <form><!-- submitted via ajax, so it doesn't need a CSRF token hidden input -->
     <div class='dialog-description'>
         <?php echo Yii::t(
-            'workflow', 'Start the {workflowName} process for the following record:', 
-            array ('{workflowName}' => $model->name)); ?> 
+            'workflow', 'Start the {workflowName} {process} for the following record:', array (
+                '{workflowName}' => CHtml::encode($model->name),
+                '{process}' => Modules::displayName(false),
+            )); ?> 
     </div>
     <div id='record-name-container'>
         <?php
@@ -118,9 +134,15 @@ x2.dragAndDropViewManager = new x2.DragAndDropViewManager ({
     <?php
     echo CHtml::label(Yii::t('app', 'Record Type'),'modelType');
     echo CHtml::dropDownList('modelType',$modelType,array(
-        'Contacts'=>Yii::t('workflow','Contacts'),
-        'Opportunity'=>Yii::t('workflow','Opportunities'),
-        'Accounts'=>Yii::t('workflow','Accounts'),
+        'Contacts'=>Yii::t('workflow','{contacts}', array(
+            '{contacts}'=>Modules::displayName(true, "Contacts")
+        )),
+        'Opportunity'=>Yii::t('workflow','{opportunities}', array(
+            '{opportunities}'=>Modules::displayName(true, "Opportunities")
+        )),
+        'Accounts'=>Yii::t('workflow','{accounts}', array(
+            '{accounts}'=>Modules::displayName(true, "Accounts")
+        )),
     ),array(
         'id'=>'new-deal-type'
     ));
@@ -132,7 +154,6 @@ x2.dragAndDropViewManager = new x2.DragAndDropViewManager ({
 <?php
 $this->renderPartial ('_processStatus', array (
     'dateRange' => $dateRange,
-    'expectedCloseDateDateRange' => $expectedCloseDateDateRange,
     'model' => $model,
     'modelType' => $modelType,
     'users' => $users,
@@ -154,12 +175,13 @@ $recordNames = X2Model::getAllRecordNames ();
 // render a dummy item view so that it can be cloned on the client
 $this->renderpartial ('_dragAndDropItemView', array (
     'data' => array (
-        'recordType' => 'contacts',
         'id' => null,
         'name' => null,
     ),
     'recordNames' => $recordNames,
     'dummyPartial' => true,
+    'recordType' => 'contacts',
+    'workflow' => $model,
 ));
 ?>
 </div>
@@ -210,25 +232,27 @@ for ($i = 0; $i < count ($stages); ++$i) {
             ),
         ),
         'id' => 'workflow-stage-'.($i + 1),
-        'dataProvider' => $this->getStageMemberDataProviderMixed (
-            $model->id, $dateRange, $expectedCloseDateDateRange, $i + 1, $users, $modelType),
+        'dataProvider' => $this->getStageMemberDataProvider ($modelType,
+            $model->id, $dateRange, $i + 1, $users),
         'itemView' => '_dragAndDropItemView',
         'viewData' => array (
             'modelTypes' => $modelTypes,
             'recordNames' => $recordNames,
             'dummyPartial' => false,
+            'recordType'=> $modelType,
+            'workflow' => $model,
         ),
         'template' => 
             '<div class="stage-list-title" style="'.$colorGradients[$i].'">'.
                 '<h2>'.$stage['name'].'</h2>
                 <div class="stage-title-row">
                 <div class="total-projected-stage-value">'.
-                Formatter::formatCurrency ($stageValues[$i][1]).
+                (is_null($stageValues[$i])?'':Formatter::formatCurrency ($stageValues[$i])).
                 '</div>
                 <div class="total-stage-deals">
-                    <span class="stage-deals-num">'.$stageValues[$i][3].'</span>
+                    <span class="stage-deals-num">'.$stageCounts[$i].'</span>
                     <span>'.
-                        ($stageValues[$i][3] === 1 ? 
+                        ($stageCounts[$i] === 1 ? 
                             Yii::t('workflow', 'deal') :
                             Yii::t('workflow', 'deals')).'</span>
                 </div>

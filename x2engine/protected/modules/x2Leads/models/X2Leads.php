@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::import('application.models.X2Model');
 
@@ -56,15 +57,26 @@ class X2Leads extends X2Model {
 
 	public function behaviors() {
 		return array_merge(parent::behaviors(),array(
-			'X2LinkableBehavior'=>array(
-				'class'=>'X2LinkableBehavior',
+			'LinkableBehavior'=>array(
+				'class'=>'LinkableBehavior',
 				'module'=>'x2Leads'
 			),
 			'ERememberFiltersBehavior' => array(
-				'class' => 'application.components.ERememberFiltersBehavior',
+				'class' => 'application.components.behaviors.ERememberFiltersBehavior',
 				'defaults'=>array(),
 				'defaultStickOnClear'=>false
-			)
+			),
+			'ModelConversionBehavior' => array(
+				'class' => 'application.components.behaviors.ModelConversionBehavior',
+                'deleteConvertedRecord' => false,
+                'convertedField' => 'converted',
+                'conversionDateField' => 'conversionDate',
+                'convertedToTypeField' => 'convertedToType',
+                'convertedToIdField' => 'convertedToId',
+			),
+            'ContactsNameBehavior' => array(
+                'class' => 'application.components.behaviors.ContactsNameBehavior',
+            ),
 		));
 	}
 
@@ -78,7 +90,6 @@ class X2Leads extends X2Model {
 	}
 
 	public static function getX2LeadsLinks($accountId) {
-
 		$allX2Leads = 
             X2Model::model('X2Leads')->findAllByAttributes(array('accountName'=>$accountId));
 
@@ -89,13 +100,33 @@ class X2Leads extends X2Model {
 		return implode(', ',$links);
 	}
 
-	public function search($resultsPerPage=null, $uniqueId=null) {
-		$criteria=new CDbCriteria;
-		$parameters=array('limit'=>ceil(Profile::getResultsPerPage()));
-		$criteria->scopes=array('findAll'=>array($parameters));
+    public function beforeSave () {
+        // backwards compatibility check for when leads didn't have first and last name fields
+        if (!$this->isNewRecord && 
+            !$this->firstName && 
+            !$this->lastName && 
+            ($this->attributeChanged ('firstName') ||
+             $this->attributeChanged ('lastName'))) {
 
-		return $this->searchBase($criteria, $resultsPerPage, $uniqueId);
-	}
+            $this->name = '';
+        }
+        return parent::beforeSave ();
+    }
+
+     public function search($resultsPerPage=null, $uniqueId=null) {
+         $criteria=new CDbCriteria;
+         $parameters=array('limit'=>ceil(Profile::getResultsPerPage()));
+         $criteria->scopes=array('findAll'=>array($parameters));
+ 
+         // allows converted leads to be filtered out of grid by default
+         $filters = $this->asa ('ERememberFiltersBehavior')->getSetting ('filters');
+         if (!isset ($filters['converted'])) {
+             $this->converted = 'false';
+         } elseif ($filters['converted'] === 'all') {
+             unset ($this->converted);
+         }   
+         return $this->searchBase($criteria, $resultsPerPage);
+     }   
 
 	public function searchAdmin() {
 		$criteria=new CDbCriteria;
@@ -103,96 +134,26 @@ class X2Leads extends X2Model {
 		return $this->searchBase($criteria);
 	}
 
-    /**
-     * @return <array of strings> Incompatibility warnings to be presented to the user before
-     *  they convert the lead to an opportunity.
-     */
-    public function getConversionIncompatibilityWarnings () {
-        $warnings = array ();
-        $opportunity = Opportunity::model ();
-        $leadsAttrs = array_diff (
-            $this->attributeNames (), Opportunity::model()->attributeNames ());
-
-        foreach ($leadsAttrs as $name) {
-            $warnings[] = 
-                Yii::t('x2Leads', 
-                    'A field {fieldName} is in Leads but not in Opportunities.',
-                    array ('{fieldName}' => $name));
+    public function getConvertedTo () {
+        if ($this->converted) {
+            $type = $this->convertedToType;
+            $id = $this->convertedToId;
+            return X2Model::model ($type)->findByPk ($id);
         }
-
-        $sharedAttrs = array_intersect (
-            $this->attributeNames (), $opportunity->attributeNames ());
-        foreach ($sharedAttrs as $name) {
-            $leadField = $this->getField ($name);
-            $opportunityField = $opportunity->getField ($name);
-
-            if (!$leadField instanceof Fields || !$opportunityField instanceof Fields) {
-                continue;
-            }
-
-            if ($leadField->type !== $opportunityField->type) {
-                $warnings[] = 
-                    Yii::t('x2Leads', 
-                        'A field {fieldName} is in both Leads and Opportunities but the fields
-                         have different types.', array ('{fieldName}' => $name));
-            }
-        }
-
-        return $warnings;
     }
 
-    /**
-     * Uses the attributes of this lead to generate a new opportunity. Then the lead is deleted.
-     * @param bool $force If true, lead will be converted to opportunitiy even if there is potential
-     *  for data loss
-     * @return Opportunity|false 
-     */
-    public function convertToOpportunity ($force=false) {
-        $attributes = $this->getAttributes ();
-        unset ($attributes['id']);
-        unset ($attributes['nameId']);
-        unset ($attributes['createDate']);
-        $opportunity = new Opportunity ();
-
-        if (!$force) { 
-            // don't convert if leads has fields not in opportunities
-            if (sizeof (
-                array_diff ($this->attributeNames (), $opportunity->attributeNames ())) > 0) {
-
-                return false;
-            }
-
-            // don't convert if a leads field and an opportunity field have the same name but a
-            // different type
-            $sharedAttrs = array_intersect (
-                $this->attributeNames (), $opportunity->attributeNames ());
-            foreach ($sharedAttrs as $name) {
-                $leadField = $this->getField ($name);
-                $opportunityField = $opportunity->getField ($name);
-
-                if (!$leadField instanceof Fields || !$opportunity instanceof Fields) {
-                    continue;
-                }
-
-                if ($leadField->type !== $opportunityField->type) {
-                    return false;
-                }
-            }
+    public function renderConvertedNotice () {
+        $convertedTo = $this->getConvertedTo ();
+        if ($convertedTo) {
+            Yii::app()->user->setFlash (
+                'notice', 
+                Yii::t('x2Leads', 'This record has been converted. '.
+                    'To view the new record, click {here}.', array (
+                        '{here}' => CHtml::link (
+                            Yii::t('x2Leads', 'here'), $convertedTo->getUrl ()
+                    ))));
+            X2Flashes::renderTopFlashes ('notice');
         }
-
-        $opportunity->setAttributes ($attributes, false);
-
-        // don't create an opportunity creation notification or event
-        $opportunity->disableBehavior('changelog'); 
-        if ($opportunity->save ()) {
-            $opportunity->mergeRelatedRecords ($this, true, false, true);
-            $opportunity->mergeRelationships ($this);
-            $changeLogBehavior = $this->asa ('changelog');
-            $changeLogBehavior->createEvent = false; // don't create a lead deletion event
-            $this->delete ();
-            return $opportunity;
-        }
-        return $opportunity;
     }
 
 }

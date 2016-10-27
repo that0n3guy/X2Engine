@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,9 +33,11 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-Yii::app()->clientScript->registerCss('recordViewCss',"
+$layoutManager = $this->widget ('RecordViewLayoutManager', array ('staticLayout' => false));
+
+Yii::app()->clientScript->registerCss('recordViewCss', "
 
 #content {
     background: none !important;
@@ -42,38 +45,29 @@ Yii::app()->clientScript->registerCss('recordViewCss',"
 }
 ");
 Yii::app()->clientScript->registerResponsiveCssFile(
-    Yii::app()->theme->baseUrl.'/css/responsiveRecordView.css');
+        Yii::app()->theme->baseUrl . '/css/responsiveRecordView.css');
 
-Yii::app()->clientScript->registerCss ('servicesView', "
+Yii::app()->clientScript->registerCss('servicesView', "
 	/*#contact-info-container {
 		margin: -6px 5px 5px 5px !important;
 	}*/
 ");
 
 $authParams['X2Model'] = $model;
-$menuItems = array(
-	array('label'=>Yii::t('services','All Cases'), 'url'=>array('index')),
-	array('label'=>Yii::t('services','Create Case'), 'url'=>array('create')),
-	array('label'=>Yii::t('services','View')),
-	array('label'=>Yii::t('services','Edit Case'), 'url'=>array('update', 'id'=>$model->id)),
-	array('label'=>Yii::t('services','Delete Case'), 'url'=>'#', 'linkOptions'=>array('submit'=>array('delete','id'=>$model->id),'confirm'=>'Are you sure you want to delete this item?')),
-	array('label'=>Yii::t('app','Send Email'),'url'=>'#','linkOptions'=>array('onclick'=>'toggleEmailForm(); return false;')),
-	array('label'=>Yii::t('app','Attach a File/Photo'),'url'=>'#','linkOptions'=>array('onclick'=>'toggleAttachmentForm(); return false;')),
-    array('label' => Yii::t('quotes', 'Quotes/Invoices'), 'url' => 'javascript:void(0)', 'linkOptions' => array('onclick' => 'x2.inlineQuotes.toggle(); return false;')),
-	array('label'=>Yii::t('services','Create Web Form'), 'url'=>array('createWebForm')),
+$menuOptions = array(
+    'index', 'create', 'view', 'edit', 'delete', 'email', 'attach', 'quotes',
+    'createWebForm', 'print', 'editLayout',
 );
-$menuItems[] = array(
-	'label' => Yii::t('app', 'Print Record'), 
-	'url' => '#',
-	'linkOptions' => array (
-		'onClick'=>"window.open('".
-			Yii::app()->createUrl('/site/printRecord', array (
-				'modelClass' => 'Services', 
-				'id' => $model->id, 
-				'pageTitle' => Yii::t('app', 'Service Case').': '.$model->name
-			))."');"
-	)
-);
+$this->insertMenu($menuOptions, $model, $authParams);
+$themeUrl = Yii::app()->theme->getBaseUrl();
+
+if ($model->contactId) {
+    // Retrieve the associated contact: the contactId
+    // field will be updated to only the model name
+    // while rendering the _detailView
+    $contact = $model->getLinkedModel('contactId');
+}
+
 $modelType = json_encode("Servces");
 $modelId = json_encode($model->id);
 Yii::app()->clientScript->registerScript('widgetShowData', "
@@ -81,141 +75,121 @@ $(function() {
 	$('body').data('modelType', $modelType);
 	$('body').data('modelId', $modelId);
 });");
-$this->actionMenu = $this->formatMenu($menuItems, $authParams);
-$themeUrl = Yii::app()->theme->getBaseUrl();
 ?>
 <div class="page-title-placeholder"></div>
 <div class="page-title-fixed-outer">
     <div class="page-title-fixed-inner">
-<div class="page-title icon services">
-<?php //echo CHtml::link('['.Yii::t('contacts','Show All').']','javascript:void(0)',array('id'=>'showAll','class'=>'right hide','style'=>'text-decoration:none;')); ?>
-<?php //echo CHtml::link('['.Yii::t('contacts','Hide All').']','javascript:void(0)',array('id'=>'hideAll','class'=>'right','style'=>'text-decoration:none;')); ?>
-	<h2><?php echo Yii::t('services','Case {n}',array('{n}'=>$model->id)); ?></h2>
-	<?php //if(Yii::app()->user->checkAccess('ServicesUpdate',$authParams)){ ?>
-	<a class="x2-button icon edit right" href="<?php 
-        echo $this->createUrl('update',array('id'=>$model->id));?>"><span></span></a>
+        <div class="page-title icon services">
+            <?php //echo CHtml::link('['.Yii::t('contacts','Show All').']','javascript:void(0)',array('id'=>'showAll','class'=>'right hide','style'=>'text-decoration:none;'));  ?>
+            <?php //echo CHtml::link('['.Yii::t('contacts','Hide All').']','javascript:void(0)',array('id'=>'hideAll','class'=>'right','style'=>'text-decoration:none;')); ?>
+            <h2><?php echo Yii::t('services', 'Case {n}', array('{n}' => $model->id)); ?></h2>
+            <?php //if(Yii::app()->user->checkAccess('ServicesUpdate',$authParams)){  ?>
+            <a class="x2-button icon edit right" href="<?php echo $this->createUrl('update', array('id' => $model->id)); ?>"><span></span></a>
+            <?php
+            echo X2Html::emailFormButton();
+            ?>
+        </div>
+    </div>
+</div>
+<div id="main-column" <?php echo $layoutManager->columnWidthStyleAttr (1); ?>>
     <?php
-    echo CHtml::link(
-        '<img src="'.Yii::app()->request->baseUrl.'/themes/x2engine/images/icons/email_button.png'.
-            '"></img>', '#',
-        array(
-            'class' => 'x2-button icon right email',
-            'title' => Yii::t('app', 'Open email form'),
-            'onclick' => 'toggleEmailForm(); return false;',
-        )
-    );
+    $form = $this->beginWidget('CActiveForm', array(
+        'id' => 'services-form',
+        'enableAjaxValidation' => false,
+        'action' => array('saveChanges', 'id' => $model->id),
+    ));
+    $this->widget ('DetailView', array(
+        'model' => $model
+    ));
+ //   $this->renderPartial('application.components.views.@DETAILVIEW', array('model' => $model, 'form' => $form, 'modelName' => 'services'));
     ?>
-	<?php //} ?>
-</div>
-</div>
-</div>
-<div id="main-column" class="half-width">
-<?php $form=$this->beginWidget('CActiveForm', array(
-	'id'=>'services-form',
-	'enableAjaxValidation'=>false,
-	'action'=>array('saveChanges','id'=>$model->id),
-));
-$this->renderPartial(
-    'application.components.views._detailView',
-    array('model'=>$model,'form'=>$form,'modelName'=>'services'));
 
-?>
+    <?php $childCases = Services::model()->findAllByAttributes(array('parentCase' => $model->id)); ?>
+    <?php if ($childCases) { ?>
+        <div id="service-child-case-wrapper" class="x2-layout form-view">
+            <div class="formSection showSection">
+                <div class="formSectionHeader">
+                    <span class="sectionTitle"><?php echo Yii::t('services', 'Child Cases'); ?></span>
+                </div>
+                <div id="parent-case" class="tableWrapper" style="min-height: 75px; padding: 5px;">
+                    <?php
+                    $comma = false;
+                    foreach ($childCases as $c) {
+                        if ($comma) { // skip the first comma
+                            echo ", ";
+                        } else {
+                            $comma = true;
+                        }
+                        echo $c->createLink();
+                    }
+                    ?>
+                </div>
+            </div>
+        </div>
+    <?php } ?>
 
-<?php $childCases = Services::model()->findAllByAttributes(array('parentCase'=>$model->id)); ?>
-<?php if($childCases) { ?>
-	<div id="service-child-case-wrapper" class="x2-layout form-view">
-	<div class="formSection showSection">
-		<div class="formSectionHeader">
-			<span class="sectionTitle"><?php echo Yii::t('services', 'Child Cases'); ?></span>
-		</div>
-		<div id="parent-case" class="tableWrapper" style="min-height: 75px; padding: 5px;">
-			<?php
-				$comma = false;
-				foreach($childCases as $c) {
-					if($comma) { // skip the first comma
-						echo ", ";
-					} else {
-						$comma = true;
-					}
-					echo $c->createLink();
-				}
-			?>
-		</div>
-	</div>
-	</div>
-<?php } ?>
-
-<?php
-$this->endWidget();
-
-if($model->contactId) { // every service case should have a contact associated with it
-	$contact = $model->contactIdModel;
-	if($contact) { // if associated contact exists, display mini contact view
-		?>
-		<div id='contact-info-container'>
-		<?php
-		$this->renderPartial(
-            'application.modules.contacts.views.contacts._detailViewMini',
-            array('model'=>$contact, 'serviceModel'=>$model));
-		?>
-		</div>
-		<?php
-	}
-}
-
-$to = null;
-if(isset($contact)) {
-	$to = '"'.$contact->name.'" <'.$contact->email.'>, ';
-}
-
-$this->widget('InlineEmailForm', array(
-	'attributes' => array(
-		'to' => $to,
-		'modelName' => 'Services',
-		'modelId' => $model->id,
-	),
-	'startHidden' => true,
-));
-
-$this->widget('X2WidgetList', array(
-    'block'=>'center', 
-    'model'=>$model, 
-    'modelType'=>'services'
-)); 
-?>
-
-<?php $this->widget('Attachments',array('associationType'=>'services','associationId'=>$model->id,'startHidden'=>true)); ?>
-
-<?php
-?>
-<div id="quote-form-wrapper">
     <?php
-    $this->widget('InlineQuotes', array(
+    $this->endWidget();
+
+    if (isset($contact) && $contact) { // every service case should have a contact associated with it
+        ?>
+        <div id='contact-info-container'>
+            <?php
+            $this->renderPartial(
+                    'application.modules.contacts.views.contacts._detailViewMini', array(
+                'model' => $contact,
+                'serviceModel' => $model
+            ));
+            ?>
+        </div>
+        <?php
+    }
+
+    $to = null;
+    if (isset($contact)) {
+        $to = '"' . $contact->name . '" <' . $contact->email . '>, ';
+    }
+
+    $this->widget('InlineEmailForm', array(
+        'attributes' => array(
+            'to' => $to,
+            'modelName' => 'Services',
+            'modelId' => $model->id,
+        ),
         'startHidden' => true,
-        'recordId' => $model->id,
-        'contactId' => $model->getLinkedAttribute('contactId', 'id'),
-        'modelName' => X2Model::getModuleModelName ()
+    ));
+
+    ?>
+
+    <?php 
+    // $this->widget('Attachments', array('associationType' => 'services', 'associationId' => $model->id, 'startHidden' => true)); 
+
+    $this->widget('ModelFileUploader', array(
+        'associationType' => 'services', 
+        'associationId' => $model->id, 
     ));
     ?>
-</div>
+
+    <div id="quote-form-wrapper">
+        <?php
+        $this->widget('InlineQuotes', array(
+            'startHidden' => true,
+            'contactId' => $model->getLinkedAttribute('contactId', 'id'),
+            'recordId' => $model->id,
+            'modelName' => X2Model::getModuleModelName()
+        ));
+        ?>
+    </div>
 
 </div>
-<div class="history half-width">
+
 <?php
-$this->widget('Publisher',
-	array(
-		'associationType'=>'services',
-		'associationId'=>$model->id,
-		'assignedTo'=>Yii::app()->user->getName(),
-		'calendar' => false
-	)
-);
-
-$this->widget('History',array('associationType'=>'services','associationId'=>$model->id));
-?>
-</div>
-
-<?php 
+$this->widget('X2WidgetList', array(
+    'layoutManager' => $layoutManager,
+    'block' => 'center',
+    'model' => $model,
+    'modelType' => 'services'
+));
 $this->widget(
-    'CStarRating',array('name'=>'rating-js-fix', 'htmlOptions'=>array('style'=>'display:none;'))); 
+        'CStarRating', array('name' => 'rating-js-fix', 'htmlOptions' => array('style' => 'display:none;')));
 ?>

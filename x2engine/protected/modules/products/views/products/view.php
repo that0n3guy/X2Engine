@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,9 +33,11 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-Yii::app()->clientScript->registerCss('recordViewCss',"
+$layoutManager = $this->widget ('RecordViewLayoutManager', array ('staticLayout' => false));
+
+Yii::app()->clientScript->registerCss('recordViewCss', "
 
 #content {
     background: none !important;
@@ -42,39 +45,17 @@ Yii::app()->clientScript->registerCss('recordViewCss',"
 }
 ");
 Yii::app()->clientScript->registerResponsiveCssFile(
-    Yii::app()->theme->baseUrl.'/css/responsiveRecordView.css');
-
+        Yii::app()->theme->baseUrl . '/css/responsiveRecordView.css');
 
 
 $themeUrl = Yii::app()->theme->getBaseUrl();
+$authParams['X2Model'] = $model;
 
-$menuItems = array(
-	array('label'=>Yii::t('products','Product List'), 'url'=>array('index')),
-	array('label'=>Yii::t('products','Create'), 'url'=>array('create')),
-	array('label'=>Yii::t('products','View')),
-	array('label'=>Yii::t('products','Update'), 'url'=>array('update', 'id'=>$model->id)),
-	array('label'=>Yii::t('products','Delete'), 'url'=>'#', 
-		'linkOptions'=>array(
-			'submit'=>array('delete','id'=>$model->id),
-			'confirm'=>Yii::t('app','Are you sure you want to delete this item?')
-		)
-	),
+
+$menuOptions = array(
+    'index', 'create', 'view', 'edit', 'delete', 'print', 'editLayout',
 );
-
-$menuItems[] = array(
-	'label' => Yii::t('app', 'Print Record'), 
-	'url' => '#',
-	'linkOptions' => array (
-		'onClick'=>"window.open('".
-			Yii::app()->createUrl('/site/printRecord', array (
-				'modelClass' => 'Product', 
-				'id' => $model->id, 
-				'pageTitle' => Yii::t('app', 'Product').': '.$model->name
-			))."');"
-	)
-);
-
-$this->actionMenu = $this->formatMenu($menuItems);
+$this->insertMenu($menuOptions, $model);
 
 $modelType = json_encode("Products");
 $modelId = json_encode($model->id);
@@ -88,46 +69,43 @@ $(function() {
 <div class="page-title-placeholder"></div>
 <div class="page-title-fixed-outer">
     <div class="page-title-fixed-inner">
-<div class="page-title icon products">
-<?php //echo CHtml::link('['.Yii::t('contacts','Show All').']','javascript:void(0)',array('id'=>'showAll','class'=>'right hide','style'=>'text-decoration:none;')); ?>
-<?php //echo CHtml::link('['.Yii::t('contacts','Hide All').']','javascript:void(0)',array('id'=>'hideAll','class'=>'right','style'=>'text-decoration:none;')); ?>
-	<h2><span class="no-bold"><?php echo Yii::t('products','Product:'); ?></span> <?php echo CHtml::encode($model->name); ?></h2>
-	<a class="x2-button icon edit right" href="<?php echo $this->createUrl('update',array('id'=>$model->id));?>"><span></span></a>
+        <div class="page-title icon products">
+            <h2><span class="no-bold"><?php echo Yii::t('products', '{module}:', array('{module}' => Modules::displayName(false))); ?></span> <?php echo CHtml::encode($model->name); ?></h2>
+            <?php
+            if(Yii::app()->user->checkAccess('ProductsUpdate', $authParams)){
+                echo X2Html::editRecordButton ($model);
+            }
+            ?>
+        </div>
+    </div>
 </div>
-</div>
-</div>
-<div id="main-column" class="half-width">
-<?php $this->renderPartial('application.components.views._detailView',array('model'=>$model,'modelName'=>'Product')); ?>
-
+<div id="main-column" <?php echo $layoutManager->columnWidthStyleAttr (1); ?>>
 <?php 
-	$this->widget('X2WidgetList', array(
-		'block'=>'center', 
-		'model'=>$model, 
-		'modelType'=>'products'
-	)); 
-?>
+$this->widget('DetailView', array(
+    'model'   => $model,
+));
 
-<?php 
-$this->widget(
-    'Attachments',
-    array(
-        'associationType'=>'products',
-        'associationId'=>$model->id,
-    )
-); 
-?>
+//$this->renderPartial('application.components.views.@DETAILVIEW', array('model' => $model, 'modelName' => 'Product')); ?>
+
+    <div class='x2-layout-island' style='padding: 5px'>
+    <?php
+    $this->widget(
+            'ModelFileUploader', array(
+                'associationType' => 'products',
+                'associationId' => $model->id,
+                'viewParams' => array (
+                    'showButton' => true,
+                    'buttonText' => Yii::t('app', 'Attach a File'),
+                )
+            )
+    );
+    ?>
+    </div>
 </div>
-<div class="history half-width">
 <?php
-$this->widget('Publisher',
-	array(
-		'associationType'=>'products',
-		'associationId'=>$model->id,
-		'assignedTo'=>Yii::app()->user->getName(),
-		'calendar' => false
-	)
-);
-
-$this->widget('History',array('associationType'=>'products','associationId'=>$model->id));
-?>
-</div>
+$this->widget('X2WidgetList', array(
+    'layoutManager' => $layoutManager,
+    'block' => 'center',
+    'model' => $model,
+    'modelType' => 'products'
+));

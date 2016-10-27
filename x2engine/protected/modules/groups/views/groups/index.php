@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,12 +33,12 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('groups','Group List')),
-	array('label'=>Yii::t('groups','Create Group'), 'url'=>array('create')),
-));
+$menuOptions = array(
+    'index', 'create',
+);
+$this->insertMenu($menuOptions);
 
 ?>
 <div class="flush-grid-view">
@@ -46,18 +47,21 @@ $this->actionMenu = $this->formatMenu(array(
 $this->widget('zii.widgets.grid.CGridView', array(
 	'id'=>'roles-grid',
 	'baseScriptUrl'=>Yii::app()->request->baseUrl.'/themes/'.Yii::app()->theme->name.'/css/gridview',
-	'template'=> '<div class="page-title icon groups"><h2>'.Yii::t('groups','Groups').'</h2><div class="title-bar">'
-		.'{summary}</div></div>{items}{pager}',
+	'template'=> '<div class="page-title icon groups"><h2>'.Yii::t('groups','{groups}', array(
+            '{groups}' => Modules::displayName(),
+        )).'</h2><div class="title-bar">{summary}</div></div>{items}{pager}',
 	'dataProvider'=>$dataProvider,
 	'columns'=>array(
 		array(
             'header'=>Yii::t('groups','Name'),
 			'name'=>'name',
-			'value'=>'CHtml::link($data->name,array("view","id"=>$data->id))',
+			'value'=>'CHtml::link($data->renderAttribute("name"),array("view","id"=>$data->id))',
 			'type'=>'raw',
 		),
 		array(
-            'header'=>Yii::t('groups','Users'),
+            'header'=>Yii::t('groups','{users}', array(
+                '{users}' => Modules::displayName(true, "Users")
+            )),
 			'name'=>'users',
 			'value'=>'count(GroupToUser::model()->findAllByAttributes(array("groupId"=>$data->id)))',
 			'type'=>'raw',

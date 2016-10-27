@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * 2nd generation REST API for X2Engine.
@@ -79,6 +80,9 @@ class Api2Controller extends CController {
 
     const ENABLED = true;
     const MAX_PAGE_SIZE = 1000;
+
+    const FIND_DELIM = ';';
+    const FIND_EQUAL = '=';
 
     /**
      * Stores {@link post}
@@ -134,6 +138,32 @@ class Api2Controller extends CController {
     }
 
     /**
+     * Retrieve the number of models of a specific class or matching query criteria
+     *
+     * @param string $_class Model name
+     * @param array $_findBy Model query criteria
+     */
+    public function actionCount($_class,$_findBy=null) {
+        $staticModel = $this->getStaticModel();
+
+        if(!empty($_findBy)) {
+            // Use case: count models by uniquely identifying attributes
+            $attributeConditions = $this->findConditions(
+                $_findBy,
+                $staticModel->attributes
+            );
+            $criteria = new CDbCriteria ();
+            foreach ($attributeConditions as $field => $value)
+                $criteria->compare ($field, $value);
+            $count = $this->getDataProvider(null, $criteria)->getTotalItemCount();
+        } else {
+            // Use case: count all models
+            $count = $this->getDataProvider()->getTotalItemCount();
+        }
+        $this->responseBody = $count;
+    }
+
+    /**
      * Responds with dropdown list metadata
      *
      * @param integer $_id
@@ -155,7 +185,7 @@ class Api2Controller extends CController {
     }
 
     /**
-     * Returns an array of field
+     * Returns an array of role-specific field-level permissions
      */
     public function actionFieldPermissions($_class) {
         $this->responseBody = $this->staticModel->fieldPermissions;
@@ -200,7 +230,7 @@ class Api2Controller extends CController {
                 $this->send(403,'You cannot delete other API users\' hooks in X2Engine.');
             $hook->setScenario('delete.remote');
             if($hook->delete()) {
-                $this->sendEmpty(204,"Successfully unsubscribed from hook with "
+                $this->sendEmpty("Successfully unsubscribed from hook with "
                         . "return URL {$hook->target_url}.");
             }
         } else { // POST (will respond to all other methods with 405)
@@ -240,7 +270,7 @@ class Api2Controller extends CController {
      * @param integer $id
      * @param array $modelInput Model parameters, i.e. if doing a lookup
      */
-    public function actionModel($_class,$_id=null) {
+    public function actionModel($_class,$_id=null,$_findBy=null) {
         $method = Yii::app()->request->getRequestType();
 
         // Run extra special stuff for the Actions class
@@ -248,8 +278,10 @@ class Api2Controller extends CController {
 
         switch($method) {
             case 'GET':
-                if(!empty($_id) && ctype_digit((string) $_id)) {
-                    // Use case: directly access the model by ID
+                if((!empty($_id) && ctype_digit((string) $_id)) ||
+                        !empty($_findBy)) {
+                    // Use case: directly access the model by ID or uniquely
+                    // identifying attributes
                     $this->responseBody = $this->model;
                 } else {
                     // Use case: if no model was directly accessed by ID,
@@ -262,7 +294,7 @@ class Api2Controller extends CController {
             case 'PUT':
                 // Additional check for request validity
                 if($method == 'POST') {
-                    if(!empty($_id)) // POST on an existing record
+                    if(!(empty($_id) && empty($_findBy))) // POST on an existing record
                         $this->send(400,'POST should be used for creating new '
                                 . 'records and cannot be used to update an '
                                 . 'existing model. PUT or PATCH should be used '
@@ -270,7 +302,7 @@ class Api2Controller extends CController {
                     // Instantiate a new active record model, but go through
                     // getStaticModel to check for class validity:
                     $class = get_class($this->getStaticModel());
-                    $this->model = new $class;
+                    if (!isset ($this->_model)) $this->model = new $class;
                 }
 
                 // Set attributes
@@ -280,13 +312,23 @@ class Api2Controller extends CController {
                 $saved = false;
                 if($method == 'POST') {
                     // Save new
-                    $saved = $this->model->save();
+                    $saved = $this->model->save( !$this->settings->rawInput );
                 } else {
                     // Update existing
                     $attributes = array_intersect(array_keys($this->jpost),
                             $this->staticModel->attributeNames());
-                    if($this->model->validate($attributes)) {
+                    if( $this->settings->rawInput || $this->model->validate($attributes)) {
+
+                        if ($this->model->asa('FlowTriggerBehavior') &&
+                                $this->model->asa('FlowTriggerBehavior')->enabled) {
+                            $this->model->enableUpdateTrigger();
+                        }
                         $saved = $this->model->update($attributes);
+                        if ($this->model->asa('FlowTriggerBehavior') &&
+                                $this->model->asa('FlowTriggerBehavior')->enabled) {
+
+                            $this->model->disableUpdateTrigger();
+                        }
                     }
                 }
 
@@ -314,7 +356,7 @@ class Api2Controller extends CController {
                 break;
             case 'DELETE':
                 if($this->model->delete()) {
-                    $this->sendEmpty(204,"Model of class \"$_class\" with id=$_id "
+                    $this->sendEmpty("Model of class \"$_class\" with id=$_id "
                             . "deleted successfully.");
                 }
                 else
@@ -385,7 +427,7 @@ class Api2Controller extends CController {
                     '_id' => $relationship->firstId,
                     '_relatedId' => $relationship->id
                 ));
-                $this->sendEmpty(303,"Specified relationship does not correspond "
+                $this->send(303,"Specified relationship does not correspond "
                         . "to $_class record $_id.");
             }
         }
@@ -470,7 +512,7 @@ class Api2Controller extends CController {
                     $this->send(400,"Cannot delete relationships without specifying which one to delete.");
                 }
                 if($relationship->delete()) {
-                    $this->sendEmpty(204,"Relationship $_relatedId deleted successfully.");
+                    $this->sendEmpty("Relationship $_relatedId deleted successfully.");
                 } else {
                     $this->send(500,"Failed to delete relationship #$_relatedId. It may have been deleted already.");
                 }
@@ -540,7 +582,7 @@ class Api2Controller extends CController {
                     $this->send(400,"Tag name must be specified when deleting a tag.");
                 }
                 if($this->model->removeTags('#'.ltrim($_tagName,'#'))) {
-                    $this->sendEmpty(204,"Tag #$_tagName deleted from $_class id=$_id.");
+                    $this->sendEmpty("Tag #$_tagName deleted from $_class id=$_id.");
                 } else {
                     $this->send(500);
                 }
@@ -569,6 +611,190 @@ class Api2Controller extends CController {
         } else {
             $this->responseBody = $this->getDataProvider('User')->getData();
         }
+    }
+
+    /**
+     * Weblead form API endpoint to allow weblead submission integration when
+     * using API-based webforms, including lead routing, tracking, weblead and
+     * assigned user email notifications, duplicate detection, and new
+     * weblead X2Workflow triggering.
+     *
+     * The body sent to this method in POST should be a JSON-encoded array.
+     */
+    public function actionWeblead() {
+        // Set staticModel and model properties for Contact creation, then assign attributes
+        $this->_staticModel = X2Model::model ('Contacts');
+        $this->model = new $this->_staticModel;
+        $webForm = null;
+        if (isset ($this->jpost['webFormId'])) {
+            // Prepare webform parameters
+            $webForm = WebForm::model()->findByPk($this->jpost['webFormId']);
+            $extractedParams['leadSource'] = $webForm->leadSource;
+            $extractedParams['generateLead'] = $webForm->generateLead;
+            $extractedParams['generateAccount'] = $webForm->generateAccount;
+            $extractedParams['userEmailTemplate'] = $webForm->userEmailTemplate;
+            $extractedParams['webleadEmailTemplate'] = $webForm->webleadEmailTemplate;
+        }
+        $this->setModelAttributes();
+        if (empty($this->model->trackingKey)) {
+            $this->model->trackingKey = Contacts::getNewTrackingKey();
+        }
+
+        $newRecord = true;
+        if($this->model->asa('DuplicateBehavior') && $this->model->checkForDuplicates()){
+            $duplicates = $this->model->getDuplicates();
+            $oldest = $duplicates[0];
+            $fields = $this->model->getFields(true);
+            foreach ($fields as $field) {
+                if (!in_array($field->fieldName,
+                                $this->model->MergeableBehavior->restrictedFields)
+                        && !is_null($this->model->{$field->fieldName})) {
+                    if ($field->fieldName === 'assignedTo' &&
+                            !in_array($oldest->{$field->fieldName}, array('Anyone', ''))) {
+                        // Don't resassign if the duplicate was already assigned
+                        continue;
+                    }
+                    if ($field->type === 'text' && !empty($oldest->{$field->fieldName})) {
+                        $oldest->{$field->fieldName} .= "\n--\n" . $this->model->{$field->fieldName};
+                    } else {
+                        $oldest->{$field->fieldName} = $this->model->{$field->fieldName};
+                    }
+                }
+            }
+            $this->model = $oldest;
+            $newRecord = $this->model->isNewRecord;
+        }
+        if($newRecord){
+            $this->model->createDate = $now;
+            if (!isset($this->jpost['assignedTo'])) {
+                // Allow assignedTo to be directly set if desired, otherwise use lead routing
+                $this->model->assignedTo = $this->getNextAssignee();
+            }
+        }
+
+        // Save the model, check for errors, and respond if necessary.
+        $saved = $this->model->save( !$this->settings->rawInput );
+        if($this->model->hasErrors()) {
+            $this->response['errors'] = $this->model->errors;
+            $this->send(422,"Model failed validation.");
+        }
+
+        // Check for fingerprint and attributes
+        // if there's not an anonyomous contact, then the fingerprint match
+        // was for an actual contact.
+        if (Yii::app()->contEd('pla') && Yii::app()->settings->enableFingerprinting &&
+            isset ($this->jpost['fingerprint'])) {
+            $attributes = (isset($this->jpost['fingerprintAttributes']))?
+                json_decode($this->jpost['fingerprintAttributes'], true) : array();
+            $anonContact = AnonContact::model ()
+                ->findByFingerprint ($this->jpost['fingerprint'], $attributes);
+            if ($anonContact !== null) {
+                $this->model->mergeWithAnonContact ($anonContact);
+            } else {
+                $this->model->setFingerprint ($this->jpost['fingerprint'], $attributes);
+            }
+        }
+
+        if ($extractedParams['generateLead'])
+            self::generateLead ($this->model, $extractedParams['leadSource']);
+        if ($extractedParams['generateAccount'])
+            self::generateAccount ($this->model);
+
+        // Create an Action, Event, Notification for the new web lead
+        $this->createWebleadAction($this->model);
+        $this->createWebleadEvent($this->model);
+
+        if($this->model->assignedTo != 'Anyone' && $this->model->assignedTo != '') {
+            $this->createWebleadNotification($this->model);
+        }
+
+        // Read selected Tags and trigger X2Workflows on new weblead
+        if (!isset($this->jpost['tags']) || empty($this->jpost['tags']))
+            $tags = array();
+        else
+            $tags = explode(',', $this->jpost['tags']);
+
+        X2Flow::trigger('WebleadTrigger', array(
+            'model' => $this->model,
+            'tags' => $tags,
+        ));
+
+        if (Yii::app()->contEd('pro')) {
+            // email to send from
+            $emailFrom = Credentials::model()->getDefaultUserAccount(
+                Credentials::$sysUseId['systemResponseEmail'], 'email');
+            if($emailFrom == Credentials::LEGACY_ID)
+                $emailFrom = array(
+                    'name' => Yii::app()->settings->emailFromName,
+                    'address' => Yii::app()->settings->emailFromAddr
+                );
+        }
+
+        if($this->model->assignedTo != 'Anyone' && $this->model->assignedTo != '') {
+            $profile = Profile::model()->findByAttributes(
+                array('username' => $this->model->assignedTo));
+
+            /* send user that's assigned to this weblead an email if the user's email
+            address is set and this weblead has a user email template */
+            if($profile !== null && !empty($profile->emailAddress)){
+
+                if (Yii::app()->contEd('pro') &&
+                    $extractedParams['userEmailTemplate']) {
+
+                    /* We'll be using the user's own email account to send the
+                    web lead response (since the contact has been assigned) and
+                    additionally, if no system notification account is available,
+                    as the account for sending the notification to the user of
+                    the new web lead (since $emailFrom is going to be modified,
+                    and it will be that way when this code block is exited and the
+                    time comes to send the "welcome aboard" email to the web lead)*/
+                    $emailFrom = Credentials::model()->getDefaultUserAccount(
+                        $profile->user->id, 'email');
+                    if($emailFrom == Credentials::LEGACY_ID)
+                        $emailFrom = array(
+                            'name' => $profile->fullName,
+                            'address' => $profile->emailAddress
+                        );
+
+                    $this->sendUserNotificationEmail($this->model, $profile->emailAddress, $emailFrom, $extractedParams['userEmailTemplate']);
+                } else {
+                    $emailFrom = Credentials::model()->getDefaultUserAccount(
+                        Credentials::$sysUseId['systemNotificationEmail'], 'email');
+                    if($emailFrom == Credentials::LEGACY_ID)
+                        $emailFrom = array(
+                            'name' => $profile->fullName,
+                            'address' => $profile->emailAddress
+                        );
+                    $this->sendLegacyUserNotificationEmail($this->model, $profile->emailAddress, $emailFrom);
+                }
+            }
+
+        }
+
+        /* send new weblead an email if we have their email address and this web
+        form has a weblead email template */
+        if(Yii::app()->contEd('pro') && $extractedParams['webleadEmailTemplate'] &&
+           !empty($this->model->email)) {
+            $this->sendWebleadNotificationEmail($this->model, $emailFrom, $extractedParams['webleadEmailTemplate']);
+        }
+
+        if (!empty($tags)){
+            X2Flow::trigger('RecordTagAddTrigger', array(
+                'model' => $this->model,
+                'tags' => $tags,
+            ));
+        }
+
+        // Set body
+        $this->responseBody = $this->model;
+
+        // Add resource location header for a newly created record
+        // and send with 201 status
+        $this->response->httpHeader['Location'] = $this->createAbsoluteUrl('/api2/model', array(
+            '_class' => 'Contacts',
+            '_id' => $this->model->id
+        ));
+        $this->send(201,"Model of class \"$class\" created successfully.");
     }
 
     /**
@@ -686,6 +912,31 @@ class Api2Controller extends CController {
                 'Basic realm="X2Engine API v2"';
 
         
+        // Record this authentication failure in the cache, and permanently ban
+        // the client IP address if applicable
+        $ip = Yii::app()->request->userHostAddress;
+        if($this->settings->maxAuthFail > 0 && !$this->settings->bruteforceExempt($ip)){
+            // Count the authentication failure using the system cache
+            $cache = Yii::app()->cache;
+            $cacheId = 'n_api_authfail_'.$ip;
+            if(!($n_authfail = $cache->get($cacheId))) {
+                $n_authfail = 1;
+            } else {
+                $n_authfail++;
+            }
+
+            // Save the new failure count
+            $cache->set($cacheId,$n_authfail,$this->settings->lockoutTime);
+
+            // Append the IP address to the blacklist if it exceeds the maximum
+            // acceptable authentication failure count
+            if($this->settings->permaBan
+                    && $n_authfail >= $this->settings->maxAuthFail) {
+                $this->settings->banIP($ip);
+                Yii::app()->settings->save();
+            }
+        }
+        
 
         $this->send(401, $message);
     }
@@ -708,7 +959,16 @@ class Api2Controller extends CController {
                 'handleErrors' => true,
                 'handleExceptions' => false,
                 'errorCode' => 500
-            )
+            ),
+            'UserMailerBehavior' => array(
+                'class' => 'UserMailerBehavior'
+            ),
+            'LeadRoutingBehavior' => array(
+                'class' => 'LeadRoutingBehavior'
+            ),
+            'WebFormBehavior' => array(
+                'class' => 'WebFormBehavior'
+            ),
         );
     }
 
@@ -760,7 +1020,8 @@ class Api2Controller extends CController {
                 }
                 break;
             case 'visibility':
-                return X2PermissionsBehavior::getVisibilityOptions();
+                $permissionsBehavior = Yii::app()->params->modelPermissions;
+                return $permissionsBehavior::getVisibilityOptions();
         }
         return array();
     }
@@ -776,9 +1037,13 @@ class Api2Controller extends CController {
      */
     public function filterAuthenticate($filterChain) {
         // Check for the availability of authentication:
+        if(!isset($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW']) && isset($_SERVER['HTTP_AUTHORIZATION'])){
+            list($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW']) 
+                    = explode(':' , base64_decode(substr($_SERVER['HTTP_AUTHORIZATION'], 6)));
+        }
         foreach(array('user','pw') as $field) {
             $srvKey = 'PHP_AUTH_'.strtoupper($field);
-            if(!isset($_SERVER[$srvKey])) {
+            if(!isset($_SERVER[$srvKey]) || empty($_SERVER[$srvKey])) {
                 $this->authFail("Missing user credentials: $field");
                 return;
             }
@@ -786,7 +1051,7 @@ class Api2Controller extends CController {
         }
         $userModel = User::model()->findByAlias($user);
         // Invalid/not found
-        if(!($userModel instanceof User) || $userModel->userKey!==$pw)
+        if(!($userModel instanceof User) || !PasswordUtil::slowEquals($userModel->userKey, $pw))
             $this->authFail("Invalid user credentials.");
         elseif(trim($userModel->userKey)==null) // Null user key = disabled
             $this->authFail("API access has been disabled for the specified user.");
@@ -875,7 +1140,7 @@ class Api2Controller extends CController {
         // on a model (as opposed to, say, querying all tags regardless of the
         // type of record they're attached to)
         if(isset($_GET['_class'])){
-            $linkable = $this->staticModel->asa('X2LinkableBehavior');
+            $linkable = $this->staticModel->asa('LinkableBehavior');
             $module = !empty($linkable) ? ucfirst($linkable->module) : $_GET['_class'];
             // Assignment/ownership as stored in the model should be
             // included in the RBAC parameters for business rules to execute
@@ -890,6 +1155,13 @@ class Api2Controller extends CController {
         // There are three actions and five different request types (DELETE,
         // GET, PATCH, POST, PUT) two of which (PATCH/PUT) are indistinct.
         switch($this->action->id) {
+            case 'count':
+                switch($method) {
+                    case 'GET':
+                        $action = "{$module}Index";
+                        break;
+                }
+                break;
             case 'model':
                 switch($method) {
                     case 'DELETE':
@@ -936,6 +1208,9 @@ class Api2Controller extends CController {
                         break;
                 }
                 break;
+            case 'weblead':
+                $action = "ContactsUpdate";
+                break;
         }
 
         // Use RBAC to check permission if an auth item exists.
@@ -948,16 +1223,100 @@ class Api2Controller extends CController {
     }
 
     
+    /**
+     * Additional pre-authentication access restrictions.
+     * 
+     * @param type $filterChain
+     */
+    public function filterRestrictions($filterChain){
+        $ip = Yii::app()->request->userHostAddress;
+        $cache = Yii::app()->cache;
+
+        // Enforce whitelist/blacklist:
+        if($this->settings->isIpBlocked($ip))
+            $this->send(403,'IP address blocked.');
+
+        // Enforce the authentication failure lockout setting:
+        if($this->settings->maxAuthFail > 0 && $this->settings->lockoutTime > 0){
+            $cache = Yii::app()->cache;
+            $cacheId = 'n_api_authfail_'.$ip;
+            if(($n_authfail = $cache->get($cacheId))
+                    && $n_authfail >= $this->settings->maxAuthFail)
+                $this->send(403, "You have been temporarily locked out due to "
+                        . "repeated authentication failures.");
+        }
+
+        // Enforce the "max requests per interval" setting
+        $reqInterval = $this->settings->requestInterval;
+        $maxRequests = $this->settings->maxRequests;
+        if($maxRequests > 0 && $reqInterval > 0){
+            $cache = Yii::app()->cache;
+            $cacheId = 'n_api_requests_'.$ip;
+            if(!($n_req = $cache->get($cacheId))){
+                $cache->set($cacheId, 1, $reqInterval);
+                $filterChain->run();
+            }
+            $n_req++;
+            $cache->set($cacheId, $n_req, $reqInterval);
+            if($n_req > $maxRequests) {
+                $this->response->httpHeader['Retry-After'] = $reqInterval;
+                $this->send(429, "You have made too many requests ($n_req). "
+                        ."Please wait at least $reqInterval "
+                        ."seconds before trying again.");
+            }
+        }
+
+
+        $filterChain->run();
+    }
+    
 
     public function filters() {
         return array(
             'available', // Application not locked
             
+            'restrictions', // Pre-authentication restrictions
+            
             'authenticate', // Valid user
             'methods', // Valid request method for the given action
             'contentType', // Valid content type when submitting data
-            'rbac + model,relationships,tags', // Checks permission
+            'rbac + count,model,relationships,tags', // Checks permission
         );
+    }
+
+    /**
+     * Generates attributes from a query parameter
+     * 
+     * Takes a special format of query parameter and returns an array of
+     * attributes. The parameter should be formatted as:
+     * name1**value1,,name2**value2[...]
+     * 
+     * @param string $condition The condition parameter
+     * @return array Associative array of key=>value pairs.
+     */
+    public function findConditions($condition,$validAttributes = array()) {
+        $conditions = explode(self::FIND_DELIM,$condition);
+
+        $attributeConditions = array();
+        foreach($conditions as $condition) {
+            $attrVal = explode(self::FIND_EQUAL,$condition);
+            if(count($attrVal) < 2) {
+                continue;
+            }
+            $attribute = array_shift($attrVal);
+            
+            $attributeConditions[$attribute] = implode(
+                self::FIND_EQUAL,$attrVal);
+        }
+        
+        if(!empty($validAttributes)) {
+            // Filter out attributes not present among those that are allowable
+            $attributeConditions = array_intersect_key(
+                $attributeConditions,
+                $validAttributes
+            );
+        }
+        return $attributeConditions;
     }
 
     //////////////////////
@@ -1089,9 +1448,11 @@ class Api2Controller extends CController {
         }
 
         // Run comparisons:
+        $searchCriteria = new CDbCriteria;
         foreach($searchAttributes as $column => $value){
-            $criteria->compare($column,$value,$partialMatch,$operator,$escape);
+            $searchCriteria->compare($column,$value,$partialMatch,$operator,$escape);
         }
+        $criteria->mergeWith ($searchCriteria);
 
         // Merge extra criteria:
         if($extraCriteria instanceof CDbCriteria) {
@@ -1137,7 +1498,7 @@ class Api2Controller extends CController {
      * Returns {@link enabled}
      */
     public function getEnabled() {
-        return self::ENABLED ;
+        return self::ENABLED  && $this->settings->enabled ;
     }
 
 
@@ -1160,6 +1521,14 @@ class Api2Controller extends CController {
      */
     public function getMaxPageSize() {
         
+        if($this->settings->maxPageSize === null 
+                || $this->settings->maxPageSize === '') {
+            // Unspecified maximum page size
+            return self::MAX_PAGE_SIZE;
+        } else {
+            return $this->settings->maxPageSize;
+        }
+        
         return self::MAX_PAGE_SIZE;
     }
 
@@ -1172,13 +1541,65 @@ class Api2Controller extends CController {
      */
     public function getModel() {
         if(!isset($this->_model)) {
-            if(!isset($_GET['_id'])){
+            if(!(isset($_GET['_id']) || isset($_GET['_findBy']))){
                 $method = Yii::app()->request->requestType;
                 $this->send(400, "Cannot use method $method in action "
                         ."\"{$this->action->id}\" without specifying a valid "
-                        ."record ID.");
+                        ."record ID or finding condition.");
             }
-            $this->_model = $this->getStaticModel()->findByPk($_GET['_id']);
+            if(isset($_GET['_id'])) {
+                $this->_model = $this->getStaticModel()->findByPk($_GET['_id']);
+            } else {
+                // Find model by attributes.
+                // 
+                // First transform the _findBy parameter into conditions
+                $staticModel = $this->getStaticModel();
+                $attributeConditions = $this->findConditions(
+                    $_GET['_findBy'],
+                    $staticModel->attributes
+                );
+                
+                // No conditions present
+                if(count($attributeConditions) == 0) {
+                    $this->send(400,"Invalid/improperly formatted attribute".
+                        " conditions: \"{$_GET['_findBy']}\"");
+                }
+
+                // Find:
+                $models = $staticModel->findAllByAttributes($attributeConditions);
+                $count = count($models);
+                switch($count) {
+                    case 0:
+                        $this->send(404,"No matching record of class ".
+                            "{$_GET['_class']} found");
+                    default:
+                        $this->_model = reset($models);
+
+                        // Return with status 300 (multiple choices) and point 
+                        // the client to the query URL if more than one result
+                        // was found, and the
+                        if($count > 1 && empty($_GET['_useFirst'])) {
+                            $queryUri = $this->createUrl('/api2/model',array_merge(
+                                array('_class' => $_GET['_class']),
+                                $attributeConditions
+                            ));
+                            $directUris = array();
+                            foreach($models as $model) {
+                                $directUris[] = $this->createUrl(
+                                    '/api2/model',
+                                    array(
+                                        '_class' => $_GET['_class'],
+                                        '_id' => $model->id
+                                    )
+                                );
+                            }
+                            $this->response->httpHeader['Location'] = $queryUri;
+                            $this->response['queryUri'] = $queryUri;
+                            $this->response['directUris'] = $directUris;
+                            $this->send(300,"Multiple records match.");
+                        }
+                }
+            }
             if(!(($this->_model) instanceof X2Model))
                 $this->send(404, "Record {$_GET['_id']} of class \""
                         .get_class($this->getStaticModel())."\" not found.");
@@ -1212,6 +1633,13 @@ class Api2Controller extends CController {
         );
     }
 
+    
+    /**
+     * Advanced API settings for Platinum Edition
+     */
+    public function getSettings() {
+        return Yii::app()->settings->api2;
+    }
     
 
     /////////////////////////////
@@ -1260,7 +1688,6 @@ class Api2Controller extends CController {
      */
     public function kludgesForActions(){
         $method = Yii::app()->request->requestType;
-
         if($_GET['_class'] == 'Actions'){
             // Check association:
             if(isset($_GET['associationType'], $_GET['associationId'])){
@@ -1289,7 +1716,7 @@ class Api2Controller extends CController {
                         $params['associationId'] = $this->model->associationId;
                     }
                     $this->response->httpHeader['Location'] = $this->createAbsoluteUrl('/api2/model',$params);
-                    $this->sendEmpty(303,'Action has a different association than '
+                    $this->send(303,'Action has a different association than '
                             . 'the one specified.');
                 }
             }
@@ -1354,9 +1781,9 @@ class Api2Controller extends CController {
                     ? X2Model::$associationModels[$searchAttributes['associationType']]
                     : $searchAttributes['associationType'];
             $staticSearchModel = X2Model::model($associationClass);
-            $searchAttributes['associationType'] = $staticSearchModel->asa('X2LinkableBehavior') === null 
+            $searchAttributes['associationType'] = $staticSearchModel->asa('LinkableBehavior') === null 
                     ? lcfirst(get_class($staticSearchModel))
-                    : $staticSearchModel->asa('X2LinkableBehavior')->module;
+                    : $staticSearchModel->asa('LinkableBehavior')->module;
         }
     }
 
@@ -1385,6 +1812,7 @@ class Api2Controller extends CController {
     public static function methods() {
         return array(
             'appInfo' => 'GET',
+            'count' => 'GET',
             'dropdowns' => 'GET',
             'fieldPermissions' => 'GET',
             'fields' => 'GET',
@@ -1393,6 +1821,7 @@ class Api2Controller extends CController {
             'models' => 'GET',
             'relationships' => 'DELETE,GET,PATCH,POST,PUT',
             'tags' => 'GET,POST,DELETE',
+            'weblead' => 'POST',
             'users' => 'GET',
             'zapierFields' => 'GET'
         );
@@ -1423,9 +1852,9 @@ class Api2Controller extends CController {
      * 
      * @param type $message
      */
-    public function sendEmpty($code=204,$message = ''){
+    public function sendEmpty($message = ''){
         $this->responseBody = '';
-        $this->send($code, $message);
+        $this->send(204, $message);
     }
 
     /**
@@ -1446,6 +1875,19 @@ class Api2Controller extends CController {
             $fields = $this->jpost;
         }
         
+        if($this->settings->rawInput) {
+            foreach(array('changelog', 'TimestampBehavior') as $behavior){
+                if(!$this->model->asa($behavior) instanceof CBehavior
+                        || !$this->model->asa($behavior)->enabled)
+                    continue;
+                $this->model->disableBehavior($behavior);
+            }
+            $this->model->setAttributes($fields,false);
+            if($this->model instanceof Actions && isset($fields['actionDescription']))
+                $this->model->actionDescription = $fields['actionDescription'];
+            return;
+        }
+        
 
         // Kludge to allow setting special fields like "type" directly in
         // Actions (which is necessary in order to properly work with action
@@ -1462,6 +1904,11 @@ class Api2Controller extends CController {
         }
 
         $this->model->setX2Fields($fields);
+
+        if(get_class ($this->model) === 'Contacts' && isset($fields['trackingKey'])){
+            // key is read-only, won't be set by setX2Fields
+            $this->model->trackingKey = $fields['trackingKey']; 
+        }
     }
 
     /**

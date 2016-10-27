@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Creates a popup dropdown menu 
@@ -52,8 +53,8 @@ function PopupDropdownMenu (argsDict) {
         css: {} // css to be applied to the popup dropdown menu on open
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
-    if (typeof this.onClickOutsideSelector === 'undefined') {
-        this.onClickOutsideSelector = that.containerElemSelector + ', ' + that.openButtonSelector;
+    if (this.onClickOutsideSelector === null) {
+        this.onClickOutsideSelector = this.containerElemSelector + ', ' + this.openButtonSelector;
     }
     this._init ();
 }
@@ -85,32 +86,59 @@ PopupDropdownMenu.prototype.close = function () {
 Private instance methods
 */
 
+PopupDropdownMenu.prototype._positionMenuLeft = function () {
+    var that = this;
+    that._containerElem.position ({
+        my: 'right top', 
+        at: 'left+22 bottom',
+        of: that._openButton,
+        using: function (css) {
+            that._containerElem.css ($.extend (css, that.css));
+        }
+    });
+    that._containerElem.addClass ('flipped');
+};
+
+PopupDropdownMenu.prototype._positionMenuRight = function () {
+    var that = this;
+    that._containerElem.css ($.extend ({
+        top: that._openButton.offset ().top + 26,
+        left: that._openButton.offset ().left - 3
+    }, that.css));
+    that._containerElem.removeClass ('flipped');
+};
+
 /**
  * position menu below button 
  */
 PopupDropdownMenu.prototype._positionMenu = function () {
     var that = this; 
 
-    // flip menu if it would go past the right edge of the window
-    if (that.defaultOrientation === 'left' || 
-        that._openButton.offset ().left + that._containerElem.width () > $(window).width ()) {
+    if (that.defaultOrientation === 'left') {
+        if (that._openButton.offset ().left - that._containerElem.width () > 0) {
 
-        that._containerElem.position ({
-            my: 'right top', 
-            at: 'left+22 bottom',
-            of: that._openButton,
-            using: function (css) {
-                that._containerElem.css ($.extend (css, that.css));
-            }
-        });
-        that._containerElem.addClass ('flipped');
+            that._positionMenuLeft ();
+            return;
+        } else if (
+            that._openButton.offset ().left + that._containerElem.width () > $(window).width ()) {
+
+            that._positionMenuRight ();
+            return;
+        }
+
     } else {
-        that._containerElem.css ($.extend ({
-            top: that._openButton.offset ().top + 30,
-            left: that._openButton.offset ().left 
-        }, that.css));
-        that._containerElem.removeClass ('flipped');
+        if (
+            that._openButton.offset ().left + that._containerElem.width () > $(window).width ()) {
+
+            that._positionMenuLeft ();
+            return;
+        } else if (that._openButton.offset ().left - that._containerElem.width () > 0) {
+
+            that._positionMenuRight ();
+            return;
+        }
     }
+    that._positionMenuLeft ();
 };
 
 /**
@@ -118,11 +146,13 @@ PopupDropdownMenu.prototype._positionMenu = function () {
  */
 PopupDropdownMenu.prototype._setUpOpenButtonBehavior = function () {
     var that = this; 
-    that._openButton.click (function (evt) {
+    that._openButton.unbind ('click.PopupDropdownMenu._setUpOpenButtonBehavior').
+        bind ('click.PopupDropdownMenu._setUpOpenButtonBehavior', function (evt) {
+
         evt.preventDefault ();
         if (!that._containerElem.is (':visible')) {
             that._positionMenu ();
-            that._containerElem.fadeIn ();
+            that._containerElem.fadeIn (100);
             if (that.autoClose) {
                 $(document).one ('click', function () {
                     that.close ();
@@ -135,6 +165,7 @@ PopupDropdownMenu.prototype._setUpOpenButtonBehavior = function () {
             }
         } else {
             that.close ();
+            return true;
         }
         return false;
     });

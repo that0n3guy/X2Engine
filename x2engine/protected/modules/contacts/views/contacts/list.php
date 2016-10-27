@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,28 +33,22 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 $heading = $listModel->name; //Yii::t('contacts','All Contacts');
 
 $authParams['X2Model'] = $listModel;
-$menuItems = array(
-    array('label'=>Yii::t('contacts','All Contacts'),'url'=>array('index')),
-    array('label'=>Yii::t('contacts','Lists'),'url'=>array('lists')),
-    array('label'=>Yii::t('contacts','Create Contact'),'url'=>array('create')),
-    array('label'=>Yii::t('contacts','Create List'),'url'=>array('createList')),
-    array('label'=>Yii::t('contacts','View List')),
-    array('label'=>Yii::t('contacts','Edit List'),'url'=>array('updateList','id'=>$listModel->id)),
-    array('label'=>Yii::t('contacts','Delete List'),'url'=>'#', 'linkOptions'=>array('submit'=>array('deleteList','id'=>$listModel->id),'confirm'=>'Are you sure you want to delete this item?')),
-);
 
 $opportunityModule = Modules::model()->findByAttributes(array('name'=>'opportunities'));
 $accountModule = Modules::model()->findByAttributes(array('name'=>'accounts'));
 
-if($opportunityModule->visible && $accountModule->visible)
-    $menuItems[] =     array('label'=>Yii::t('app', 'Quick Create'), 'url'=>array('/site/createRecords', 'ret'=>'contacts'), 'linkOptions'=>array('id'=>'x2-create-multiple-records-button', 'class'=>'x2-hint', 'title'=>Yii::t('app', 'Create a Contact, Account, and Opportunity.')));
+$menuOptions = array(
+    'all', 'lists', 'create', 'createList', 'viewList', 'editList', 'deleteList',
+);
+if ($opportunityModule->visible && $accountModule->visible)
+    $menuOptions[] = 'quick';
+$this->insertMenu($menuOptions, $listModel, $authParams);
 
-$this->actionMenu = $this->formatMenu($menuItems, $authParams);
 
 Yii::app()->clientScript->registerScript('search', "
 $('.search-button').unbind('click').click(function(){
@@ -125,24 +120,25 @@ $('#removeFromList').unbind('click').click(function() {
 <div class="search-form" style="display:none">
 <?php /* $this->renderPartial('_search',array(
     'model'=>$model,
-        'users'=>UserChild::getNames(),
+        'users'=>User::getNames(),
 )); */ ?>
 </div><!-- search-form -->
 <?php
 
 $massActions = array(
-    'addToList', 'newList'
+    'MassTag', 'MassTagRemove', 'MassUpdateFields', 'MassAddToList', 
+    'NewListFromSelection'
 );
 
 if ($listModel->type === 'static') {
-    $massActions[] = 'removeFromList';
+    $massActions[] = 'MassRemoveFromList';
 }
 
 $this->widget('X2GridView', array(
     'id'=>'contacts-grid',
     'enableQtips' => true,
     'qtipManager' => array (
-        'X2QtipManager',
+        'X2GridViewQtipManager',
         'loadingText'=> addslashes(Yii::t('app','loading...')),
         'qtipSelector' => ".contact-name"
     ),
@@ -198,4 +194,5 @@ $this->widget('X2GridView', array(
     'enableControls'=>true,
     'enableTags'=>true,
     'fullscreen'=>true,
+    'enableSelectAllOnAllPages' => false,
 ));

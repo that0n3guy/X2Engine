@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,14 +33,23 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * @package application.modules.groups.controllers 
  */
 class GroupsController extends x2base {
+
     public $modelClass='Groups';
 
+//    public function behaviors() {
+//        return array_merge(parent::behaviors(), array(
+//            'MobileControllerBehavior' => array(
+//                'class' => 
+//                    'application.modules.mobile.components.behaviors.MobileControllerBehavior'
+//            ),
+//        ));
+//    }
 	
 	/**
 	 * Filters to be used by the controller.
@@ -56,6 +66,19 @@ class GroupsController extends x2base {
             'setPortlets',
         );
 	}
+
+//    public function actionMobileView ($id) {
+//        $model = $this->loadModel ($id);
+//        $this->dataUrl = $model->getUrl ();
+//        if ($this->checkPermissions($model, 'view')) {
+//            $this->render (
+//                $this->pathAliasBase.'views.mobile.recordView',
+//                array (
+//                    'model' => $model,
+//                )
+//            );
+//        }
+//    }
 
 	/**
 	 * Displays a particular model.
@@ -154,6 +177,7 @@ class GroupsController extends x2base {
 			else
 				$users=array();
 			if($model->save()){
+                $changeMade = false;
 				foreach($users as $user){
 					$link=new GroupToUser;
 					$link->groupId=$model->id;
@@ -162,10 +186,13 @@ class GroupsController extends x2base {
                         $link->userId=$userRecord->id;
                         $link->username=$userRecord->username;
                         $test=GroupToUser::model()->findByAttributes(array('groupId'=>$model->id,'userId'=>$userRecord->id));
-                        if(!isset($test))
+                        if(!isset($test)) {
                             $link->save();
+                            $changeMade = true;
+                        }
                     }
 				}
+                if ($changeMade) Yii::app()->authCache->clear ();
 				$this->redirect(array('view','id'=>$model->id));
 			}
 		}
@@ -266,7 +293,67 @@ class GroupsController extends x2base {
 	}
 
     public function actionGetItems ($term) {
-        X2LinkableBehavior::getItems ($term);
+        LinkableBehavior::getItems ($term);
+    }
+
+    /**
+     * Create a menu for Groups
+     * @param array Menu options to remove
+     * @param X2Model Model object passed to the view
+     * @param array Additional menu parameters
+     */
+    public function insertMenu($selectOptions = array(), $model = null, $menuParams = null) {
+        $Group = Modules::displayName(false);
+        $modelId = isset($model) ? $model->id : 0;
+
+        /**
+         * To show all options:
+         * $menuOptions = array(
+         *     'index', 'create', 'view', 'edit', 'delete',
+         * );
+         */
+
+        $menuItems = array(
+            array(
+                'name'=>'index',
+                'label'=>Yii::t('groups','{group} List', array(
+                    '{group}' => $Group,
+                )),
+                'url'=>array('index')
+            ),
+            array(
+                'name'=>'create',
+                'label'=>Yii::t('groups','Create {group}', array(
+                    '{group}' => $Group,
+                )),
+                'url'=>array('create')
+            ),
+            array(
+                'name'=>'view',
+                'label'=>Yii::t('groups','View'),
+                'url'=>array('view', 'id'=>$modelId)
+            ),
+            array(
+                'name'=>'edit',
+                'label'=>Yii::t('groups','Edit {group}', array(
+                    '{group}' => $Group,
+                )),
+                'url'=>array('update', 'id'=>$modelId)
+            ),
+            array(
+                'name'=>'delete',
+                'label'=>Yii::t('groups','Delete {group}', array(
+                    '{group}' => $Group,
+                )),
+                'url'=>'#',
+                'linkOptions'=>array(
+                    'submit'=>array('delete','id'=>$modelId),
+                    'confirm'=>Yii::t('app','Are you sure you want to delete this item?'))
+            ),
+        );
+
+        $this->prepareMenu($menuItems, $selectOptions);
+        $this->actionMenu = $this->formatMenu($menuItems, $menuParams);
     }
 
 }

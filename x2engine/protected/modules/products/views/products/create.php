@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,14 +33,18 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-$this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('products','Product List'), 'url'=>array('index')),
-	array('label'=>Yii::t('products','Create')),
-));
+$menuOptions = array(
+    'index', 'create',
+);
+$this->insertMenu($menuOptions);
 ?>
-<div class="page-title icon products"><h2><?php echo Yii::t('products','Create New Product'); ?></h2></div>
+<div class="page-title icon products"><h2>
+    <?php echo Yii::t('products','Create New {module}', array(
+        '{module}' => Modules::displayName(false),
+    )); ?>
+</h2></div>
 <?php
 if(!isset($model->status) || $model->status == '') {
 	$model->status = 'Active';
@@ -49,4 +54,8 @@ if(!isset($model->currency) || $model->currency == '') {
 }
 ?>
 
-<?php echo $this->renderPartial('application.components.views._form', array('model'=>$model,'users'=>$users,'modelName'=>'Product')); ?>
+<?php 
+$this->widget ('FormView', array(
+	'model' => $model
+));
+//echo $this->renderPartial('application.components.views.@FORMVIEW', array('model'=>$model,'users'=>$users,'modelName'=>'Product')); ?>

@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,10 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+// TODO: move this out of iframe to simplify dependency registration
+
 Yii::import('application.extensions.CJuiDateTimePicker.CJuiDateTimePicker');
 $jsVersion = '?'.Yii::app()->params->buildDate;
 $themeUrl = Yii::app()->theme->getBaseUrl();
@@ -63,12 +67,19 @@ $language = (Yii::app()->language == 'en') ? '' : Yii::app()->getLanguage();
         <link rel="stylesheet" type="text/css" href="<?php echo $themeUrl; ?>/css/responsiveUIElements.css?<?php echo $jsVersion ?>" media="screen, projection" />
         <link rel="stylesheet" type="text/css" href="<?php echo $themeUrl; ?>/css/responsiveX2Forms.css?<?php echo $jsVersion ?>" media="screen, projection" />
         <link rel="stylesheet" type="text/css" href="<?php echo Yii::app()->clientScript->coreScriptUrl.'/jui/css/base/jquery-ui.css'; ?>" />
-        <!-- -->
+        <!-- used for products actions -->
+        <link rel="stylesheet" type="text/css" href="<?php echo Yii::app()->getModule ('quotes')->assetsUrl.'/css/lineItemsMain.css'; ?>" />
+        <link rel="stylesheet" type="text/css" href="<?php echo Yii::app()->getModule ('quotes')->assetsUrl.'/css/lineItemsRead.css'; ?>" />
+        <link rel="stylesheet" type="text/css" href="<?php echo Yii::app()->getModule ('quotes')->assetsUrl.'/css/lineItemsWrite.css'; ?>" />
+        <link rel="stylesheet" type="text/css" href="<?php echo Yii::app()->getModule ('quotes')->assetsUrl.'/css/lineItemsMini.css'; ?>" />
+        <!--  -->
         <script type="text/javascript" src="<?php echo Yii::app()->clientScript->coreScriptUrl.'/jquery.js'; ?>"></script>
         <script type="text/javascript" src="<?php echo Yii::app()->clientScript->coreScriptUrl.'/jui/js/jquery-ui.min.js'; ?>"></script>
         <script type="text/javascript" src="<?php echo Yii::app()->clientScript->coreScriptUrl.'/jui/js/jquery-ui-i18n.min.js'; ?>"></script>
         <script type="text/javascript" src="<?php echo Yii::app()->getBaseUrl().'/js/jquery-ui-timepicker-addon.js'; ?>"></script>
         <script type="text/javascript" src="<?php echo Yii::app()->getBaseUrl().'/js/qtip/jquery.qtip.min.js'; ?>"></script>
+        <script type="text/javascript" src="<?php echo Yii::app()->getBaseUrl().'/js/ComboBox.js'; ?>"></script>
+        <script><?php echo Yii::app()->getJSGlobalsSetupScript (); ?></script>
         <?php
         $mmPath = Yii::getPathOfAlias('application.extensions.moneymask.assets');
         $aMmPath = Yii::app()->getAssetManager()->publish($mmPath);
@@ -85,6 +96,9 @@ $language = (Yii::app()->language == 'en') ? '' : Yii::app()->getLanguage();
                 )); ?>
             });
         </script>
+        <!-- used for products actions-->
+        <script><?php echo Yii::app()->clientScript->getCurrencyConfigScript (); ?></script>
+        <script type="text/javascript" src="<?php echo Yii::app()->getModule ('quotes')->assetsUrl.'/js/LineItems.js'; ?>"></script>
         <!-- -->
         <script type="text/javascript">
             $(document).ready(function() {
@@ -177,15 +191,56 @@ $language = (Yii::app()->language == 'en') ? '' : Yii::app()->getLanguage();
                     height: 21px;
                 }
             }
+            .dialog-label {
+                font-weight: bold;
+                display: block;
+            }
+
+            .cell {
+                float: left;
+            }
+
+            .dialog-cell {
+                padding: 5px;
+            }
+
+            #calendar-invites tr,th{
+                font-weight: bold;
+                padding: 5px;
+            }
+
+            #calendar-invites tr,td{
+                padding: 5px;
+
+            }
+            #calendar-invite-box{
+                border-top: 1px solid #ccc;
+                margin-top: 10px;
+            }
         </style>
         <title><?php Yii::t('actions', 'Action View Frame'); ?></title>
     </head>
     <body>
         <?php
+        if ($textOnly) {
+        ?>
+        <div id='actions-frameUpdate-form' 
+         data-action-type='<?php echo X2Html::sanitizeAttribute ($model->type); ?>'>
+            <div class='content'>
+            <?php
+            echo CHtml::encode ($model->actionDescription);
+            ?>
+            </div>
+        </div>
+        <?php
+        } else {
         $form = $this->beginWidget('CActiveForm', array(
             'id' => 'actions-frameUpdate-form',
             'enableAjaxValidation' => false,
-            'action' => 'update?id='.$model->id
+            'action' => 'update?id='.$model->id,
+            'htmlOptions' => array (
+                'data-action-type' => $model->type,
+            ),
         ));
         ?>
         <div class='form'>
@@ -333,6 +388,36 @@ $language = (Yii::app()->language == 'en') ? '' : Yii::app()->getLanguage();
                 echo "<span class='field-value'>";
                 echo Formatter::convertLineBreaks($model->actionDescription);
                 echo "</span>";
+                 // used for products actions
+                if ($model->type === 'products') {
+                    $quote = $model->getActionsDummyQuote ();
+                    if (!$quote) $quote = new Quote;
+                    echo '<div class="field-value">';
+                    $this->renderPartial ('application.modules.quotes.views.quotes._lineItems',
+                        array (
+                            'model' => $quote,
+                            'readOnly' => true,
+                            'module' => Yii::app()->getModule ('quotes'),
+                            'mini' => true,
+                            'products' => Product::activeProducts (),
+                            'namespacePrefix' => 'actionIframeproductsTabView'
+                        )
+                    );
+                    echo '</div>';
+                    echo '<span class="hidden-frame-form" style="display: none;">';
+                    $this->renderPartial ('application.modules.quotes.views.quotes._lineItems',
+                        array (
+                            'model' => $quote,
+                            'readOnly' => false,
+                            'module' => Yii::app()->getModule ('quotes'),
+                            'mini' => true,
+                            'products' => Product::activeProducts (),
+                            'namespacePrefix' => 'actionIframeproductsTabEdit',
+                            'saveButtonId' => 'action-edit-submit-butotn'
+                        )
+                    );
+                    echo '</span>';
+                }
                  
                 echo '<div>';
                 echo CHtml::ajaxSubmitButton(
@@ -340,6 +425,9 @@ $language = (Yii::app()->language == 'en') ? '' : Yii::app()->getLanguage();
                     array(
                         'id' => 'action-edit-submit-button',
                         'style' => 'display:none;float:left;',
+                         // used for products actions
+                        'onClick' => ($model->type === 'products' ? 
+                            'return x2.actionIframeproductsTabEditlineItems.validateAllInputs ();' : ''),
                           
                         'class' => 'hidden-frame-form x2-button highlight')); 
                 echo CHtml::link(
@@ -351,17 +439,44 @@ $language = (Yii::app()->language == 'en') ? '' : Yii::app()->getLanguage();
 
                 ?>
             </div>
+            <?php if($model->type === 'event' && !empty($model->invites)){ ?>
+                <div style="clear:both"></div>
+                <div id="calendar-invite-box" class="row">
+                    <div class="cell dialog-cell">
+                        <table id="calendar-invites">
+                            <tr>
+                                <th><?php echo Yii::t('calendar', 'Guest'); ?></th>
+                                <th><?php echo Yii::t('calendar', 'Status'); ?></th>
+                            </tr>
+                            <?php
+                            foreach ($model->invites as $invite) {
+                                echo "<tr>";
+                                echo "<td>" . $invite->email . "</td><td>" . 
+                                        (is_null($invite->status) ? Yii::t('calendar', 'Awaiting response') 
+                                        : Yii::t('calendar', $invite->status)) . "</td>";
+                                echo "</tr>";
+                            }
+                            ?>
+                        </table>
+                    </div>
+                </div>
+            <?php } ?>
             </div>
                 <?php $this->endWidget(); ?>
-                <?php if(!empty($model->associationType) && is_numeric($model->associationId) && !is_null(X2Model::getAssociationModel($model->associationType, $model->associationId)) && ($publisher == 'false' || !$publisher)){ ?>
+                <?php if(($publisher == 'false' || !$publisher) && !empty($model->associationType) && is_numeric($model->associationId) && !is_null(X2Model::getAssociationModel($model->associationType, $model->associationId))){ ?>
                 <div id="recordBody" class="form">
                     <?php echo '<div class="page-title"><h3>'.Yii::t('actions', 'Associated Record').'</h3></div>'; ?>
                     <?php
                     if($model->associationType == 'contacts'){
-                        $this->renderPartial('application.modules.contacts.views.contacts._detailViewMini', array(
+                        $this->widget ('DetailView', array(
                             'model' => X2Model::model('Contacts')->findByPk($model->associationId),
-                            'actionModel' => $model,
+                            'scenario' => 'Inline',
+                            'nameLink' => true
                         ));
+                        // $this->renderPartial('application.modules.contacts.views.contacts._@DETAILVIEWMini', array(
+                            // 'model' => X2Model::model('Contacts')->findByPk($model->associationId),
+                            // 'actionModel' => $model,
+                        // ));
                     }else{
                         echo ucwords(
                             Events::parseModelName(X2Model::getModelName($model->associationType))).
@@ -377,6 +492,9 @@ $language = (Yii::app()->language == 'en') ? '' : Yii::app()->getLanguage();
         </div>
         <div id="actionFooter">
         </div>
+        <?php
+        }
+        ?>
     </body>
 </html>
 <script>

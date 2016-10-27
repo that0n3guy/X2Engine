@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Track service/support cases among contacts.
@@ -80,22 +81,27 @@ class ServicesController extends x2base {
             'inlineEmail' => array(
                 'class' => 'InlineEmailAction',
             ),
-            'servicesReport' => array(
-                'class' => 'ServicesReportAction',
-            ),
-            'exportServiceReport' => array(
-                'class' => 'ExportServiceReportAction',
-            ),
         ));
     }
 
     public function behaviors(){
         return array_merge(parent::behaviors(), array(
+            'MobileControllerBehavior' => array(
+                'class' => 
+                    'application.modules.mobile.components.behaviors.MobileControllerBehavior'
+            ),
+            'MobileActionHistoryBehavior' => array(
+                'class' => 
+                    'application.modules.mobile.components.behaviors.MobileActionHistoryBehavior'
+            ),
             'ServiceRoutingBehavior' => array(
                 'class' => 'ServiceRoutingBehavior'
             ),
             'QuickCreateRelationshipBehavior' => array(
                 'class' => 'QuickCreateRelationshipBehavior',
+            ),
+            'WebFormBehavior' => array(
+                'class' => 'WebFormBehavior'
             ),
         ));
     }
@@ -106,6 +112,7 @@ class ServicesController extends x2base {
      */
     public function actionView($id){
         $model = $this->loadModel($id);
+        if (!$this->checkPermissions($model, 'view')) $this->denied ();
 
         // add service case to user's recent item list
         User::addRecentItem('s', $id, Yii::app()->user->getId()); 
@@ -314,15 +321,8 @@ class ServicesController extends x2base {
         $this->render('index', array('model' => $model));
     }
 
-    public function actionGetItems(){
-        // We need to select the id both as 'id' and 'value' in order to correctly populate the association form.
-        $sql = 'SELECT id, id as value FROM x2_services WHERE id LIKE :qterm ORDER BY id ASC';
-        $command = Yii::app()->db->createCommand($sql);
-        $qterm = $_GET['term'].'%';
-        $command->bindParam(":qterm", $qterm, PDO::PARAM_STR);
-        $result = $command->queryAll();
-        echo CJSON::encode($result);
-        exit;
+    public function actionGetItems($term){
+        LinkableBehavior::getItems ($term, 'id', 'id');
     }
 
     /**
@@ -373,5 +373,105 @@ class ServicesController extends x2base {
             Yii::app()->params->profile->hideCasesWithStatus = CJSON::encode($hideStatuses);
             Yii::app()->params->profile->update(array('hideCasesWithStatus'));
         }
+    }
+
+    /**
+     * Create a menu for Services
+     * @param array Menu options to remove
+     * @param X2Model Model object passed to the view
+     * @param array Additional menu parameters
+     */
+    public function insertMenu($selectOptions = array(), $model = null, $menuParams = null) {
+        $Services = Modules::displayName();
+        $Service = Modules::displayName(false);
+        $modelId = isset($model) ? $model->id : 0;
+
+        /**
+         * To show all options:
+         * $menuOptions = array(
+         *     'index', 'create', 'view', 'edit', 'delete', 'email', 'attach', 'quotes',
+         *     'createWebForm', 'print', 'import', 'export',
+         * );
+         */
+
+        $menuItems = array(
+            array(
+                'name'=>'index',
+                'label'=>Yii::t('services','All Cases'),
+                'url'=>array('index')
+            ),
+            array(
+                'name'=>'create',
+                'label'=>Yii::t('services','Create Case'),
+                'url'=>array('create')
+            ),
+            RecordViewLayoutManager::getViewActionMenuListItem ($modelId),
+            array(
+                'name'=>'edit',
+                'label'=>Yii::t('services','Edit Case'),
+                'url'=>array('update', 'id'=>$modelId)
+            ),
+            array(
+                'name'=>'delete',
+                'label'=>Yii::t('services','Delete Case'),
+                'url'=>'#',
+                'linkOptions'=>array(
+                    'submit'=>array('delete','id'=>$modelId),
+                    'confirm'=>'Are you sure you want to delete this item?')
+            ),
+            array(
+                'name'=>'email',
+                'label'=>Yii::t('app','Send Email'),
+                'url'=>'#',
+                'linkOptions'=>array('onclick'=>'toggleEmailForm(); return false;')
+            ),
+            ModelFileUploader::menuLink(),
+            array(
+                'name'=>'quotes',
+                'label' => Yii::t('quotes', '{quotes}/Invoices', array(
+                    '{quotes}' => Modules::displayName(true, "Quotes"),
+                )),
+                'url' => 'javascript:void(0)',
+                'linkOptions' => array('onclick' => 'x2.inlineQuotes.toggle(); return false;')
+            ),
+            array(
+                'name'=>'createWebForm',
+                'label'=>Yii::t('services','Create Web Form'),
+                'url'=>array('createWebForm')
+            ),
+            array(
+                'name'=>'print',
+                'label' => Yii::t('app', 'Print Record'),
+                'url' => '#',
+                'linkOptions' => array (
+                    'onClick'=>"window.open('".
+                        Yii::app()->createUrl('/site/printRecord', array (
+                            'modelClass' => 'Services',
+                            'id' => $modelId,
+                            'pageTitle' => Yii::t('app', '{service} Case', array(
+                                '{service}' => $Service,
+                            )).': '.(isset($model) ? $model->name : "")
+                        ))."');"
+                )
+            ),
+            array(
+                'name'=>'import',
+                'label'=>Yii::t('services', 'Import {services}', array(
+                    '{services}' => $Services,
+                )),
+                'url'=>array('admin/importModels', 'model'=>'Services'),
+            ),
+            array(
+                'name'=>'export',
+                'label'=>Yii::t('services', 'Export {services}', array(
+                    '{services}' => $Services,
+                )),
+                'url'=>array('admin/exportModels', 'model'=>'Services'),
+            ),
+            RecordViewLayoutManager::getEditLayoutActionMenuListItem (),
+        );
+
+        $this->prepareMenu($menuItems, $selectOptions);
+        $this->actionMenu = $this->formatMenu($menuItems, $menuParams);
     }
 }

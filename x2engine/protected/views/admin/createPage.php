@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,14 +33,100 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
+
+Yii::app()->clientScript->registerCssFile(
+    Yii::app()->theme->baseUrl.'/css/views/admin/createPage.css');
+
+Yii::app()->clientScript->registerScript('adminCreatePageJS',"
+;(function () {
+
+var form$ = $('#admin-add-top-link-form');
+form$.find ('.choice-container').click (function () {
+    if ($(this).hasClass ('selected-choice')) {
+    } else {
+        form$.find ('.choice-container').toggleClass ('selected-choice');
+    }
+});
+
+$('#create-top-bar-link').click (function () {
+    form$.find ('.choice-container').not ('.selected-choice').find (':input').
+        attr ('disabled', 'disabled');
+    form$.find ('.choice-container.selected-choice').find (':input').
+        removeAttr ('disabled');
+});
+
+}) ();
+", CClientScript::POS_END);
+
 ?>
 <div class='page-title'>
-<h2><?php echo Yii::t('admin','Create Page'); ?></h2>
+<h2><?php echo Yii::t('admin','Add Top Bar Link'); ?></h2>
 </div>
-<div class='admin-form-container'>
-    <?php echo Yii::t('admin','This form will allow you to create a Document that will be linked on the top menu bar.') ?>
-    <br /><br />
+<div class='admin-form-container form' id='admin-add-top-link-form'>
+    <?php
+    $form = $this->beginWidget ('X2ActiveForm', array (
+            'formModel' => $model,
+            'instantiateJSClassOnInit' => false,
+        ));
+        X2Html::getFlashes ();
+        echo $form->errorSummary ($model);
+        echo Yii::t(
+            'admin',
+            'Add a link to the top bar, either to a specific URL, or to a record in X2CRM.').
+            "<br />";
+        ?>
+        <div class='choice-container-outer'>
+            <div class='url-specification-container choice-container<?php  
+                echo $model->getSelection () === 'topLinkUrl' ? ' selected-choice' : '';
+            ?>'>
+            <?php
+            echo CHtml::tag ('h3', array (), CHtml::encode (Yii::t('admin', 'Specify a URL:')));
+            echo $form->label ($model, 'topLinkUrl');
+            echo $form->textField ($model, 'topLinkUrl');
+            echo $form->label ($model, 'topLinkText');
+            echo $form->textField ($model, 'topLinkText');
+            ?>
+            </div>
+            <?php
+            echo '<div class="alternation-text">-&nbsp;'.CHtml::encode (Yii::t('app', 'OR')).
+                '&nbsp;-</div>';
+            ?>
+            <div class='record-specification-container choice-container<?php
+                echo $model->getSelection () !== 'topLinkUrl' ? ' selected-choice' : '';
+            ?>'>
+            <?php
+            echo CHtml::tag ('h3', array (), CHtml::encode (Yii::t('admin', 'Select a record:')));
+            echo $form->label ($model, 'recordName');
+            if (!isset ($model->recordType)) $model->recordType = 'Contacts';
+            echo $form->multiTypeAutocomplete ($model, 'recordType', 'recordId',
+                X2Model::getModelTypes (true, function ($elem) {
+                    return X2Model::model ($elem)->asa ('LinkableBehavior');
+                }),
+                array (
+                    'autocompleteName' => 'recordName',
+                    'autocompleteValue' => $model->recordName,
+                    'htmlOptions' => array (
+                        'class' => 'all-form-input-style',
+                    )
+                )
+            );
+            ?>
+            </div>
+            <div class='extra-options-container'>
+            <?php
+            echo $form->checkBox ($model, 'openInNewTab');
+            echo $form->label ($model, 'openInNewTab', array (
+                'style' => 'display: inline;',
+            ));
+            ?>
+            </div>
+        </div>
+        <?php
+        echo CHtml::submitButton(Yii::t('admin', "Create"), array(
+            'class' => 'x2-button',
+            'id' => 'create-top-bar-link',
+        ));
+    $this->endWidget ();
+    ?>
 </div>
-
-<?php echo $this->renderPartial('application.modules.docs.views.docs._form', array('model'=>$model,'users'=>$users)); ?>

@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Extends functionality of jQuery UI sortable for the purposes of the workflow drag and drop UI.
@@ -59,26 +60,33 @@ $.widget ("x2.workflowDragAndDropSortable", $.ui.sortable, {
      *  -within other lists, the list item will always be prepended to the list, maintaining 
      *   lastUpdated ordering
      */
-	_rearrange: function(event, i, a, hardRefresh) {
-        if (this.currentContainer !== this.originalContainer || this.isLastItem) {
+	_rearrange: function(event, i /* item with least distance */, a /* container */, hardRefresh) {
+        var currList = i ? $(i.item).closest ('.list-view') : a.closest ('.list-view');
+        var origList = this.originalContainer.element.closest ('.list-view');
 
-            if (this.isLastItem && this.currentContainer === this.originalContainer) {
-                // item is last item in list, append to list
+        if (currList.attr ('id') !== origList.attr ('id') && this.isLastItem) {
+            // item is last item in list, append to list
 
-                originalRearrange.call (this, event, null, this.currentContainer.element, hardRefresh, true);
-            } else { 
-                // item is being dropped into another container, prepend it to that container's list
+            originalRearrange.call (this, event, null, currList.find ('.items'), hardRefresh, true);
+        } else if (currList.attr ('id') !== origList.attr ('id')) {
+            // item is being dropped into another container, prepend it to that container's list
 
-                originalRearrange.call (this, event, null, this.currentContainer.element, hardRefresh);
-            }
+            originalRearrange.call (this, event, null, currList.find ('.items'), hardRefresh);
         } else if (this.currentItem.next () || this.currentItem.prev ()) {
             // item is being dropped into original container, return it to its original position
 
-            var sibling = this.currentItem.next () || this.currentItem.prev ();
+            var prev;
+            if (this.currentItem.next ()) {
+                var sibling = this.currentItem.next ();
+                prev = false;
+            } else {
+                var sibling = this.currentItem.prev ();
+                prev = true;
+            }
             //console.log ('sibling = ');
             //console.log (sibling);
 
-            originalRearrange.call (this, event, {item: [$(sibling).get (0)]}, null, hardRefresh);
+            originalRearrange.call (this, event, {item: [$(sibling).get (0)]}, null, hardRefresh, prev);
         } 
 
         /*!
@@ -92,15 +100,15 @@ $.widget ("x2.workflowDragAndDropSortable", $.ui.sortable, {
          *
          * http://api.jqueryui.com/sortable/
          */
-        function originalRearrange (event, i, a, hardRefresh, append) {
+        function originalRearrange (event, i, a, hardRefresh, append, prev) {
             //console.log (i);
             /* x2modstart */ 
             // modified so that place holder is prepended, instead of appended
             var append = typeof append === 'undefined' ? false : append; 
             if (append)
-                a ? $(a[0]).append($(this.placeholder[0])) : i.item[0].parentNode.insertBefore(this.placeholder[0], (this.direction == 'down' ? i.item[0] : i.item[0].nextSibling));
+                a ? $(a[0]).append($(this.placeholder[0])) : i.item[0].parentNode.insertBefore(this.placeholder[0], (!prev ? i.item[0] : i.item[0].nextSibling));
             else 
-                a ? $(a[0]).prepend($(this.placeholder[0])) : i.item[0].parentNode.insertBefore(this.placeholder[0], (this.direction == 'down' ? i.item[0] : i.item[0].nextSibling));
+                a ? $(a[0]).prepend($(this.placeholder[0])) : i.item[0].parentNode.insertBefore(this.placeholder[0], (!prev ? i.item[0] : i.item[0].nextSibling));
 
             /* x2modend */ 
             //Various things done here to improve the performance:

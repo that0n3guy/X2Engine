@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 
 $dragAndDropView = isset ($parentView) && $parentView === '_dragAndDropView';
@@ -43,7 +44,12 @@ $dragAndDropView = isset ($parentView) && $parentView === '_dragAndDropView';
     <?php
     if (!$dragAndDropView) {
     ?>
-    <h2><?php echo Yii::t('workflow', 'Process Status'); ?></h2>
+    <h2>
+        <?php
+        echo Yii::t('workflow', '{process} Status', array(
+            '{process}' => Modules::displayName(false),
+        )); ?>
+    </h2>
     <?php 
     }
     $form = $this->beginWidget('CActiveForm', array(
@@ -68,38 +74,14 @@ $dragAndDropView = isset ($parentView) && $parentView === '_dragAndDropView';
         ));
         ?>
     </div>
-    <div class="row">
-        <div class='date-range-title'><?php echo Yii::t('app', 'Expected Close Date:'); ?> </div>
-        <?php
-        $this->widget ('DateRangeInputsWidget', array (
-            'startDateName' => 'expectedCloseDateStart',
-            'startDateLabel' => Yii::t('workflow', 'Start Date'),
-            'startDateValue' => $expectedCloseDateDateRange['start'],
-            'endDateName' => 'expectedCloseDateEnd',
-            'endDateLabel' => Yii::t('app', 'End Date'),
-            'endDateValue' => $expectedCloseDateDateRange['end'],
-            'dateRangeName' => 'expectedCloseDateRange',
-            'dateRangeLabel' => Yii::t('app', 'Date Range'),
-            'dateRangeValue' => $expectedCloseDateDateRange['range'] === '' ? 
-                'all' : $expectedCloseDateDateRange['range'],
-        ));
-        ?>
-    </div>
     <div class="row row-no-title">
         <div class="cell">
             <?php echo CHtml::label(Yii::t('app', 'Record Type'),'modelType'); ?>
             <?php
-            echo CHtml::dropDownList('modelType',$modelType,array(
-                ''=>Yii::t('workflow','All'),
-                'contacts'=>Yii::t('workflow','Contacts'),
-                'opportunities'=>Yii::t('workflow','Opportunities'),
-                'accounts'=>Yii::t('workflow','Accounts'),
-            ),array(
-                'id'=>'workflow-model-type-filter',
-                'style'=>'display: none;',
-                'multiple' => 'multiple',
-                'class' => 'x2-multiselect-dropdown',
-                'data-selected-text' => Yii::t('workflow', 'record type(s)'),
+            echo CHtml::dropDownList('modelType', $modelType,
+                    X2Model::getModelTypesWhichSupportWorkflow(true, true),
+                    array(
+                'id' => 'workflow-model-type-filter',
             ));
             ?>
         </div>
@@ -107,7 +89,9 @@ $dragAndDropView = isset ($parentView) && $parentView === '_dragAndDropView';
     <div class="row row-no-title">
         <div class="cell">
             <?php 
-            echo CHtml::label(Yii::t('workflow','User'), 'users');
+            echo CHtml::label(Yii::t('workflow','{user}', array(
+                '{user}' => Modules::displayName(false, "Users"),
+            )), 'users');
             echo CHtml::dropDownList(
                 'users',$users,
                 array_merge(array(''=>Yii::t('app','All')),User::getNames())); ?>

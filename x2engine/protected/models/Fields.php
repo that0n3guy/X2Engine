@@ -1,8 +1,8 @@
 <?php
 
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -22,7 +22,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -33,7 +34,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * This is the model class for table "x2_fields".
@@ -56,12 +57,25 @@ class Fields extends CActiveRecord {
      */
     const NAMEID_DELIM = '_';
 
+    const MULTI_ASSIGNMENT_DELIM = ', ';
+
     const RATING_MIN = 1;
+
     const RATING_MAX = 5;
 
-    private static $_purifier;
+    const WRITE_PERMISSION = 2;
+
+    const READ_PERMISSION = 1;
+
+    const NO_PERMISSION = 0;
+
+    public $includeEmpty = true;
 
     private $_myTableName;
+
+    private $_typeChanged = false;
+
+    private static $_purifier;
 
     /**
      * PHP types corresponding to field types in X2Engine.
@@ -83,10 +97,112 @@ class Fields extends CActiveRecord {
         'link' => 'string',
         'optionalAssignment' => 'string',
         'percentage' => 'double',
-        
         'rating' => 'integer',
         'varchar' => 'string',
     );
+
+    /**
+     * Constructor override.
+     */
+    public function __construct($scenario = 'insert') {
+        parent::__construct($scenario);
+        if($scenario == 'search') {
+            $this->setAttributes(
+                array_fill_keys(
+                    $this->attributeNames(),
+                    null
+                ),
+                false);
+        }   
+    }
+
+    public function behaviors () {
+        return array_merge (parent::behaviors (), array (
+            'CommonFieldsBehavior' => array (
+                'class' => 'application.components.behaviors.CommonFieldsBehavior',
+            )
+        ));
+    }
+
+    public function getDropdownValue ($fieldValue) {
+        return X2Model::model('Dropdowns')->getDropdownValue(
+            $this->linkType, $fieldValue);
+    }
+
+    public function getDropdownOptions () {
+        return Dropdowns::getItems($this->linkType, null, true);
+    }
+
+    public function setAttributes ($values, $safeOnly=true) {
+        if (isset ($values['type']) && $this->type !== $values['type']) {
+            $this->_typeChanged = true;
+        }
+        return parent::setAttributes ($values, $safeOnly);
+    }
+
+    /**
+     * Rules for saving a field.
+     *
+     * See the following MySQL documentation pages for more info on length
+     * restrictions and naming requirements:
+     * http://dev.mysql.com/doc/refman/5.0/en/identifiers.html
+     *
+     * @return array validation rules for model attributes.
+     */
+    public function rules(){
+        // NOTE: you should only define rules for those attributes that
+        // will receive user inputs.
+        return array(
+            array('modelName, attributeLabel', 'length', 'max' => 250),
+            array('fieldName','length','max'=>64), // Max length for column identifiers in MySQL
+            array('fieldName','match','pattern'=>'/^[a-zA-Z]\w+$/','message'=>Yii::t('admin','Field name may only contain alphanumeric characters and underscores.')),
+            array('fieldName','nonReserved'),
+            array('modelName, fieldName, attributeLabel', 'required'),
+            array(
+                'modelName','in','range'=>array_keys(X2Model::getModelNames()),'allowEmpty'=>false),
+            array('defaultValue','validDefault'),
+            array('relevance','in','range'=>array_keys(self::searchRelevance())),
+            array('custom, modified, readOnly, searchable, required, uniqueConstraint', 'boolean'),
+            array('fieldName','uniqueFieldName'),
+            array('linkType','length','max'=>250),
+            array('description','length','max'=>500),
+            array('type','length','max'=>20),
+            array('keyType','in','range' => array('MUL','UNI','PRI','FIX','FOR'), 'allowEmpty'=>true),
+            array('keyType','requiredUnique'),
+            array('data','validCustom'),
+            // The following rule is used by search().
+            // Please remove those attributes that should not be searched.
+            array('id, modelName, fieldName, attributeLabel, custom, modified, readOnly, keyType', 'safe', 'on' => 'search'),
+        );
+    }
+    
+    /**
+     * Counts the number of records such that the field is not null.
+     *
+     * @return integer
+     */
+    public function countNonNull() {
+        return Yii::app()->db->createCommand()->
+            select('COUNT(*)')->
+            from(X2Model::model($this->modelName)->tableName())->
+            where(
+                 "{$this->fieldName} IS NOT NULL AND 
+                {$this->fieldName} != :default AND
+                {$this->fieldName} != ''",
+                array(
+                    ':default' => $this->defaultValue
+                )
+            )->queryScalar();
+    }
+
+    public static function getLinkTypes () {
+        return Yii::app()->db->createCommand ("
+            SELECT distinct(modelName)
+            FROM x2_fields
+            WHERE fieldName='nameId'
+            ORDER by modelName ASC
+        ")->queryColumn ();
+    }
 
     /**
      * Legacy function kept for backwards compatibility.
@@ -240,6 +356,12 @@ class Fields extends CActiveRecord {
                 'columnDefinition'=>'VARCHAR(40)',
                 'phpType' => 'string'
             ),
+            'custom'=>array(
+                'title' => Yii::t('admin','Custom'),
+                'validator' => 'safe',
+                'columnDefinition' => 'VARCHAR(255)',
+                'phpType' => 'string'
+            ),
         );
         // No scenario, return all data
         if(empty($scenario)){
@@ -383,6 +505,11 @@ class Fields extends CActiveRecord {
         }
     }
 
+    public static function id ($nameId) {
+        list ($name, $id) = self::nameAndId ($nameId);
+        return $id;
+    }
+
     /**
      * Generates a combination name and id field to uniquely identify the record.
      */
@@ -437,7 +564,7 @@ class Fields extends CActiveRecord {
      * @param string $currencySymbol Optional currency symbol to trim off the string before conversion
      * @param string $percentSymbol Optional percent symbol to trim off the string before conversion
      */
-    public static function strToNumeric($input, $type = 'float'){
+    public static function strToNumeric($input, $type = 'float', $curSym = null){
         $sign = 1;
         // Typecasting in the case that it's not a string
         $inType = gettype($input);
@@ -462,6 +589,9 @@ class Fields extends CActiveRecord {
         }
         $stripSymbols = array_filter(array_values(Yii::app()->params->supportedCurrencySymbols), 'stripSymbols');
 
+        // Strip specified currency symbol
+        if (!is_null($curSym))
+            $stripSymbols[] = $curSym;
         // Just in case "Other" currency used: include that currency's symbol
         $defaultSym = Yii::app()->getLocale()->getCurrencySymbol(Yii::app()->settings->currency);
         if($defaultSym)
@@ -497,6 +627,24 @@ class Fields extends CActiveRecord {
         } else
             return $value;
     }
+
+    /**
+     * Table modification is performed before field update since field should not be saved if
+     * column data type cannot be updated
+     * TODO: place column modification in a transaction with field update
+     */
+    public function beforeSave () {
+        $valid = parent::beforeSave ();
+        if ($valid && $this->_typeChanged) {
+            $table = Yii::app()->db->schema->tables[$this->myTableName];
+            $existing = array_key_exists($this->fieldName, $table->columns) && 
+                $table->columns[$this->fieldName] instanceof CDbColumnSchema;
+            if($existing){ 
+                $valid = $this->modifyColumn();
+            }
+        }
+        return $valid;
+    }
     
     /**
      * Perform the creation of a new database column.
@@ -510,11 +658,12 @@ class Fields extends CActiveRecord {
     public function afterSave(){
         // Does the column already exist?
         $table = Yii::app()->db->schema->tables[$this->myTableName];
-        $existing = array_key_exists($this->fieldName, $table->columns) && $table->columns[$this->fieldName] instanceof CDbColumnSchema;
+        $existing = array_key_exists($this->fieldName, $table->columns) && 
+            $table->columns[$this->fieldName] instanceof CDbColumnSchema;
 
         if(!$existing){ // Going to create the column.
             $this->createColumn();
-        }
+        } 
         if($this->keyType != 'PRI' && $this->keyType != 'FIX'){
             // The key for this column is not primary/hard-coded (managed by
             // X2Engine developers, and cannot be user-modified), so it can
@@ -564,6 +713,7 @@ class Fields extends CActiveRecord {
             'uniqueConstraint' => Yii::t('admin', 'Unique'),
             'defaultValue' => Yii::t('admin', 'Default Value'),
             'keyType' => Yii::t('admin','Key Type'),
+            'data' => Yii::t('admin','Template'),
         );
     }
 
@@ -604,6 +754,31 @@ class Fields extends CActiveRecord {
         }catch(CDbException $e){
             $this->delete(); // If the SQL failed, remove the x2_fields record of it to prevent issues.
         }
+    }
+
+    /**
+     * Modifies the data type of an existing column 
+     */
+    public function modifyColumn () {
+        // Get the column definition.
+        $fieldType = $this->type;
+        $columnDefinitions = Fields::getFieldTypes('columnDefinition');
+
+        if(isset($columnDefinitions[$fieldType])){
+            $fieldType = $columnDefinitions[$fieldType];
+        }else{
+            $fieldType = 'VARCHAR(250)';
+        }
+
+        //Yii::app()->db->createCommand('set sql_mode=STRICT_ALL_TABLES;')->execute();
+        $sql = "ALTER TABLE `{$this->myTableName}` MODIFY COLUMN `{$this->fieldName}` $fieldType";
+        try{
+            Yii::app()->db->createCommand($sql)->execute();
+        }catch(CDbException $e){
+            $this->addError ('type', $e->getMessage ());
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -700,7 +875,7 @@ class Fields extends CActiveRecord {
 
             case 'date':
             case 'dateTime':
-                if(ctype_digit((string) $value))  // must already be a timestamp
+                if(is_numeric ((string) $value))  // must already be a timestamp
                     return $value;
                 $value = $this->type === 'dateTime' ? Formatter::parseDateTime($value) : Formatter::parseDate($value);
                 return $value === false ? null : $value;
@@ -750,40 +925,6 @@ class Fields extends CActiveRecord {
         return array();
     }
 
-    /**
-     * Rules for saving a field.
-     *
-     * See the following MySQL documentation pages for more info on length
-     * restrictions and naming requirements:
-     * http://dev.mysql.com/doc/refman/5.0/en/identifiers.html
-     *
-     * @return array validation rules for model attributes.
-     */
-    public function rules(){
-        // NOTE: you should only define rules for those attributes that
-        // will receive user inputs.
-        return array(
-            array('modelName, attributeLabel', 'length', 'max' => 250),
-            array('fieldName','length','max'=>64), // Max length for column identifiers in MySQL
-            array('fieldName','match','pattern'=>'/^[a-zA-Z]\w+$/','message'=>Yii::t('admin','Field name may only contain alphanumeric characters and underscores.')),
-            array('fieldName','nonReserved'),
-            array('modelName, fieldName, attributeLabel', 'required'),
-            array(
-                'modelName','in','range'=>array_keys(X2Model::getModelNames()),'allowEmpty'=>false),
-            array('defaultValue','validDefault'),
-            array('relevance','in','range'=>array_keys(self::searchRelevance())),
-            array('custom, modified, readOnly, searchable, required, uniqueConstraint', 'boolean'),
-            array('fieldName','uniqueFieldName'),
-            array('linkType','length','max'=>250),
-            array('type','length','max'=>20),
-            array('keyType','in','range' => array('MUL','UNI','PRI','FIX'), 'allowEmpty'=>true),
-            array('keyType','requiredUnique'),
-            // The following rule is used by search().
-            // Please remove those attributes that should not be searched.
-            array('id, modelName, fieldName, attributeLabel, custom, modified, readOnly, keyType', 'safe', 'on' => 'search'),
-        );
-    }
-    
     /**
      * Retrieves a list of models based on the current search/filter conditions.
      * @return CActiveDataProvider the data provider that can return the models based on the search/filter conditions.
@@ -874,6 +1015,54 @@ class Fields extends CActiveRecord {
                 $this->addError($attribute, str_replace($dummyField->attributeLabel, $dummyField->getAttributeLabel($attribute), $error));
             }
         }
+    }
+
+
+    /**
+     * Alter/purify the input for the custom data field.
+     *
+     * @param string $attribute
+     * @param array $params
+     */
+    public function validCustom($attribute,$params = array()) {
+        if($this->type == 'custom') {
+            if($this->linkType == 'formula') {
+                $this->$attribute = trim($this->$attribute);
+                if(strpos($this->$attribute,'=')!==0) {
+                    $this->$attribute = '='.$this->$attribute;
+                }
+            } else if($this->linkType == 'display') {
+               $this->$attribute = self::getPurifier()->purify($this->$attribute);
+            }
+        }
+    }
+
+    /**
+     * Retrieve associated dropdown, if it exists
+     * @return null|Dropdowns
+     */
+    private $_dropdown;
+    public function getDropdown () {
+        if ($this->type !== 'dropdown') return null;
+        if (!isset ($this->_dropdown)) {
+            $this->_dropdown = Dropdowns::model ()->findByPk ($this->linkType);
+        }
+        return $this->_dropdown;
+    }
+
+    public static function getFieldsOfModelsWithFieldLevelPermissions () {
+        $fields = Fields::model()
+            ->findAll(array('order' => 'modelName ASC'));
+        $filtered = array ();
+        foreach ($fields as $field) {
+            $modelClass = $field->modelName;
+            if (class_exists ($modelClass) && 
+                $modelClass::model ()->supportsFieldLevelPermissions) { 
+
+                $filtered[] = $field;
+            }
+        }
+        return $filtered;
     }
 
 }

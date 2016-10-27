@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,46 +33,42 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-$profile = Profile::model()->findByPk(Yii::app()->user->id);
-$this->showActions = $profile->showActions;
+if (isset ($showActions)) {
+    $this->showActions = $showActions;
+    Yii::app()->params->profile->showActions = $this->showActions;
+    Yii::app()->params->profile->save ();
+} else {
+    $this->showActions = Yii::app()->params->profile->showActions;
+}
 
 // if user hasn't saved a type of action to show, show uncomple actions by default
 if(!$this->showActions) 
     $this->showActions = 'uncomplete';
-if($this->showActions == 'uncomplete')
-	$model->complete = 'NO';
+if($this->showActions == 'uncomplete' || $this->showActions == 'overdue')
+	$model->complete = 'No';
 else if ($this->showActions == 'complete')
-	$model->complete = 'YES';
+	$model->complete = 'Yes';
 else
 	$model->complete = '';
 
-$menuItems = array(
-	array('label'=>Yii::t('actions','Today\'s Actions'),'url'=>array('index')),
-	array('label'=>Yii::t('actions','All My Actions'),'url'=>array('viewAll')),
-	array('label'=>Yii::t('actions','Everyone\'s Actions'),'url'=>array('viewGroup')),
-	array('label'=>Yii::t('actions','Create'),'url'=>array('create')),
-        array('label'=>Yii::t('actions', 'Import Actions'), 'url'=>array('admin/importModels', 'model'=>'Actions'), 'visible'=>Yii::app()->params->isAdmin),
-        array('label'=>Yii::t('actions', 'Export Actions'), 'url'=>array('admin/exportModels', 'model'=>'Actions'), 'visible'=>Yii::app()->params->isAdmin),
+
+$menuOptions = array(
+    'todays', 'my', 'everyones', 'create', 'import', 'export',
 );
-
 if($this->route === 'actions/actions/index') {
-	$heading = Yii::t('actions','Today\'s Actions');
+	$heading = Yii::t('actions','Today\'s {module}', array('{module}'=>Modules::displayName()));
 	$dataProvider=$model->searchIndex();
-	unset($menuItems[0]['url']);
-
 } elseif($this->route === 'actions/actions/viewAll') {
-	$heading = Yii::t('actions','All My Actions');
+	$heading = Yii::t('actions','All My {module}', array('{module}'=>Modules::displayName()));
 	$dataProvider=$model->searchAll();
-	unset($menuItems[1]['url']);
 } else {
-	$heading = Yii::t('actions','Everyone\'s Actions');
+	$heading = Yii::t('actions','Everyone\'s {module}', array('{module}'=>Modules::displayName()));
 	$dataProvider=$model->searchAllGroup();
-	unset($menuItems[2]['url']);
 }
+$this->insertMenu($menuOptions);
 
-$this->actionMenu = $this->formatMenu($menuItems);
 
 // functions for completeing/uncompleting multiple selected actions
 Yii::app()->clientScript->registerScript('oldActionsIndexScript', "
@@ -83,10 +80,15 @@ x2.actionFrames.afterActionUpdate = (function () {
     };
 }) ();
 function toggleShowActions() {
-	var show = $('#dropdown-show-actions').val(); // value of dropdown (which actions to show)
-	$.post(".json_encode(Yii::app()->controller->createUrl('/actions/actions/saveShowActions')).", {ShowActions: show}, function() {
-		$.fn.yiiGridView.update('actions-grid', {data: $.param($('#actions-grid input[name=\"Actions[complete]\"]'))});
-	});
+    var show = $('#dropdown-show-actions').val(); // value of dropdown (which actions to show)
+    $.post(
+        ".json_encode(Yii::app()->controller->createUrl('/actions/actions/saveShowActions')).",
+        {ShowActions: show}, function() {
+            $.fn.yiiGridView.update('actions-grid', {
+                data: $.param($('#actions-grid input[name=\"Actions[complete]\"]'))
+            });
+        }
+    );
 }
 ",CClientScript::POS_END);
 
@@ -104,7 +106,7 @@ $this->widget('X2GridView', array(
         '/css/gridview',
     'enableQtips' => true,
     'qtipManager' => array (
-        'X2QtipManager',
+        'X2GridViewQtipManager',
         'loadingText'=> addslashes(Yii::t('app','loading...')),
         'qtipSelector' => ".contact-name"
     ),
@@ -119,11 +121,15 @@ $this->widget('X2GridView', array(
             Yii::t('actions','Switch to List'),
             array('index','toggleView'=>1),
             array('class'=>'x2-button')
-        ).'{filterHint}'.'{summary}{topPager}'.
+        ).'{filterHint}'.'{massActionButtons}'.'{summary}{topPager}'.
         '{items}{pager}',
     'fixedHeader' => true,
 	'dataProvider'=>$dataProvider,
-    'massActions' => array ('delete', 'tag', 'updateField', 'completeAction', 'uncompleteAction'),
+    'massActions' => array(
+        'MassDelete', 'MassTag', 'MassTagRemove', 'MassUpdateFields', 
+        'MassAddRelationship', 
+        'MassCompleteAction', 'MassUncompleteAction'
+    ),
 	// 'enableSorting'=>false,
 	// 'model'=>$model,
 	'filter'=>$model,
@@ -143,33 +149,29 @@ $this->widget('X2GridView', array(
 	),
 	'specialColumns'=>array(
 		'actionDescription'=>array(
-            'header'=>Yii::t('actions','Action Description'),
+            'header'=>Yii::t('actions','{action} Description', array('{action}'=>Modules::displayName(false))),
 			'name'=>'actionDescription',
 			'value'=>
                 'CHtml::link(
-                    ($data->type=="attachment") ? 
-                        Media::attachmentActionText($data->actionDescription) : 
-                        CHtml::encode(Formatter::trimText($data->actionDescription)),
+                    ($data->actionDescription === "" ? Yii::t("actions", "View {action}", array("{action}"=>Modules::displayName(false, "Actions"))) :
+                        (($data->type=="attachment") ? 
+                            Media::attachmentActionText($data) : 
+                            CHtml::encode(Formatter::trimText($data->actionDescription)))),
                     array("view","id"=>$data->id))',
 			'type'=>'raw',
             'filter' => false,
+            'sortable' => false,
 		),
 		'associationName'=>array(
 			'name'=>'associationName',
 			'header'=>Yii::t('actions','Association Name'),
 			'value'=>
                 'strcasecmp($data->associationName,"None") == 0 ? 
-                    Yii::t("app","None") : 
-                    CHtml::link(
-                        $data->associationName,
-                        array("/".$data->associationType . (($data->associationType === "product") ? "s" : "") .
-                              "/".$data->associationType . (($data->associationType === "product") ? "s" : "") .
-                              "/".$data->associationId),
-                        array("class"=>($data->associationType=="contacts" ? 
-                            "contact-name" : null)))',
+                    Yii::t("app","None") : $data->getAssociationLink()',
 			'type'=>'raw',
 		),
 	),
 	'enableControls'=>true,
 	'fullscreen'=>true,
+    'enableSelectAllOnAllPages' => false,
 ));

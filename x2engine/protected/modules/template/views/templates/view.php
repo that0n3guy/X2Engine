@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,9 +33,11 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
-Yii::app()->clientScript->registerCss('contactRecordViewCss',"
+$layoutManager = $this->widget ('RecordViewLayoutManager', array ('staticLayout' => false));
+
+Yii::app()->clientScript->registerCss('contactRecordViewCss', "
 
 #content {
     background: none !important;
@@ -43,35 +46,39 @@ Yii::app()->clientScript->registerCss('contactRecordViewCss',"
 ");
 
 Yii::app()->clientScript->registerResponsiveCssFile(
-    Yii::app()->theme->baseUrl.'/css/responsiveRecordView.css');
+        Yii::app()->theme->baseUrl . '/css/responsiveRecordView.css');
 
 include("protected/modules/templates/templatesConfig.php");
 
+$actionMenuViewItem = RecordViewLayoutManager::getViewActionMenuListItem ($model->id);
+if (isset ($actionMenuViewItem['url'])) unset ($actionMenuViewItem['url']);
+
 $this->actionMenu = $this->formatMenu(array(
-	array('label'=>Yii::t('module','{X} List',array('{X}'=>$moduleConfig['recordName'])), 'url'=>array('index')),
-	array('label'=>Yii::t('module','Create {X}',array('{X}'=>$moduleConfig['recordName'])), 'url'=>array('create')),
-	array('label'=>Yii::t('module','View {X}',array('{X}'=>$moduleConfig['recordName']))),
-	array('label'=>Yii::t('module','Edit {X}',array('{X}'=>$moduleConfig['recordName'])), 'url'=>array('update', 'id'=>$model->id)),
-	array('label'=>Yii::t('module','Delete {X}',array('{X}'=>$moduleConfig['recordName'])), 'url'=>'#', 'linkOptions'=>array('submit'=>array('delete','id'=>$model->id),'confirm'=>Yii::t('app','Are you sure you want to delete this item?'))),
+    array('label' => Yii::t('module', '{X} List', array('{X}' => Modules::itemDisplayName())), 'url' => array('index')),
+    array('label' => Yii::t('module', 'Create {X}', array('{X}' => Modules::itemDisplayName())), 'url' => array('create')),
+    $actionMenuViewItem,
+    array('label' => Yii::t('module', 'Edit {X}', array('{X}' => Modules::itemDisplayName())), 'url' => array('update', 'id' => $model->id)),
+    array('label' => Yii::t('module', 'Delete {X}', array('{X}' => Modules::itemDisplayName())), 'url' => '#', 'linkOptions' => array('submit' => array('delete', 'id' => $model->id), 'confirm' => Yii::t('app', 'Are you sure you want to delete this item?'))),
     array(
         'label' => Yii::t('app', 'Send Email'), 'url' => '#',
         'linkOptions' => array('onclick' => 'toggleEmailForm(); return false;')),
-    array('label' => Yii::t('app', 'Attach A File/Photo'), 'url' => '#', 'linkOptions' => array('onclick' => 'toggleAttachmentForm(); return false;')),
+    ModelFileUploader::menuLink(),
     array('label' => Yii::t('quotes', 'Quotes/Invoices'), 'url' => 'javascript:void(0)', 'linkOptions' => array('onclick' => 'x2.inlineQuotes.toggle(); return false;')),
     array(
         'label' => Yii::t('app', 'Print Record'),
         'url' => '#',
-        'linkOptions' => array (
-            'onClick'=>"window.open('".
-                Yii::app()->createUrl('/site/printRecord', array (
-                    'modelClass' => "Templates",
-                    'id' => $model->id,
-                    'pageTitle' => 
-                        Yii::t('app', '{X}', array ('{X}' => $moduleConfig['recordName'])).': '.$model->name
-                ))."');"
+        'linkOptions' => array(
+            'onClick' => "window.open('" .
+            Yii::app()->createUrl('/site/printRecord', array(
+                'modelClass' => "Templates",
+                'id' => $model->id,
+                'pageTitle' =>
+                Yii::t('app', '{X}', array('{X}' => Modules::itemDisplayName())) . ': ' . $model->name
+            )) . "');"
         ),
     ),
-));
+    RecordViewLayoutManager::getEditLayoutActionMenuListItem (),
+), array ('X2Model' => $model));
 
 $modelType = json_encode("Templates");
 $modelId = json_encode($model->id);
@@ -85,80 +92,63 @@ $(function() {
 <div class="page-title-placeholder"></div>
 <div class="page-title-fixed-outer">
     <div class="page-title-fixed-inner">
-<div class="page-title icon">
-    <h2>
-        <?php 
-        echo Yii::t('module','View {X}',array('{X}'=>$moduleConfig['recordName'])); ?>: <?php 
-        echo $model->name; 
-        ?>
-    </h2>
-    <?php
-    echo CHtml::link(
-        '<span></span>', $this->createUrl('update', array('id' => $model->id)),
-        array(
-            'class' => 'x2-button icon edit right',
-            'title' => Yii::t('app', 'Edit {X}', array('{X}'=>$moduleConfig['recordName'])),
-        )
-    );
-    echo CHtml::link(
-        '<img src="'.Yii::app()->request->baseUrl.'/themes/x2engine/images/icons/email_button.png'.
-            '"></img>', '#',
-        array(
-            'class' => 'x2-button icon right email',
-            'title' => Yii::t('app', 'Open email form'),
-            'onclick' => 'toggleEmailForm(); return false;'
-        )
-    );
-    ?>
+        <div class="page-title templates">
+            <h2>
+                <?php echo Yii::t('module', 'View {X}', array('{X}' => Modules::itemDisplayName())); ?>: <?php
+                echo $model->renderAttribute ('name');
+                ?>
+            </h2>
+            <?php
+            echo X2Html::editRecordButton($model);
+            echo X2Html::emailFormButton();
+            echo X2Html::inlineEditButtons();
+            ?>
+        </div>
+    </div>
 </div>
-</div>
-</div>
-<div id="main-column" class="half-width">
-<?php $this->renderPartial('application.components.views._detailView',array('model'=>$model, 'modelName'=>'templates')); ?>
+<div id="main-column" <?php echo $layoutManager->columnWidthStyleAttr (1); ?>>
+            <?php 
+            $this->widget ('DetailView', array(
+                'model' => $model
+            ));
+            //$this->renderPartial('application.components.views.@DETAILVIEW', array('model' => $model, 'modelName' => 'templates')); ?>
 
 <?php
-
-$this->widget('InlineEmailForm',
-	array(
-		'attributes'=>array(
-			'to'=>implode (', ', $model->getRelatedContactsEmails ()),
-			'modelName'=> get_class ($model),
-			'modelId'=>$model->id,
-		),
-		'insertableAttributes' => 
-            array(
-                Yii::t('module','{modelName} Attributes',
-                    array ('{modelName}' => get_class ($model))) => 
-                        $model->getEmailInsertableAttrs ($model)
-            ),
-		'startHidden'=>true,
-	)
+$this->widget('InlineEmailForm', array(
+    'attributes' => array(
+        'to' => implode(', ', $model->getRelatedContactsEmails()),
+        'modelName' => get_class($model),
+        'modelId' => $model->id,
+    ),
+    'insertableAttributes' =>
+    array(
+        Yii::t('module', '{modelName} Attributes', array('{modelName}' => get_class($model))) =>
+        $model->getEmailInsertableAttrs($model)
+    ),
+    'startHidden' => true,
+        )
 );
 
-$this->widget('Attachments', array('associationType' => 'templates', 'associationId' => $model->id, 'startHidden' => true)); 
 
-$this->widget('X2WidgetList', array('block'=>'center', 'model'=>$model, 'modelType'=>'Templates'));
+$this->widget ('ModelFileUploader', array(
+    'associationType' => 'templates',
+    'associationId' => $model->id,
+));
+
 ?>
-<div id="quote-form-wrapper">
+    <div id="quote-form-wrapper">
     <?php
     $this->widget('InlineQuotes', array(
         'startHidden' => true,
         'contactId' => $model->id,
-        'modelName' => X2Model::getModuleModelName ()
+        'modelName' => X2Model::getModuleModelName()
     ));
     ?>
+    </div>
 </div>
-</div>
-<div class="history half-width">
 <?php
-$this->widget('Publisher',
-	array(
-		'associationType'=>'templates',
-		'associationId'=>$model->id,
-		'assignedTo'=>Yii::app()->user->getName(),
-		'calendar' => false
-	)
-);
-$this->widget('History',array('associationType'=>'templates','associationId'=>$model->id));
-?>
-</div>
+$this->widget('X2WidgetList', 
+    array(
+        'layoutManager' => $layoutManager,
+        'model' => $model,
+    ));

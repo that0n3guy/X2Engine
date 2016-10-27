@@ -1,7 +1,7 @@
 <?php
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -21,7 +21,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -32,7 +33,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 Yii::app()->clientScript->registerCss('attachmentsCss',"
 
@@ -43,87 +44,6 @@ Yii::app()->clientScript->registerCss('attachmentsCss',"
 
 ");
 
-$script = "
-x2.attachments = (function () {
-
-function X2Attachments (argsDict) {
-    argsDict = typeof argsDict === 'undefined' ? {} : argsDict;
-    var defaultArgs = {
-    };
-    auxlib.applyArgs (this, defaultArgs, argsDict);
-
-    // array with disallowed extensions
-    this._illegal_ext = ['exe','bat','dmg','js','jar','swf','php','pl','cgi','htaccess','py'];	
-    this._fileIsUploaded = false;
-    this._submitButtonSelector = '#submitAttach';
-}
-
-/**
- * @return bool True if a file with a valid extension has been uploaded, false otherwise
- */
-X2Attachments.prototype.fileIsUploaded = function () {
-    return this._fileIsUploaded;
-};
-
-X2Attachments.prototype.checkName = function (evt) {
-    var elem = evt;
-
-    var re = this.checkFileName (evt);
-
-	// if re is 1, the extension isn't illegal
-	if (re) {
-		// enable submit
-        this._fileIsUploaded = true;
-		$(this._submitButtonSelector).removeAttr('disabled');
-	} else {
-        this._fileIsUploaded = false;
-		// delete the file name, disable Submit, Alert message
-		elem.value = '';
-		$(this._submitButtonSelector).attr('disabled','disabled');
-
-		var filenameError = ".json_encode(Yii::t('app', '"{X}" is not an allowed filetype.')).";
-		alert(filenameError.replace('{X}',ar_ext));
-	}
-};
-
-X2Attachments.prototype.checkFileName = function (evt) {
-    var elem = evt.target;
-
-	// - www.coursesweb.net
-	// get the file name and split it to separe the extension
-	var name = elem.value;
-	var ar_name = name.split('.');
-
-	var ar_ext = ar_name[ar_name.length - 1].toLowerCase();
-
-	// check the file extension
-	var re = 1;
-	for(var i in this._illegal_ext) {
-		if(this._illegal_ext[i] == ar_ext) {
-			re = 0;
-			break;
-		}
-	}
-
-    return re === 1;
-};
-
-return new X2Attachments ();
-
-}) (); ";
-
-if (!$mobile) {
-    Yii::app()->clientScript->registerScript(
-        'uploadExtensionCheck', $script, CClientScript::POS_HEAD);
-} else {
-?>
-<script>
-<?php
-echo $script;
-?>
-</script>
-<?php
-}
 ?>
 <div id="attachment-form-top"></div>
 <div id="attachment-form"<?php if($startHidden) echo ' style="display:none;"'; ?>>

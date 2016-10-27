@@ -1,6 +1,6 @@
-/*****************************************************************************************
- * X2Engine Open Source Edition is a customer relationship management program developed by
- * X2Engine, Inc. Copyright (C) 2011-2014 X2Engine Inc.
+/***********************************************************************************
+ * X2CRM is a customer relationship management program developed by
+ * X2Engine, Inc. Copyright (C) 2011-2016 X2Engine Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License version 3 as published by the
@@ -20,7 +20,8 @@
  * 02110-1301 USA.
  * 
  * You can contact X2Engine, Inc. P.O. Box 66752, Scotts Valley,
- * California 95067, USA. or at email address contact@x2engine.com.
+ * California 95067, USA. on our website at www.x2crm.com, or at our
+ * email address: contact@x2engine.com.
  * 
  * The interactive user interfaces in modified source and object code versions
  * of this program must display Appropriate Legal Notices, as required under
@@ -31,7 +32,7 @@
  * X2Engine" logo. If the display of the logo is not reasonably feasible for
  * technical reasons, the Appropriate Legal Notices must display the words
  * "Powered by X2Engine".
- *****************************************************************************************/
+ **********************************************************************************/
 
 /**
  * Manages behavior of the doc viewer profile widget
@@ -44,20 +45,16 @@
  */
 function DocViewerProfileWidget (argsDict) {
     var defaultArgs = {
-        translations: [],
         getItemsUrl: '', // used to populate autocomplete
         getDocUrl: '', // url to request a doc
         docId: '', // the id of the doc currently being viewed
-        editDocUrl: '', // url to edit a doc
-        canEdit: false, // has permission to edit current doc
-        checkEditPermissionUrl: ''
     };
     auxlib.applyArgs (this, defaultArgs, argsDict);
 
 	SortableWidget.call (this, argsDict);	
 }
 
-DocViewerProfileWidget.prototype = auxlib.create (SortableWidget.prototype);
+DocViewerProfileWidget.prototype = auxlib.create (IframeWidget.prototype);
 
 
 /*
@@ -72,28 +69,12 @@ Private static methods
 Public instance methods
 */
 
-/**
- * Hide iframe to prevent lag 
- */
-DocViewerProfileWidget.prototype.onDragStart = function () {
-    // prevent default text from shifting when iframe is hidden
-    this.contentContainer.height (this.contentContainer.height ());
-
-    this._iframeElem.hide ();
-    SortableWidget.prototype.onDragStart.call (this);
-};
-
-DocViewerProfileWidget.prototype.onDragStop = function () {
-    this.contentContainer.height ('');
-    this._iframeElem.show ();
-    SortableWidget.prototype.onDragStop.call (this);
-};
-
 /*
 Private instance methods
 */
 
 DocViewerProfileWidget.prototype._setUpDefaultTextBehavior = function () {
+    if (this.docId !== '') return;
     var that = this;
     this.element.find ('.default-text-container a').click (function (evt) {
         evt.preventDefault ();
@@ -145,7 +126,6 @@ DocViewerProfileWidget.prototype._setUpSelectADocBehavior = function () {
                             that.docId = selectedDocId;
                             that.changeLabel (selectedDocLabel);
                             that.element.find ('.default-text-container').remove ();
-                            that._checkEditPermission ();
                         } else {
                             auxlib.createErrorFeedbackBox ({
                                 prevElem: $(that._selectADocDialog).find ('.selected-doc'),
@@ -195,69 +175,9 @@ DocViewerProfileWidget.prototype._setUpSelectADocBehavior = function () {
 };
 
 /**
- * Update iframe height on widget resize 
- */
-DocViewerProfileWidget.prototype._resizeEvent = function () {
-    var that = this; 
-    that._iframeElem.attr ('height', that.contentContainer.height ());
-};
-
-/**
- * Save iframe height on resize stop 
- */
-DocViewerProfileWidget.prototype._afterStop = function () {
-    var that = this; 
-    that.setProperty ('height', that._iframeElem.attr ('height'));
-};
-
-/**
- * Places a div over the iframe so that it doesn't interfere with mouse dragging 
- */
-DocViewerProfileWidget.prototype._turnOnSortingMode = function () {
-    this._iframeOverlay = $('<div>', {
-        width: this.contentContainer.width (),
-        height: this.contentContainer.height (),
-        css: {
-            position: 'absolute',
-            'z-index': 100
-        }
-    });
-    this.contentContainer.append (this._iframeOverlay);
-    this._iframeOverlay.position ({
-        my: 'left top',
-        at: 'left top',
-        of: this.contentContainer
-    });
-};
-
-/**
- * removes iframe overlay created by _turnOnSortingMode ()
- */
-DocViewerProfileWidget.prototype._turnOffSortingMode = function () {
-    this._iframeOverlay.remove ();
-};
-
-DocViewerProfileWidget.prototype._setUpEditBehavior = function () {
-    var that = this; 
-    $(this.element).find ('.widget-edit-button').unbind ('click.widgetEdit');
-    $(this.element).find ('.widget-edit-button').bind ('click.widgetEdit', function (evt) {
-        evt.preventDefault ();
-        window.location = that.editDocUrl + '?id=' + that.docId;
-        return false;
-    });
-};
-
-/**
  * Detects presence of UI elements (and sets properties accordingly), calls their setup methods
  */
 DocViewerProfileWidget.prototype._callUIElementSetupMethods = function () {
-    if ($(this.element).find ('.widget-edit-button').length) {
-        this._setUpEditBehavior ();
-        this._editBehaviorEnabled = true;
-    } else {
-        this._editBehaviorEnabled = false;
-    }
-
     SortableWidget.prototype._callUIElementSetupMethods.call (this);
 };
 
@@ -273,11 +193,7 @@ DocViewerProfileWidget.prototype._setUpTitleBarBehavior = function () {
         $(this.element).mouseover (function () {
             that._cursorInWidget = true;
             $(that.element).find ('.submenu-title-bar .x2-icon-button').each (function () {
-                if ($(this).hasClass ('widget-edit-button') && !that.canEdit) {
-                    return true;
-                } else {
-                    $(this).show ();
-                }
+                $(this).show ();
             });
         });
         $(this.element).mouseleave (function () {
@@ -288,47 +204,20 @@ DocViewerProfileWidget.prototype._setUpTitleBarBehavior = function () {
             }
         });
     }
-};
-
-DocViewerProfileWidget.prototype._hideShowEditButton = function () {
-    if (this.canEdit && this._cursorInWidget)
-        this._editButton.show ();
-    else
-        this._editButton.hide ();
-};
-
-DocViewerProfileWidget.prototype._checkEditPermission = function () {
-    var that = this; 
-    $.ajax ({
-        method: 'GET',
-        url: this.checkEditPermissionUrl,
-        data: {
-            id: this.docId
-        },
-        success: function (data) {
-            if (data === 'true') {
-                that.canEdit = true;
-            } else {
-                that.canEdit = false;
-            }
-            that._hideShowEditButton ();
-        }
-    });
+    if (this.element.find ('.delete-widget-button').length) {
+        this._setUpWidgetDeletion ();
+    }
 };
 
 DocViewerProfileWidget.prototype._init = function () {
     SortableWidget.prototype._init.call (this);
     this._selectADocButtonSelector = this.elementSelector + ' .select-a-document-button';
     this._selectADocButton = $(this._selectADocButtonSelector);
-    this._selectADocDialog = $('#select-a-document-dialog');
-    this._editButton = $(this.element).find ('.widget-edit-button');
+    this._selectADocDialog = $('#select-a-document-dialog-' + this.widgetUID);
     this._iframeElem = this.contentContainer.find ('iframe');
     this._iframeSrc = '';
     this._setUpSelectADocBehavior ();
+    this._setUpDefaultTextBehavior ();
     this.element.find ('.default-text-container').show ();
 
-    if (this.docId === '') {
-        this._setUpDefaultTextBehavior ();
-    }
 };
-
